@@ -280,6 +280,33 @@ app.get('/api/calendar', async (req, res) => {
 const DIST_PATH = path.join(process.cwd(), 'dist');
 const isProduction = process.env.NODE_ENV === 'production';
 
+// Seed endpoint - replaces all data
+app.post('/api/seed', async (req, res) => {
+  try {
+    const { projects, team } = req.body
+    
+    // Clear and insert projects
+    if (projects) {
+      await run('DELETE FROM projects')
+      for (const p of projects) {
+        await run(`INSERT INTO projects (id, name, status, dueDate, assignee, url, description, businessLine, deckLink, prdLink, briefLink, startDate, endDate, timeline, deckName, prdName, briefName, figmaLink, customLinks, designers) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [p.id, p.name, p.status || 'active', p.dueDate || null, p.assignee || null, p.url || '', p.description || '', p.businessLine || null, p.deckLink || '', p.prdLink || '', p.briefLink || '', p.startDate || null, p.endDate || null, JSON.stringify(p.timeline || []), p.deckName || '', p.prdName || '', p.briefName || '', p.figmaLink || '', JSON.stringify(p.customLinks || []), JSON.stringify(p.designers || [])])
+      }
+    }
+    
+    // Clear and insert team
+    if (team) {
+      await run('DELETE FROM team')
+      for (const t of team) {
+        await run(`INSERT INTO team (id, name, role, brands, status, slack, email, avatar, timeOff) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [t.id, t.name, t.role || '', JSON.stringify(t.brands || []), t.status || 'offline', t.slack || '', t.email || '', t.avatar || '', JSON.stringify(t.timeOff || [])])
+      }
+    }
+    
+    res.json({ success: true })
+  } catch (e) { res.status(500).json({error: e.message}); }
+})
+
 if (isProduction) {
   try {
     app.use(express.static(DIST_PATH));
