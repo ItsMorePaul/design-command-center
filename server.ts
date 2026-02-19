@@ -10,10 +10,17 @@ const DB_PATH = process.env.DB_PATH || path.join(process.cwd(), 'data', 'shared.
 app.use(cors());
 app.use(express.json());
 
-const db = new sqlite3.Database(DB_PATH);
+let db;
+try {
+  db = new sqlite3.Database(DB_PATH);
+  console.log('Database connected:', DB_PATH);
+} catch (e) {
+  console.error('Database connection error:', e);
+}
 
 // Helper to run SQL
 const run = (sql, params = []) => new Promise((resolve, reject) => {
+  if (!db) return reject(new Error('Database not connected'));
   db.run(sql, params, function(err) {
     if (err) reject(err);
     else resolve(this);
@@ -21,6 +28,7 @@ const run = (sql, params = []) => new Promise((resolve, reject) => {
 });
 
 const all = (sql, params = []) => new Promise((resolve, reject) => {
+  if (!db) return reject(new Error('Database not connected'));
   db.all(sql, params, (err, rows) => {
     if (err) reject(err);
     else resolve(rows);
@@ -268,14 +276,21 @@ app.get('/api/calendar', async (req, res) => {
 
 // Serve static files in production
 const DIST_PATH = path.join(process.cwd(), 'dist');
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(DIST_PATH));
-  app.get('(.*)', (req, res) => {
-    res.sendFile(path.join(DIST_PATH, 'index.html'));
-  });
+const isProduction = process.env.NODE_ENV === 'production';
+
+if (isProduction) {
+  try {
+    app.use(express.static(DIST_PATH));
+    app.get('(.*)', (req, res) => {
+      res.sendFile(path.join(DIST_PATH, 'index.html'));
+    });
+  } catch (e) {
+    console.error('Error serving static files:', e);
+  }
 }
 
 app.listen(PORT, () => {
   console.log(`API server running on http://localhost:${PORT}`);
   console.log(`Database: ${DB_PATH}`);
+  console.log(`Production mode: ${isProduction}`);
 });
