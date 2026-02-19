@@ -914,6 +914,12 @@
     min-width: 0;
     overflow: hidden;
     padding: 0.15rem;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  .day-cell:active {
+    background: rgba(99, 102, 241, 0.15);
   }
   
   .day-number {
