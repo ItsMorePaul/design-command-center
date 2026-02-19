@@ -220,34 +220,44 @@ function App() {
   }
 
   // Version tracking
-  const [siteVersion, setSiteVersion] = useState(() => {
-    const saved = localStorage.getItem('dcc-site-version')
-    return saved ? JSON.parse(saved) : { version: 1, builtAt: new Date().toISOString() }
-  })
-  const [dbVersion, setDbVersion] = useState(() => {
-    const saved = localStorage.getItem('dcc-db-version')
-    return saved ? JSON.parse(saved) : { version: 1, savedAt: new Date().toISOString() }
-  })
+  const [siteVersion, setSiteVersion] = useState({ version: 1, builtAt: new Date().toISOString() })
+  const [dbVersion, setDbVersion] = useState({ version: 1, savedAt: new Date().toISOString() })
   
-  // Update DB version on data save
-  const updateDbVersion = () => {
-    const newVersion = { version: dbVersion.version + 1, savedAt: new Date().toISOString() }
-    setDbVersion(newVersion)
-    localStorage.setItem('dcc-db-version', JSON.stringify(newVersion))
+  // Update DB version on server when data saves
+  const updateDbVersion = async () => {
+    try {
+      const res = await fetch('/api/versions/db', { method: 'POST' })
+      const data = await res.json()
+      setDbVersion({ version: data.db_version, savedAt: data.updated_at })
+    } catch (e) {
+      console.error('Failed to update DB version:', e)
+    }
   }
   
-  // Increment site version on each page load (simulates code build)
-  useEffect(() => {
-    const currentBuild = localStorage.getItem('dcc-site-build')
-    const now = new Date().toISOString()
-    const nowMs = Date.now()
-    // If last build was > 5 minutes ago, treat as new build
-    if (!currentBuild || nowMs - parseInt(currentBuild) > 5 * 60 * 1000) {
-      const newVersion = { version: siteVersion.version + 1, builtAt: now }
-      setSiteVersion(newVersion)
-      localStorage.setItem('dcc-site-version', JSON.stringify(newVersion))
-      localStorage.setItem('dcc-site-build', nowMs.toString())
+  // Increment site version (called manually or on deploy)
+  const incrementSiteVersion = async () => {
+    try {
+      const res = await fetch('/api/versions/site', { method: 'POST' })
+      const data = await res.json()
+      setSiteVersion({ version: data.site_version, builtAt: data.updated_at })
+    } catch (e) {
+      console.error('Failed to update site version:', e)
     }
+  }
+
+  // Load versions from server on mount
+  useEffect(() => {
+    const loadVersions = async () => {
+      try {
+        const res = await fetch('/api/versions')
+        const data = await res.json()
+        setSiteVersion({ version: data.site_version || 1, builtAt: data.updated_at || new Date().toISOString() })
+        setDbVersion({ version: data.db_version || 1, savedAt: data.updated_at || new Date().toISOString() })
+      } catch (e) {
+        console.error('Failed to load versions:', e)
+      }
+    }
+    loadVersions()
   }, [])
 
   // Load initial data from API
@@ -844,15 +854,15 @@ function App() {
 
         <div className="sidebar-footer">
           <div className="version-info">
-            <div className="version-row">
+            <div className="version-row" onClick={incrementSiteVersion} style={{ cursor: 'pointer' }} title="Click to increment site version">
               <span className="version-label">Site</span>
               <span className="version-num">v{siteVersion.version}</span>
-              <span className="version-time">{new Date(siteVersion.builtAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}</span>
+              <span className="version-time">{siteVersion.builtAt ? new Date(siteVersion.builtAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' }) : '-'}</span>
             </div>
             <div className="version-row">
               <span className="version-label">DB</span>
               <span className="version-num">v{dbVersion.version}</span>
-              <span className="version-time">{new Date(dbVersion.savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'short' })}</span>
+              <span className="version-time">{dbVersion.savedAt ? new Date(dbVersion.savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'short' }) : '-'}</span>
             </div>
           </div>
         </div>

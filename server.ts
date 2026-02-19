@@ -319,6 +319,50 @@ if (isProduction) {
   }
 }
 
+// ============ VERSION TRACKING ============
+const VERSION_KEY = 'dcc_versions'
+
+// Initialize versions in DB if not exist
+const initVersions = async () => {
+  try {
+    const existing = await get("SELECT * FROM app_versions WHERE key = ?", [VERSION_KEY])
+    if (!existing) {
+      await run("INSERT INTO app_versions (key, site_version, db_version, updated_at) VALUES (?, 1, 1, datetime('now'))", [VERSION_KEY])
+    }
+  } catch (e) {
+    console.log('Version init:', e.message)
+  }
+}
+
+// Ensure table exists
+run("CREATE TABLE IF NOT EXISTS app_versions (key TEXT PRIMARY KEY, site_version INTEGER DEFAULT 1, db_version INTEGER DEFAULT 1, updated_at TEXT)").then(() => initVersions())
+
+// Get versions
+app.get('/api/versions', async (req, res) => {
+  try {
+    const versions = await get("SELECT * FROM app_versions WHERE key = ?", [VERSION_KEY])
+    res.json(versions || { site_version: 1, db_version: 1 })
+  } catch (e) { res.status(500).json({error: e.message}); }
+})
+
+// Update site version
+app.post('/api/versions/site', async (req, res) => {
+  try {
+    await run("UPDATE app_versions SET site_version = site_version + 1, updated_at = datetime('now') WHERE key = ?", [VERSION_KEY])
+    const versions = await get("SELECT * FROM app_versions WHERE key = ?", [VERSION_KEY])
+    res.json(versions)
+  } catch (e) { res.status(500).json({error: e.message}); }
+})
+
+// Update DB version
+app.post('/api/versions/db', async (req, res) => {
+  try {
+    await run("UPDATE app_versions SET db_version = db_version + 1, updated_at = datetime('now') WHERE key = ?", [VERSION_KEY])
+    const versions = await get("SELECT * FROM app_versions WHERE key = ?", [VERSION_KEY])
+    res.json(versions)
+  } catch (e) { res.status(500).json({error: e.message}); }
+})
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`API server running on http://localhost:${PORT}`);
   console.log(`Database: ${DB_PATH}`);
