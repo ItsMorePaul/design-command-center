@@ -364,8 +364,9 @@ const initVersions = async () => {
     const existing = await get("SELECT * FROM app_versions WHERE key = ?", [VERSION_KEY])
     if (!existing) {
       const { versionNumber, versionTime } = getCurrentVersionParts()
-      await run("INSERT INTO app_versions (key, site_version, site_time, db_version, db_time, updated_at) VALUES (?, ?, ?, ?, ?, datetime('now'))", 
-        [VERSION_KEY, versionNumber, versionTime, versionNumber, versionTime])
+      const commit = getGitCommit()
+      await run("INSERT INTO app_versions (key, site_version, site_time, db_version, db_time, site_commit, updated_at) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))", 
+        [VERSION_KEY, versionNumber, versionTime, versionNumber, versionTime, commit])
     }
   } catch (e) {
     console.log('Version init:', e.message)
@@ -373,21 +374,33 @@ const initVersions = async () => {
 }
 
 // Ensure table exists
-run("CREATE TABLE IF NOT EXISTS app_versions (key TEXT PRIMARY KEY, site_version TEXT, site_time TEXT, db_version TEXT, db_time TEXT, updated_at TEXT)").then(() => initVersions())
+run("CREATE TABLE IF NOT EXISTS app_versions (key TEXT PRIMARY KEY, site_version TEXT, site_time TEXT, db_version TEXT, db_time TEXT, site_commit TEXT, updated_at TEXT)").then(() => initVersions())
 
-// Get versions - auto-updates site version to current time when minute changes (detects code reload)
+// Get current git commit hash
+const getGitCommit = (): string => {
+  try {
+    const { execSync } = require('child_process')
+    return execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim().slice(0, 7)
+  } catch {
+    return ''
+  }
+}
+
+// Get versions - auto-updates site version when git commit changes (code changes)
 app.get('/api/versions', async (req, res) => {
   try {
     const { versionNumber, versionTime } = getCurrentVersionParts()
     const existing = await get("SELECT * FROM app_versions WHERE key = ?", [VERSION_KEY])
+    const currentCommit = getGitCommit()
     
-    // Only update if the time has changed (code was redeployed)
-    if (!existing || existing.site_time !== versionTime) {
-      await run("UPDATE app_versions SET site_version = ?, site_time = ?, updated_at = datetime('now') WHERE key = ?", [versionNumber, versionTime, VERSION_KEY])
+    // Update if git commit changed (code was modified)
+    if (existing && existing.site_commit !== currentCommit && currentCommit) {
+      await run("UPDATE app_versions SET site_version = ?, site_time = ?, site_commit = ?, updated_at = datetime('now') WHERE key = ?", 
+        [versionNumber, versionTime, currentCommit, VERSION_KEY])
     }
     
     const versions = await get("SELECT * FROM app_versions WHERE key = ?", [VERSION_KEY])
-    res.json(versions || { site_version: versionNumber, site_time: versionTime, db_version: versionNumber, db_time: versionTime })
+    res.json(versions || { site_version: versionNumber, site_time: versionTime, db_version: versionNumber, db_time: versionTime, site_commit: currentCommit })
   } catch (e) { res.status(500).json({error: e.message}); }
 })
 
