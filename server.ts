@@ -290,7 +290,7 @@ if (isProduction) {
   }
 }
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`API server running on http://localhost:${PORT}`);
   console.log(`Database: ${DB_PATH}`);
   console.log(`Production mode: ${isProduction}`);
