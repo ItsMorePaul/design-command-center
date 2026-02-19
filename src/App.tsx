@@ -598,8 +598,8 @@ function App() {
         const designerB = b.designers?.[0] || ''
         return designerA.localeCompare(designerB)
       case 'dueDate':
-        const dateA = a.dueDate || 'zzz'
-        const dateB = b.dueDate || 'zzz'
+        const dateA = a.endDate || 'zzz'
+        const dateB = b.endDate || 'zzz'
         return dateA.localeCompare(dateB)
       case 'status':
         // Primary: status, Secondary: name
@@ -963,7 +963,7 @@ function App() {
                                   const member = team.find(m => m.name === d)
                                   if (member) {
                                     setEditingMember(member)
-                                    setFormData({ name: member.name, role: member.role, brands: member.brands, status: member.status, slack: member.slack || '', email: member.email || '' })
+                                    setFormData({ name: member.name, role: member.role, brands: member.brands, status: member.status, slack: member.slack || '', email: member.email || '', timeOff: member.timeOff || [] })
                                     setShowModal(true)
                                   }
                                 }}
