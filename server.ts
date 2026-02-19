@@ -377,10 +377,12 @@ const initVersions = async () => {
 run("CREATE TABLE IF NOT EXISTS app_versions (key TEXT PRIMARY KEY, site_version TEXT, site_time TEXT, db_version TEXT, db_time TEXT, site_commit TEXT, updated_at TEXT)").then(() => initVersions())
 
 // Get current git commit hash
+import { execSync } from 'child_process'
+
 const getGitCommit = (): string => {
   try {
-    const { execSync } = require('child_process')
-    return execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim().slice(0, 7)
+    const commit = execSync('git rev-parse HEAD', { encoding: 'utf8', cwd: process.cwd() }).trim().slice(0, 7)
+    return commit
   } catch {
     return ''
   }
