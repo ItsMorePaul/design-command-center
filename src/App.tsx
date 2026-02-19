@@ -33,17 +33,14 @@ const formatDateRange = (startDate: string, endDate: string) => {
   return `${startStr} - ${endStr}`
 }
 
-// Format timestamp like "20260219.120600" (yyyymmdd.hhmmss)
+// Format timestamp like "120600" (hhmmss)
 const formatVersionTime = (isoString: string) => {
   if (!isoString) return '-'
   const d = new Date(isoString)
-  const yyyy = d.getFullYear()
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
   const hh = String(d.getHours()).padStart(2, '0')
   const min = String(d.getMinutes()).padStart(2, '0')
   const ss = String(d.getSeconds()).padStart(2, '0')
-  return `${yyyy}${mm}${dd}.${hh}${min}${ss}`
+  return `${hh}${min}${ss}`
 }
 
 // Get today's formatted date for display
