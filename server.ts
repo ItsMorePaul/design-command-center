@@ -4,7 +4,7 @@ import sqlite3 from 'sqlite3';
 import path from 'path';
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 const DB_PATH = process.env.DB_PATH || path.join(process.cwd(), 'data', 'shared.db');
 
 app.use(cors());
