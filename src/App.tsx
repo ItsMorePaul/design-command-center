@@ -153,7 +153,8 @@ function App() {
   const [projectFilters, setProjectFilters] = useState({
     businessLines: [] as string[],
     designers: [] as string[],
-    statuses: [] as string[]
+    statuses: [] as string[],
+    project: null as string | null
   })
   const [calendarFilters, setCalendarFilters] = useState({
     designers: [] as string[],
@@ -297,6 +298,10 @@ function App() {
   const handleEventClick = (event: any) => {
     if (event.type === 'project' && event.projectName) {
       setSelectedDay(null)
+      setProjectFilters({
+        ...projectFilters,
+        project: event.projectName
+      })
       setActiveTab('projects')
     }
   }
@@ -633,6 +638,11 @@ function App() {
 
   // Filter projects based on active filters
   const filteredProjects = sortedProjects.filter(project => {
+    // Project filter (from day modal click)
+    if (projectFilters.project && project.name !== projectFilters.project) {
+      return false
+    }
+    
     // Business Line filter
     if (projectSortBy === 'businessLine' && projectFilters.businessLines.length > 0) {
       if (!project.businessLine || !projectFilters.businessLines.includes(project.businessLine)) {
@@ -939,6 +949,19 @@ function App() {
                       ))}
                     </>
                   )}
+                </div>
+              )}
+
+              {/* Active Project Filter (from day modal) */}
+              {projectFilters.project && (
+                <div className="projects-filter-row">
+                  <span className="filter-label">Showing:</span>
+                  <button
+                    className="filter-pill active"
+                    onClick={() => setProjectFilters({ ...projectFilters, project: null })}
+                  >
+                    {projectFilters.project} ×
+                  </button>
                 </div>
               )}
 
@@ -1977,13 +2000,11 @@ function App() {
                 >
                   <div className="event-type-badge">
                     {event.type === 'timeoff' ? '🏖️ Time Off' : event.type === 'holiday' ? '🎉 Holiday' : '📋 Project'}
-                  </div>
-                  <div className="event-name">
-                    {event.name}
                     {event.type === 'project' && event.startDate && event.endDate && (
                       <span className="event-date-range-inline"> {formatDateRange(event.startDate, event.endDate)}</span>
                     )}
                   </div>
+                  <div className="event-name">{event.name}</div>
                   {event.type === 'project' && event.projectName && (
                     <div className="event-detail">{event.projectName}</div>
                   )}
