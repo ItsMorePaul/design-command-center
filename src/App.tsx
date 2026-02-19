@@ -33,6 +33,19 @@ const formatDateRange = (startDate: string, endDate: string) => {
   return `${startStr} - ${endStr}`
 }
 
+// Format timestamp like "20260219.120600" (yyyymmdd.hhmmss)
+const formatVersionTime = (isoString: string) => {
+  if (!isoString) return '-'
+  const d = new Date(isoString)
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const hh = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  const ss = String(d.getSeconds()).padStart(2, '0')
+  return `${yyyy}${mm}${dd}.${hh}${min}${ss}`
+}
+
 // Get today's formatted date for display
 const getTodayFormatted = () => {
   const today = new Date()
@@ -867,12 +880,12 @@ function App() {
             <div className="version-row" onClick={incrementSiteVersion} style={{ cursor: 'pointer' }} title="Click to increment site version">
               <span className="version-label">Site</span>
               <span className="version-num">v{siteVersion.version}</span>
-              <span className="version-time">{siteVersion.builtAt ? new Date(siteVersion.builtAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' }) : '-'}</span>
+              <span className="version-time">{formatVersionTime(siteVersion.builtAt)}</span>
             </div>
             <div className="version-row">
               <span className="version-label">DB</span>
               <span className="version-num">v{dbVersion.version}</span>
-              <span className="version-time">{dbVersion.savedAt ? new Date(dbVersion.savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'short' }) : '-'}</span>
+              <span className="version-time">{formatVersionTime(dbVersion.savedAt)}</span>
             </div>
           </div>
         </div>
