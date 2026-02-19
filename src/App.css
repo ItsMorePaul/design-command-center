@@ -751,6 +751,64 @@
     border-bottom: 1px solid var(--color-border);
   }
   
+  /* Header - not fixed, smaller on mobile */
+  .header {
+    padding: 0.75rem 1rem;
+    flex-shrink: 0;
+  }
+  
+  .header-title h1 {
+    font-size: 1.1rem;
+  }
+  
+  .header-title .date {
+    font-size: 0.75rem;
+  }
+  
+  /* Calendar - fix clipping on mobile */
+  .calendar-panel {
+    position: relative;
+    top: 0;
+    overflow: visible;
+  }
+  
+  .calendar-panel-content {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Calendar grid - horizontal scroll on mobile */
+  .month-grid {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .days-grid {
+    min-width: 500px; /* Ensure grid doesn't squash too much */
+  }
+  
+  .day-cell {
+    min-height: 60px;
+    padding: 0.15rem;
+  }
+  
+  .day-number {
+    font-size: 0.7rem;
+  }
+  
+  .event-tag {
+    font-size: 0.55rem;
+    padding: 1px 2px;
+  }
+  
+  .event-text {
+    font-size: 0.55rem;
+  }
+  
+  .event-detail {
+    font-size: 0.45rem;
+  }
+  
   .logo {
     margin-bottom: 0;
   }
