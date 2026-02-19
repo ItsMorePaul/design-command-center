@@ -3,7 +3,7 @@
   "build": {
     "builder": "NIXPACKS",
     "buildCommand": "npm install && npm run build",
-    "startCommand": "npx tsx server.ts"
+    "startCommand": "npx -y tsx server.ts"
   },
   "deploy": {
     "numReplicas": 1,
