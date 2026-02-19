@@ -1,0 +1,115 @@
+{
+  "projects": [
+    {
+      "id": "1",
+      "name": "Q1 Brand Refresh",
+      "status": "active",
+      "dueDate": "Feb 28",
+      "assignee": "Jason"
+    },
+    {
+      "id": "2",
+      "name": "Mobile App Redesign",
+      "status": "review",
+      "dueDate": "Mar 15",
+      "assignee": "Fariah"
+    },
+    {
+      "id": "3",
+      "name": "Dashboard Analytics",
+      "status": "active",
+      "dueDate": "Mar 1",
+      "assignee": "Elena"
+    },
+    {
+      "id": "4",
+      "name": "Design System v3",
+      "status": "blocked",
+      "dueDate": "TBD",
+      "assignee": "Dewey"
+    },
+    {
+      "id": "5",
+      "name": "Landing Page Update",
+      "status": "done",
+      "dueDate": "Feb 10",
+      "assignee": "Andy"
+    }
+  ],
+  "team": [
+    {
+      "id": "1",
+      "name": "Jason H.",
+      "role": "Senior Designer",
+      "brands": [
+        "Barron's",
+        "MarketWatch"
+      ],
+      "status": "online"
+    },
+    {
+      "id": "2",
+      "name": "Fariah K.",
+      "role": "UX Designer",
+      "brands": [
+        "IBD"
+      ],
+      "status": "online"
+    },
+    {
+      "id": "3",
+      "name": "Elena M.",
+      "role": "Product Designer",
+      "brands": [
+        "Mansion Global"
+      ],
+      "status": "away"
+    },
+    {
+      "id": "4",
+      "name": "Dewey T.",
+      "role": "Design Lead",
+      "brands": [
+        "Market Data"
+      ],
+      "status": "online"
+    },
+    {
+      "id": "5",
+      "name": "Andy L.",
+      "role": "Visual Designer",
+      "brands": [
+        "FN London"
+      ],
+      "status": "offline"
+    },
+    {
+      "id": "6",
+      "name": "Brian R.",
+      "role": "UI Developer",
+      "brands": [
+        "PEN"
+      ],
+      "status": "online"
+    },
+    {
+      "id": "7",
+      "name": "Adrian B.",
+      "role": "Motion Designer",
+      "brands": [
+        "Messaging"
+      ],
+      "status": "away"
+    }
+  ],
+  "brandOptions": [
+    "Barron's",
+    "MarketWatch",
+    "IBD",
+    "Mansion Global",
+    "FN London",
+    "PEN",
+    "Messaging",
+    "Market Data"
+  ]
+}

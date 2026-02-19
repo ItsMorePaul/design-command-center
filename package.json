@@ -8,6 +8,7 @@
     "dev:all": "concurrently \"vite\" \"npm run server\"",
     "server": "npx tsx server.ts",
     "build": "tsc -b && vite build",
+    "start": "npx tsx server.ts",
     "lint": "eslint .",
     "preview": "vite preview"
   },
