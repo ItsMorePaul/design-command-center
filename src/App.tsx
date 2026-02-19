@@ -148,7 +148,6 @@ function App() {
   const [timelineFormData, setTimelineFormData] = useState({ name: '', startDate: '', endDate: '' })
   
   const [isLoaded, setIsLoaded] = useState(false)
-  const [sortBy, setSortBy] = useState<'name' | 'role' | 'status' | 'brand'>('name')
   const [projectSortBy, setProjectSortBy] = useState<'name' | 'businessLine' | 'designer' | 'dueDate' | 'status'>('name')
   const [projectFilters, setProjectFilters] = useState({
     businessLines: [] as string[],
@@ -223,21 +222,6 @@ function App() {
   const [siteVersion, setSiteVersion] = useState({ version: '', time: '' })
   const [dbVersion, setDbVersion] = useState({ version: '', time: '' })
   
-  // Increment site version (for deployments)
-  const incrementSiteVersion = async () => {
-    try {
-      const res = await fetch('/api/versions/site', { 
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ timestamp: new Date().toISOString() })
-      })
-      const data = await res.json()
-      setSiteVersion({ version: data.site_version, time: data.site_time })
-    } catch (e) {
-      console.error('Failed to update site version:', e)
-    }
-  }
-
   // Load versions from server on mount
   useEffect(() => {
     const loadVersions = async () => {
@@ -627,22 +611,9 @@ function App() {
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   }
 
-  // Sort team by selected criteria
+  // Sort team by name (fixed - no sort UI)
   const sortedTeam = [...team].sort((a, b) => {
-    switch (sortBy) {
-      case 'name':
-        return a.name.localeCompare(b.name)
-      case 'role':
-        return a.role.localeCompare(b.role)
-      case 'status':
-        return a.status.localeCompare(b.status)
-      case 'brand':
-        const brandA = a.brands[0] || ''
-        const brandB = b.brands[0] || ''
-        return brandA.localeCompare(brandB)
-      default:
-        return 0
-    }
+    return a.name.localeCompare(b.name)
   })
 
   // Sort projects by selected criteria
@@ -1172,33 +1143,6 @@ function App() {
 
           {activeTab === 'team' && (
             <div className="team-grid">
-              <div className="team-sort-bar">
-                <span className="sort-label">Sort by:</span>
-                <button 
-                  className={`sort-btn ${sortBy === 'name' ? 'active' : ''}`}
-                  onClick={() => setSortBy('name')}
-                >
-                  Name
-                </button>
-                <button 
-                  className={`sort-btn ${sortBy === 'role' ? 'active' : ''}`}
-                  onClick={() => setSortBy('role')}
-                >
-                  Role
-                </button>
-                <button 
-                  className={`sort-btn ${sortBy === 'status' ? 'active' : ''}`}
-                  onClick={() => setSortBy('status')}
-                >
-                  Status
-                </button>
-                <button 
-                  className={`sort-btn ${sortBy === 'brand' ? 'active' : ''}`}
-                  onClick={() => setSortBy('brand')}
-                >
-                  Brand
-                </button>
-              </div>
               <div className="team-list">
                 {sortedTeam.map(member => (
                   <div key={member.id} className="team-card">
