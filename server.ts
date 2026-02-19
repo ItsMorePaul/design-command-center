@@ -252,6 +252,8 @@ app.get('/api/calendar', async (req, res) => {
                   type: 'timeoff',
                   name: off.name || 'Time Off',
                   person: member.name,
+                  startDate: off.startDate,
+                  endDate: off.endDate,
                   color: '#ef4444'
                 });
               }

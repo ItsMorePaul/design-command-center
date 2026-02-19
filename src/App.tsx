@@ -2039,8 +2039,8 @@ function App() {
                   onClick={() => event.type === 'project' && handleEventClick(event)}
                 >
                   <div className="event-type-badge">
-                    {event.type === 'timeoff' ? '🏖️ Time Off' : event.type === 'holiday' ? '🎉 Holiday' : ''}
-                    {event.type === 'project' && event.startDate && event.endDate && (
+                    {event.type === 'timeoff' ? '🏖️' : event.type === 'holiday' ? '🎉' : '📋'} 
+                    {event.startDate && event.endDate && (
                       <span className="event-date-range-inline">{formatDateRange(event.startDate, event.endDate)}</span>
                     )}
                   </div>
