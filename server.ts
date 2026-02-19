@@ -328,30 +328,33 @@ if (isProduction) {
 }
 
 // ============ VERSION TRACKING ============
-// Format: vYYMMDD.HHMM (e.g., v260219.121500)
-// Site version: updates on deployment (code changes)
-// DB version: updates on any data change
+// Version: vYYMMDD (e.g., v260219)
+// Time: hhmmss (e.g., 121500)
 
 const VERSION_KEY = 'dcc_versions'
 
-// Generate version string from timestamp
-const generateVersion = (timestamp: string | Date) => {
+// Generate version number (vYYMMDD) and time (hhmmss) from timestamp
+const generateVersionParts = (timestamp: string | Date) => {
   const d = timestamp instanceof Date ? timestamp : new Date(timestamp)
   const yy = String(d.getFullYear()).slice(-2)
   const mm = String(d.getMonth() + 1).padStart(2, '0')
   const dd = String(d.getDate()).padStart(2, '0')
   const hh = String(d.getHours()).padStart(2, '0')
   const min = String(d.getMinutes()).padStart(2, '0')
-  return `v${yy}${mm}${dd}.${hh}${min}`
+  const ss = String(d.getSeconds()).padStart(2, '0')
+  return { 
+    versionNumber: `v${yy}${mm}${dd}`, 
+    versionTime: `${hh}${min}${ss}` 
+  }
 }
 
-// Get current version string
-const getCurrentVersion = () => generateVersion(new Date())
+// Get current version parts
+const getCurrentVersionParts = () => generateVersionParts(new Date())
 
 // Update DB version helper
 const updateDbVersion = async () => {
-  const version = getCurrentVersion()
-  await run("UPDATE app_versions SET db_version = ?, updated_at = datetime('now') WHERE key = ?", [version, VERSION_KEY])
+  const { versionNumber, versionTime } = getCurrentVersionParts()
+  await run("UPDATE app_versions SET db_version = ?, db_time = ?, updated_at = datetime('now') WHERE key = ?", [versionNumber, versionTime, VERSION_KEY])
 }
 
 // Initialize versions table
@@ -359,9 +362,9 @@ const initVersions = async () => {
   try {
     const existing = await get("SELECT * FROM app_versions WHERE key = ?", [VERSION_KEY])
     if (!existing) {
-      const now = getCurrentVersion()
-      await run("INSERT INTO app_versions (key, site_version, db_version, updated_at) VALUES (?, ?, ?, datetime('now'))", 
-        [VERSION_KEY, now, now])
+      const { versionNumber, versionTime } = getCurrentVersionParts()
+      await run("INSERT INTO app_versions (key, site_version, site_time, db_version, db_time, updated_at) VALUES (?, ?, ?, ?, ?, datetime('now'))", 
+        [VERSION_KEY, versionNumber, versionTime, versionNumber, versionTime])
     }
   } catch (e) {
     console.log('Version init:', e.message)
@@ -369,13 +372,14 @@ const initVersions = async () => {
 }
 
 // Ensure table exists
-run("CREATE TABLE IF NOT EXISTS app_versions (key TEXT PRIMARY KEY, site_version TEXT, db_version TEXT, updated_at TEXT)").then(() => initVersions())
+run("CREATE TABLE IF NOT EXISTS app_versions (key TEXT PRIMARY KEY, site_version TEXT, site_time TEXT, db_version TEXT, db_time TEXT, updated_at TEXT)").then(() => initVersions())
 
 // Get versions
 app.get('/api/versions', async (req, res) => {
   try {
     const versions = await get("SELECT * FROM app_versions WHERE key = ?", [VERSION_KEY])
-    res.json(versions || { site_version: getCurrentVersion(), db_version: getCurrentVersion() })
+    const def = getCurrentVersionParts()
+    res.json(versions || { site_version: def.versionNumber, site_time: def.versionTime, db_version: def.versionNumber, db_time: def.versionTime })
   } catch (e) { res.status(500).json({error: e.message}); }
 })
 
@@ -383,8 +387,8 @@ app.get('/api/versions', async (req, res) => {
 app.post('/api/versions/site', async (req, res) => {
   try {
     const timestamp = req.body?.timestamp ? new Date(req.body.timestamp) : new Date()
-    const version = generateVersion(timestamp)
-    await run("UPDATE app_versions SET site_version = ?, updated_at = datetime('now') WHERE key = ?", [version, VERSION_KEY])
+    const { versionNumber, versionTime } = generateVersionParts(timestamp)
+    await run("UPDATE app_versions SET site_version = ?, site_time = ?, updated_at = datetime('now') WHERE key = ?", [versionNumber, versionTime, VERSION_KEY])
     const versions = await get("SELECT * FROM app_versions WHERE key = ?", [VERSION_KEY])
     res.json(versions)
   } catch (e) { res.status(500).json({error: e.message}); }

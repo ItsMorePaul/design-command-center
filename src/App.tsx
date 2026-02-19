@@ -220,13 +220,8 @@ function App() {
   }
 
   // Version tracking
-  const [siteVersion, setSiteVersion] = useState({ version: '' })
-  const [dbVersion, setDbVersion] = useState({ version: '' })
-  
-  // Update DB version on server when data saves
-  const updateDbVersion = async () => {
-    // Handled server-side now
-  }
+  const [siteVersion, setSiteVersion] = useState({ version: '', time: '' })
+  const [dbVersion, setDbVersion] = useState({ version: '', time: '' })
   
   // Increment site version (for deployments)
   const incrementSiteVersion = async () => {
@@ -237,7 +232,7 @@ function App() {
         body: JSON.stringify({ timestamp: new Date().toISOString() })
       })
       const data = await res.json()
-      setSiteVersion({ version: data.site_version })
+      setSiteVersion({ version: data.site_version, time: data.site_time })
     } catch (e) {
       console.error('Failed to update site version:', e)
     }
@@ -249,8 +244,8 @@ function App() {
       try {
         const res = await fetch('/api/versions')
         const data = await res.json()
-        setSiteVersion({ version: data.site_version || '' })
-        setDbVersion({ version: data.db_version || '' })
+        setSiteVersion({ version: data.site_version || '', time: data.site_time || '' })
+        setDbVersion({ version: data.db_version || '', time: data.db_time || '' })
       } catch (e) {
         console.error('Failed to load versions:', e)
       }
@@ -492,7 +487,6 @@ function App() {
       setProjects([...projects, newProject])
       refreshCalendar()
     }
-    updateDbVersion()
     setShowProjectModal(false)
   }
 
@@ -810,7 +804,6 @@ function App() {
       setTeam([...team, newMember])
       refreshCalendar()
     }
-    updateDbVersion()
     setShowModal(false)
   }
 
@@ -854,13 +847,13 @@ function App() {
           <div className="version-info">
             <div className="version-row" onClick={incrementSiteVersion} style={{ cursor: 'pointer' }} title="Click to increment site version">
               <span className="version-label">Site</span>
-              <span className="version-num">{siteVersion.version}</span>
-              <span className="version-time">{siteVersion.version || '-'}</span>
+              <span className="version-num">{siteVersion.version || '-'}</span>
+              <span className="version-time">{siteVersion.time || '-'}</span>
             </div>
             <div className="version-row">
               <span className="version-label">DB</span>
-              <span className="version-num">{dbVersion.version}</span>
-              <span className="version-time">{dbVersion.version || '-'}</span>
+              <span className="version-num">{dbVersion.version || '-'}</span>
+              <span className="version-time">{dbVersion.time || '-'}</span>
             </div>
           </div>
         </div>
