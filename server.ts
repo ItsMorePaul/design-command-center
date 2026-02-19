@@ -281,7 +281,8 @@ const isProduction = process.env.NODE_ENV === 'production';
 if (isProduction) {
   try {
     app.use(express.static(DIST_PATH));
-    app.get('(.*)', (req, res) => {
+    // Explicitly serve index.html for root
+    app.get('/', (req, res) => {
       res.sendFile(path.join(DIST_PATH, 'index.html'));
     });
   } catch (e) {
