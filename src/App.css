@@ -784,11 +784,13 @@
   }
   
   .days-grid {
-    min-width: 500px; /* Ensure grid doesn't squash too much */
+    min-width: 100%;
   }
   
   .day-cell {
     min-height: 60px;
+    min-width: 0;
+    overflow: hidden;
     padding: 0.15rem;
   }
   
@@ -803,6 +805,9 @@
   
   .event-text {
     font-size: 0.55rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   
   .event-detail {
