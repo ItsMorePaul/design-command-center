@@ -239,13 +239,14 @@ function App() {
   // Increment site version on each page load (simulates code build)
   useEffect(() => {
     const currentBuild = localStorage.getItem('dcc-site-build')
-    const now = Date.now()
+    const now = new Date().toISOString()
+    const nowMs = Date.now()
     // If last build was > 5 minutes ago, treat as new build
-    if (!currentBuild || now - parseInt(currentBuild) > 5 * 60 * 1000) {
-      const newVersion = { version: siteVersion.version + 1, builtAt: now.toString() }
+    if (!currentBuild || nowMs - parseInt(currentBuild) > 5 * 60 * 1000) {
+      const newVersion = { version: siteVersion.version + 1, builtAt: now }
       setSiteVersion(newVersion)
       localStorage.setItem('dcc-site-version', JSON.stringify(newVersion))
-      localStorage.setItem('dcc-site-build', now.toString())
+      localStorage.setItem('dcc-site-build', nowMs.toString())
     }
   }, [])
 
