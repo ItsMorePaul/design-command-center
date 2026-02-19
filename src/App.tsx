@@ -24,6 +24,15 @@ const getTodayStr = () => {
   return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 }
 
+// Format date range like "Feb 2 - Mar 12"
+const formatDateRange = (startDate: string, endDate: string) => {
+  const start = new Date(startDate + 'T12:00:00')
+  const end = new Date(endDate + 'T12:00:00')
+  const startStr = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const endStr = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return `${startStr} - ${endStr}`
+}
+
 // Get today's formatted date for display
 const getTodayFormatted = () => {
   const today = new Date()
@@ -282,6 +291,19 @@ function App() {
 
   const deleteProject = async (id: string) => {
     await fetch(`/api/projects/${id}`, { method: 'DELETE' })
+  }
+
+  // Handle clicking a project event in day modal - filter to that project
+  const handleEventClick = (event: any) => {
+    if (event.type === 'project' && event.projectName) {
+      setSelectedDay(null)
+      setActiveTab('calendar')
+      setCalendarFilters({
+        designers: [],
+        projects: [event.projectName],
+        brands: []
+      })
+    }
   }
 
   const handleAddProject = () => {
@@ -1955,12 +1977,16 @@ function App() {
               {selectedDay.events.map((event: any, idx: number) => (
                 <div 
                   key={idx} 
-                  className={`day-modal-event ${event.type === 'timeoff' ? 'timeoff' : event.type === 'holiday' ? 'holiday' : 'project'}`}
+                  className={`day-modal-event ${event.type === 'timeoff' ? 'timeoff' : event.type === 'holiday' ? 'holiday' : 'project'} ${event.type === 'project' ? 'clickable' : ''}`}
+                  onClick={() => event.type === 'project' && handleEventClick(event)}
                 >
                   <div className="event-type-badge">
                     {event.type === 'timeoff' ? '🏖️ Time Off' : event.type === 'holiday' ? '🎉 Holiday' : '📋 Project'}
                   </div>
                   <div className="event-name">{event.name}</div>
+                  {event.type === 'project' && event.startDate && event.endDate && (
+                    <div className="event-date-range">{formatDateRange(event.startDate, event.endDate)}</div>
+                  )}
                   {event.type === 'project' && event.projectName && (
                     <div className="event-detail">{event.projectName}</div>
                   )}

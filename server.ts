@@ -229,6 +229,8 @@ app.get('/api/calendar', async (req, res) => {
                   type: 'project',
                   name: t.name,
                   projectName: proj.name,
+                  startDate: t.startDate,
+                  endDate: t.endDate,
                   color: '#6366f1'
                 });
               }

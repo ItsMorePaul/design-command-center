@@ -670,6 +670,23 @@
   margin-top: 0.25rem;
 }
 
+.day-modal-event.clickable {
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.day-modal-event.clickable:hover {
+  border-color: var(--color-accent);
+  background: rgba(99, 102, 241, 0.15);
+}
+
+.event-date-range {
+  font-size: 0.8rem;
+  color: var(--color-accent);
+  font-weight: 500;
+  margin-top: 0.35rem;
+}
+
 .form-group {
   margin-bottom: 1.25rem;
 }
