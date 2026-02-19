@@ -68,6 +68,8 @@ app.post('/api/projects', async (req, res) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
       [projectId, name, status || 'active', dueDate, assignee, url, description, businessLine, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinksJson, designersJson, startDate, endDate, timelineJson]
     );
+    // Update DB version
+    await run("UPDATE app_versions SET db_version = db_version + 1 WHERE key = ?", [VERSION_KEY])
     res.json({id: projectId, ...req.body});
   } catch (e) { res.status(500).json({error: e.message}); }
 });
@@ -75,6 +77,7 @@ app.post('/api/projects', async (req, res) => {
 app.delete('/api/projects/:id', async (req, res) => {
   try {
     await run('DELETE FROM projects WHERE id = ?', [req.params.id]);
+    await run("UPDATE app_versions SET db_version = db_version + 1 WHERE key = ?", [VERSION_KEY])
     res.json({success: true});
   } catch (e) { res.status(500).json({error: e.message}); }
 });
@@ -103,6 +106,7 @@ app.post('/api/team', async (req, res) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
       [memberId, name, role, brandsJson, status || 'offline', slack, email, avatar, timeOffJson]
     );
+    await run("UPDATE app_versions SET db_version = db_version + 1 WHERE key = ?", [VERSION_KEY])
     res.json({id: memberId, ...req.body});
   } catch (e) { res.status(500).json({error: e.message}); }
 });
@@ -110,6 +114,7 @@ app.post('/api/team', async (req, res) => {
 app.delete('/api/team/:id', async (req, res) => {
   try {
     await run('DELETE FROM team WHERE id = ?', [req.params.id]);
+    await run("UPDATE app_versions SET db_version = db_version + 1 WHERE key = ?", [VERSION_KEY])
     res.json({success: true});
   } catch (e) { res.status(500).json({error: e.message}); }
 });
@@ -302,6 +307,9 @@ app.post('/api/seed', async (req, res) => {
           [t.id, t.name, t.role || '', JSON.stringify(t.brands || []), t.status || 'offline', t.slack || '', t.email || '', t.avatar || '', JSON.stringify(t.timeOff || [])])
       }
     }
+    
+    // Update DB version on seed
+    await run("UPDATE app_versions SET db_version = db_version + 1 WHERE key = ?", [VERSION_KEY])
     
     res.json({ success: true })
   } catch (e) { res.status(500).json({error: e.message}); }
