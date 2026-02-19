@@ -293,16 +293,11 @@ function App() {
     await fetch(`/api/projects/${id}`, { method: 'DELETE' })
   }
 
-  // Handle clicking a project event in day modal - filter to that project
+  // Handle clicking a project event in day modal - switch to projects page
   const handleEventClick = (event: any) => {
     if (event.type === 'project' && event.projectName) {
       setSelectedDay(null)
-      setActiveTab('calendar')
-      setCalendarFilters({
-        designers: [],
-        projects: [event.projectName],
-        brands: []
-      })
+      setActiveTab('projects')
     }
   }
 
@@ -1983,10 +1978,12 @@ function App() {
                   <div className="event-type-badge">
                     {event.type === 'timeoff' ? '🏖️ Time Off' : event.type === 'holiday' ? '🎉 Holiday' : '📋 Project'}
                   </div>
-                  <div className="event-name">{event.name}</div>
-                  {event.type === 'project' && event.startDate && event.endDate && (
-                    <div className="event-date-range">{formatDateRange(event.startDate, event.endDate)}</div>
-                  )}
+                  <div className="event-name">
+                    {event.name}
+                    {event.type === 'project' && event.startDate && event.endDate && (
+                      <span className="event-date-range-inline"> {formatDateRange(event.startDate, event.endDate)}</span>
+                    )}
+                  </div>
                   {event.type === 'project' && event.projectName && (
                     <div className="event-detail">{event.projectName}</div>
                   )}

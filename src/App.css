@@ -687,6 +687,12 @@
   margin-top: 0.35rem;
 }
 
+.event-date-range-inline {
+  font-size: 0.8rem;
+  color: var(--color-accent);
+  font-weight: 500;
+}
+
 .form-group {
   margin-bottom: 1.25rem;
 }
