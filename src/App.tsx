@@ -784,7 +784,7 @@ function App() {
       <aside className="sidebar">
         <div className="logo">
           <LayoutGrid size={22} className="logo-icon" />
-          <span className="logo-text">Design Cmd</span>
+          <span className="logo-text">WandiHub</span>
         </div>
         
         <nav className="nav">
