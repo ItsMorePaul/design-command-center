@@ -33,16 +33,6 @@ const formatDateRange = (startDate: string, endDate: string) => {
   return `${startStr} - ${endStr}`
 }
 
-// Format timestamp like "120600" (hhmmss)
-const formatVersionTime = (isoString: string) => {
-  if (!isoString) return '-'
-  const d = new Date(isoString)
-  const hh = String(d.getHours()).padStart(2, '0')
-  const min = String(d.getMinutes()).padStart(2, '0')
-  const ss = String(d.getSeconds()).padStart(2, '0')
-  return `${hh}${min}${ss}`
-}
-
 // Get today's formatted date for display
 const getTodayFormatted = () => {
   const today = new Date()
@@ -230,36 +220,24 @@ function App() {
   }
 
   // Version tracking
-  const [siteVersion, setSiteVersion] = useState({ version: 1, builtAt: new Date().toISOString() })
-  const [dbVersion, setDbVersion] = useState({ version: 1, savedAt: new Date().toISOString() })
+  const [siteVersion, setSiteVersion] = useState({ version: '' })
+  const [dbVersion, setDbVersion] = useState({ version: '' })
   
   // Update DB version on server when data saves
   const updateDbVersion = async () => {
-    try {
-      const timestamp = new Date().toISOString()
-      const res = await fetch('/api/versions/db', { 
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ timestamp })
-      })
-      const data = await res.json()
-      setDbVersion({ version: data.db_version, savedAt: data.updated_at })
-    } catch (e) {
-      console.error('Failed to update DB version:', e)
-    }
+    // Handled server-side now
   }
   
-  // Increment site version (called manually or on deploy)
+  // Increment site version (for deployments)
   const incrementSiteVersion = async () => {
     try {
-      const timestamp = new Date().toISOString()
       const res = await fetch('/api/versions/site', { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ timestamp })
+        body: JSON.stringify({ timestamp: new Date().toISOString() })
       })
       const data = await res.json()
-      setSiteVersion({ version: data.site_version, builtAt: data.updated_at })
+      setSiteVersion({ version: data.site_version })
     } catch (e) {
       console.error('Failed to update site version:', e)
     }
@@ -271,8 +249,8 @@ function App() {
       try {
         const res = await fetch('/api/versions')
         const data = await res.json()
-        setSiteVersion({ version: data.site_version || 1, builtAt: data.updated_at || new Date().toISOString() })
-        setDbVersion({ version: data.db_version || 1, savedAt: data.updated_at || new Date().toISOString() })
+        setSiteVersion({ version: data.site_version || '' })
+        setDbVersion({ version: data.db_version || '' })
       } catch (e) {
         console.error('Failed to load versions:', e)
       }
@@ -876,13 +854,13 @@ function App() {
           <div className="version-info">
             <div className="version-row" onClick={incrementSiteVersion} style={{ cursor: 'pointer' }} title="Click to increment site version">
               <span className="version-label">Site</span>
-              <span className="version-num">v{siteVersion.version}</span>
-              <span className="version-time">{formatVersionTime(siteVersion.builtAt)}</span>
+              <span className="version-num">{siteVersion.version}</span>
+              <span className="version-time">{siteVersion.version || '-'}</span>
             </div>
             <div className="version-row">
               <span className="version-label">DB</span>
-              <span className="version-num">v{dbVersion.version}</span>
-              <span className="version-time">{formatVersionTime(dbVersion.savedAt)}</span>
+              <span className="version-num">{dbVersion.version}</span>
+              <span className="version-time">{dbVersion.version || '-'}</span>
             </div>
           </div>
         </div>

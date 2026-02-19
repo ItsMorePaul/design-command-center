@@ -69,7 +69,7 @@ app.post('/api/projects', async (req, res) => {
       [projectId, name, status || 'active', dueDate, assignee, url, description, businessLine, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinksJson, designersJson, startDate, endDate, timelineJson]
     );
     // Update DB version
-    await run("UPDATE app_versions SET db_version = db_version + 1 WHERE key = ?", [VERSION_KEY])
+    await updateDbVersion()
     res.json({id: projectId, ...req.body});
   } catch (e) { res.status(500).json({error: e.message}); }
 });
@@ -77,7 +77,7 @@ app.post('/api/projects', async (req, res) => {
 app.delete('/api/projects/:id', async (req, res) => {
   try {
     await run('DELETE FROM projects WHERE id = ?', [req.params.id]);
-    await run("UPDATE app_versions SET db_version = db_version + 1 WHERE key = ?", [VERSION_KEY])
+    await updateDbVersion()
     res.json({success: true});
   } catch (e) { res.status(500).json({error: e.message}); }
 });
@@ -106,7 +106,7 @@ app.post('/api/team', async (req, res) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
       [memberId, name, role, brandsJson, status || 'offline', slack, email, avatar, timeOffJson]
     );
-    await run("UPDATE app_versions SET db_version = db_version + 1 WHERE key = ?", [VERSION_KEY])
+    await updateDbVersion()
     res.json({id: memberId, ...req.body});
   } catch (e) { res.status(500).json({error: e.message}); }
 });
@@ -114,7 +114,7 @@ app.post('/api/team', async (req, res) => {
 app.delete('/api/team/:id', async (req, res) => {
   try {
     await run('DELETE FROM team WHERE id = ?', [req.params.id]);
-    await run("UPDATE app_versions SET db_version = db_version + 1 WHERE key = ?", [VERSION_KEY])
+    await updateDbVersion()
     res.json({success: true});
   } catch (e) { res.status(500).json({error: e.message}); }
 });
@@ -309,7 +309,7 @@ app.post('/api/seed', async (req, res) => {
     }
     
     // Update DB version on seed
-    await run("UPDATE app_versions SET db_version = db_version + 1 WHERE key = ?", [VERSION_KEY])
+    await updateDbVersion()
     
     res.json({ success: true })
   } catch (e) { res.status(500).json({error: e.message}); }
@@ -328,14 +328,40 @@ if (isProduction) {
 }
 
 // ============ VERSION TRACKING ============
+// Format: vYYMMDD.HHMM (e.g., v260219.121500)
+// Site version: updates on deployment (code changes)
+// DB version: updates on any data change
+
 const VERSION_KEY = 'dcc_versions'
 
-// Initialize versions in DB if not exist
+// Generate version string from timestamp
+const generateVersion = (timestamp: string | Date) => {
+  const d = timestamp instanceof Date ? timestamp : new Date(timestamp)
+  const yy = String(d.getFullYear()).slice(-2)
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const hh = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  return `v${yy}${mm}${dd}.${hh}${min}`
+}
+
+// Get current version string
+const getCurrentVersion = () => generateVersion(new Date())
+
+// Update DB version helper
+const updateDbVersion = async () => {
+  const version = getCurrentVersion()
+  await run("UPDATE app_versions SET db_version = ?, updated_at = datetime('now') WHERE key = ?", [version, VERSION_KEY])
+}
+
+// Initialize versions table
 const initVersions = async () => {
   try {
     const existing = await get("SELECT * FROM app_versions WHERE key = ?", [VERSION_KEY])
     if (!existing) {
-      await run("INSERT INTO app_versions (key, site_version, db_version, updated_at) VALUES (?, 1, 1, datetime('now'))", [VERSION_KEY])
+      const now = getCurrentVersion()
+      await run("INSERT INTO app_versions (key, site_version, db_version, updated_at) VALUES (?, ?, ?, datetime('now'))", 
+        [VERSION_KEY, now, now])
     }
   } catch (e) {
     console.log('Version init:', e.message)
@@ -343,35 +369,28 @@ const initVersions = async () => {
 }
 
 // Ensure table exists
-run("CREATE TABLE IF NOT EXISTS app_versions (key TEXT PRIMARY KEY, site_version INTEGER DEFAULT 1, db_version INTEGER DEFAULT 1, updated_at TEXT)").then(() => initVersions())
+run("CREATE TABLE IF NOT EXISTS app_versions (key TEXT PRIMARY KEY, site_version TEXT, db_version TEXT, updated_at TEXT)").then(() => initVersions())
 
 // Get versions
 app.get('/api/versions', async (req, res) => {
   try {
     const versions = await get("SELECT * FROM app_versions WHERE key = ?", [VERSION_KEY])
-    res.json(versions || { site_version: 1, db_version: 1 })
+    res.json(versions || { site_version: getCurrentVersion(), db_version: getCurrentVersion() })
   } catch (e) { res.status(500).json({error: e.message}); }
 })
 
-// Update site version
+// Update site version (for deployments)
 app.post('/api/versions/site', async (req, res) => {
   try {
-    const timestamp = req.body?.timestamp || new Date().toISOString()
-    await run("UPDATE app_versions SET site_version = site_version + 1, updated_at = ? WHERE key = ?", [timestamp, VERSION_KEY])
+    const timestamp = req.body?.timestamp ? new Date(req.body.timestamp) : new Date()
+    const version = generateVersion(timestamp)
+    await run("UPDATE app_versions SET site_version = ?, updated_at = datetime('now') WHERE key = ?", [version, VERSION_KEY])
     const versions = await get("SELECT * FROM app_versions WHERE key = ?", [VERSION_KEY])
     res.json(versions)
   } catch (e) { res.status(500).json({error: e.message}); }
 })
 
-// Update DB version
-app.post('/api/versions/db', async (req, res) => {
-  try {
-    const timestamp = req.body?.timestamp || new Date().toISOString()
-    await run("UPDATE app_versions SET db_version = db_version + 1, updated_at = ? WHERE key = ?", [timestamp, VERSION_KEY])
-    const versions = await get("SELECT * FROM app_versions WHERE key = ?", [VERSION_KEY])
-    res.json(versions)
-  } catch (e) { res.status(500).json({error: e.message}); }
-})
+// Update DB version (automatic on data changes - handled in individual endpoints)
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`API server running on http://localhost:${PORT}`);
