@@ -753,7 +753,8 @@ function App() {
     setProjectFilters({
       businessLines: [],
       designers: [],
-      statuses: []
+      statuses: [],
+      project: null
     })
   }
 
