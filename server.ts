@@ -270,7 +270,7 @@ app.get('/api/calendar', async (req, res) => {
 const DIST_PATH = path.join(process.cwd(), 'dist');
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(DIST_PATH));
-  app.get('*', (req, res) => {
+  app.get('(.*)', (req, res) => {
     res.sendFile(path.join(DIST_PATH, 'index.html'));
   });
 }
