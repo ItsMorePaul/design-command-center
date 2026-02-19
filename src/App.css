@@ -658,6 +658,10 @@
   color: #ef4444;
 }
 
+.day-modal-event.timeoff .event-date-range-inline {
+  color: #ef4444;
+}
+
 .day-modal-event.holiday .event-type-badge {
   color: #6b7280;
 }

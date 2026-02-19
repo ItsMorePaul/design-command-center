@@ -376,12 +376,15 @@ const initVersions = async () => {
 // Ensure table exists
 run("CREATE TABLE IF NOT EXISTS app_versions (key TEXT PRIMARY KEY, site_version TEXT, site_time TEXT, db_version TEXT, db_time TEXT, updated_at TEXT)").then(() => initVersions())
 
-// Get versions
+// Get versions - auto-updates site version to current time on every call
 app.get('/api/versions', async (req, res) => {
   try {
+    // Auto-update site version to current time (tracks code updates by the minute)
+    const { versionNumber, versionTime } = getCurrentVersionParts()
+    await run("UPDATE app_versions SET site_version = ?, site_time = ?, updated_at = datetime('now') WHERE key = ?", [versionNumber, versionTime, VERSION_KEY])
+    
     const versions = await get("SELECT * FROM app_versions WHERE key = ?", [VERSION_KEY])
-    const def = getCurrentVersionParts()
-    res.json(versions || { site_version: def.versionNumber, site_time: def.versionTime, db_version: def.versionNumber, db_time: def.versionTime })
+    res.json(versions || { site_version: versionNumber, site_time: versionTime, db_version: versionNumber, db_time: versionTime })
   } catch (e) { res.status(500).json({error: e.message}); }
 })
 

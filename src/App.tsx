@@ -1501,7 +1501,7 @@ function App() {
                                     title={`${event.name}${event.person ? ` - ${event.person}` : ''}${event.projectName ? ` (${event.projectName})` : ''}`}
                                   >
                                     <span className="event-text">
-                                      {event.type === 'timeoff' ? '🏖️' : event.type === 'holiday' ? '🎉' : '📋'} {event.name}
+                                      {event.type === 'timeoff' ? '🌴' : event.type === 'holiday' ? '🎉' : '📋'} {event.name}
                                     </span>
                                     {event.type === 'project' && event.projectName && (
                                       <span className="event-detail">{event.projectName}</span>
@@ -2039,7 +2039,7 @@ function App() {
                   onClick={() => event.type === 'project' && handleEventClick(event)}
                 >
                   <div className="event-type-badge">
-                    {event.type === 'timeoff' ? '🏖️' : event.type === 'holiday' ? '🎉' : '📋'} 
+                    {event.type === 'timeoff' && <span style={{ marginRight: '5px' }}>🌴</span>}
                     {event.startDate && event.endDate && (
                       <span className="event-date-range-inline">{formatDateRange(event.startDate, event.endDate)}</span>
                     )}
