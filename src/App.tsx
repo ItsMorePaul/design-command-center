@@ -845,7 +845,7 @@ function App() {
 
         <div className="sidebar-footer">
           <div className="version-info">
-            <div className="version-row" onClick={incrementSiteVersion} style={{ cursor: 'pointer' }} title="Click to increment site version">
+            <div className="version-row">
               <span className="version-label">Site</span>
               <span className="version-num">{siteVersion.version || '-'}</span>
               <span className="version-time">{siteVersion.time || '-'}</span>

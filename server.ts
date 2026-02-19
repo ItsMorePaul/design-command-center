@@ -335,7 +335,7 @@ if (isProduction) {
 
 const VERSION_KEY = 'dcc_versions'
 
-// Generate version number (vYYMMDD) and time (hhmmss) from timestamp
+// Generate version number (vYYMMDD) and time (hhmm) from timestamp
 const generateVersionParts = (timestamp: string | Date) => {
   const d = timestamp instanceof Date ? timestamp : new Date(timestamp)
   const yy = String(d.getFullYear()).slice(-2)
@@ -343,10 +343,9 @@ const generateVersionParts = (timestamp: string | Date) => {
   const dd = String(d.getDate()).padStart(2, '0')
   const hh = String(d.getHours()).padStart(2, '0')
   const min = String(d.getMinutes()).padStart(2, '0')
-  const ss = String(d.getSeconds()).padStart(2, '0')
   return { 
     versionNumber: `v${yy}${mm}${dd}`, 
-    versionTime: `${hh}${min}${ss}` 
+    versionTime: `${hh}${min}` 
   }
 }
 
@@ -376,12 +375,19 @@ const initVersions = async () => {
 // Ensure table exists
 run("CREATE TABLE IF NOT EXISTS app_versions (key TEXT PRIMARY KEY, site_version TEXT, site_time TEXT, db_version TEXT, db_time TEXT, updated_at TEXT)").then(() => initVersions())
 
-// Get versions - returns current stored version (does not update)
+// Get versions - auto-updates site version to current time when minute changes (detects code reload)
 app.get('/api/versions', async (req, res) => {
   try {
+    const { versionNumber, versionTime } = getCurrentVersionParts()
+    const existing = await get("SELECT * FROM app_versions WHERE key = ?", [VERSION_KEY])
+    
+    // Only update if the time has changed (code was redeployed)
+    if (!existing || existing.site_time !== versionTime) {
+      await run("UPDATE app_versions SET site_version = ?, site_time = ?, updated_at = datetime('now') WHERE key = ?", [versionNumber, versionTime, VERSION_KEY])
+    }
+    
     const versions = await get("SELECT * FROM app_versions WHERE key = ?", [VERSION_KEY])
-    const def = getCurrentVersionParts()
-    res.json(versions || { site_version: def.versionNumber, site_time: def.versionTime, db_version: def.versionNumber, db_time: def.versionTime })
+    res.json(versions || { site_version: versionNumber, site_time: versionTime, db_version: versionNumber, db_time: versionTime })
   } catch (e) { res.status(500).json({error: e.message}); }
 })
 
