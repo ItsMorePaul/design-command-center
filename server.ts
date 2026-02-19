@@ -363,10 +363,10 @@ const initVersions = async () => {
   try {
     const existing = await get("SELECT * FROM app_versions WHERE key = ?", [VERSION_KEY])
     if (!existing) {
+      // Only initialize DB version, not site version (site version comes from local deployments)
       const { versionNumber, versionTime } = getCurrentVersionParts()
-      const commit = getGitCommit()
-      await run("INSERT INTO app_versions (key, site_version, site_time, db_version, db_time, site_commit, updated_at) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))", 
-        [VERSION_KEY, versionNumber, versionTime, versionNumber, versionTime, commit])
+      await run("INSERT INTO app_versions (key, site_version, site_time, db_version, db_time, site_commit, updated_at) VALUES (?, NULL, NULL, ?, ?, NULL, datetime('now'))", 
+        [VERSION_KEY, versionNumber, versionTime])
     }
   } catch (e) {
     console.log('Version init:', e.message)
