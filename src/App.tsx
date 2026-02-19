@@ -845,12 +845,12 @@ function App() {
             <div className="version-row">
               <span className="version-label">Site</span>
               <span className="version-num">v{siteVersion.version}</span>
-              <span className="version-time">{new Date(siteVersion.builtAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+              <span className="version-time">{new Date(siteVersion.builtAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}</span>
             </div>
             <div className="version-row">
               <span className="version-label">DB</span>
               <span className="version-num">v{dbVersion.version}</span>
-              <span className="version-time">{new Date(dbVersion.savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+              <span className="version-time">{new Date(dbVersion.savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'short' })}</span>
             </div>
           </div>
         </div>
