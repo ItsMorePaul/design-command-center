@@ -133,6 +133,9 @@ function App() {
   // Timeline editing state
   const [showTimelineModal, setShowTimelineModal] = useState(false)
   const [editingTimeline, setEditingTimeline] = useState<TimelineRange | null>(null)
+  
+  // Calendar day modal state
+  const [selectedDay, setSelectedDay] = useState<{ date: string; events: any[]; dayName: string } | null>(null)
   const [timelineFormData, setTimelineFormData] = useState({ name: '', startDate: '', endDate: '' })
   
   const [isLoaded, setIsLoaded] = useState(false)
@@ -1403,7 +1406,11 @@ function App() {
                               })
                             }
                             return (
-                            <div key={idx} className={`day-cell ${dayEvents.length > 0 ? 'has-events' : ''} ${isToday ? 'today' : ''} ${day.dayName === 'Sat' || day.dayName === 'Sun' ? 'weekend' : ''}`}>
+                            <div 
+                              key={idx} 
+                              className={`day-cell ${dayEvents.length > 0 ? 'has-events' : ''} ${isToday ? 'today' : ''} ${day.dayName === 'Sat' || day.dayName === 'Sun' ? 'weekend' : ''}`}
+                              onClick={() => dayEvents.length > 0 && setSelectedDay({ date: day.date, events: dayEvents, dayName: day.dayName })}
+                            >
                               <span className="day-number">{isToday ? '★ ' : ''}{day.day}</span>
                               <div className="day-events">
                                 {dayEvents.map((event: any, eIdx: number) => (
@@ -1929,6 +1936,39 @@ function App() {
               <button className="primary-btn" onClick={handleSaveTimeline}>
                 {editingTimeline ? 'Save Changes' : 'Add Range'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Calendar Day Modal */}
+      {selectedDay && (
+        <div className="modal-overlay" onClick={() => setSelectedDay(null)}>
+          <div className="modal day-modal" onClick={e => e.stopPropagation()}>
+            <div className="day-modal-header">
+              <h2>
+                {new Date(selectedDay.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+              </h2>
+              <button className="close-btn" onClick={() => setSelectedDay(null)}>×</button>
+            </div>
+            <div className="day-modal-content">
+              {selectedDay.events.map((event: any, idx: number) => (
+                <div 
+                  key={idx} 
+                  className={`day-modal-event ${event.type === 'timeoff' ? 'timeoff' : event.type === 'holiday' ? 'holiday' : 'project'}`}
+                >
+                  <div className="event-type-badge">
+                    {event.type === 'timeoff' ? '🏖️ Time Off' : event.type === 'holiday' ? '🎉 Holiday' : '📋 Project'}
+                  </div>
+                  <div className="event-name">{event.name}</div>
+                  {event.type === 'project' && event.projectName && (
+                    <div className="event-detail">{event.projectName}</div>
+                  )}
+                  {event.type === 'timeoff' && event.person && (
+                    <div className="event-detail">{event.person}</div>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         </div>
