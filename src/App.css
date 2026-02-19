@@ -682,6 +682,14 @@
   margin-top: 0.25rem;
 }
 
+.day-modal-event.timeoff .event-detail {
+  color: #ef4444;
+}
+
+.day-modal-event.project .event-detail {
+  color: #6366f1;
+}
+
 .day-modal-event.clickable {
   cursor: pointer;
   transition: all 0.15s ease;

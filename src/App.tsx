@@ -1501,7 +1501,7 @@ function App() {
                                     title={`${event.name}${event.person ? ` - ${event.person}` : ''}${event.projectName ? ` (${event.projectName})` : ''}`}
                                   >
                                     <span className="event-text">
-                                      {event.type === 'timeoff' ? '🌴' : event.type === 'holiday' ? '🎉' : '📋'} {event.name}
+                                      {event.type === 'timeoff' ? '🌴 ' : ''}{event.name}
                                     </span>
                                     {event.type === 'project' && event.projectName && (
                                       <span className="event-detail">{event.projectName}</span>
@@ -2038,12 +2038,19 @@ function App() {
                   className={`day-modal-event ${event.type === 'timeoff' ? 'timeoff' : event.type === 'holiday' ? 'holiday' : 'project'} ${event.type === 'project' ? 'clickable' : ''}`}
                   onClick={() => event.type === 'project' && handleEventClick(event)}
                 >
-                  <div className="event-type-badge">
-                    {event.type === 'timeoff' && <span style={{ marginRight: '5px' }}>🌴</span>}
-                    {event.startDate && event.endDate && (
+                  {event.type === 'timeoff' && (
+                    <div className="event-type-badge">
+                      <span style={{ marginRight: '5px' }}>🌴</span>
+                      {event.startDate && event.endDate && (
+                        <span className="event-date-range-inline">{formatDateRange(event.startDate, event.endDate)}</span>
+                      )}
+                    </div>
+                  )}
+                  {(event.type === 'project' || event.type === 'holiday') && event.startDate && event.endDate && (
+                    <div className="event-type-badge">
                       <span className="event-date-range-inline">{formatDateRange(event.startDate, event.endDate)}</span>
-                    )}
-                  </div>
+                    </div>
+                  )}
                   <div className="event-name">{event.name}</div>
                   {event.type === 'project' && event.projectName && (
                     <div className="event-detail">{event.projectName}</div>
