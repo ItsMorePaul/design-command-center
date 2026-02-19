@@ -226,7 +226,12 @@ function App() {
   // Update DB version on server when data saves
   const updateDbVersion = async () => {
     try {
-      const res = await fetch('/api/versions/db', { method: 'POST' })
+      const timestamp = new Date().toISOString()
+      const res = await fetch('/api/versions/db', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ timestamp })
+      })
       const data = await res.json()
       setDbVersion({ version: data.db_version, savedAt: data.updated_at })
     } catch (e) {
@@ -237,7 +242,12 @@ function App() {
   // Increment site version (called manually or on deploy)
   const incrementSiteVersion = async () => {
     try {
-      const res = await fetch('/api/versions/site', { method: 'POST' })
+      const timestamp = new Date().toISOString()
+      const res = await fetch('/api/versions/site', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ timestamp })
+      })
       const data = await res.json()
       setSiteVersion({ version: data.site_version, builtAt: data.updated_at })
     } catch (e) {

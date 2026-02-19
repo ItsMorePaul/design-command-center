@@ -348,7 +348,8 @@ app.get('/api/versions', async (req, res) => {
 // Update site version
 app.post('/api/versions/site', async (req, res) => {
   try {
-    await run("UPDATE app_versions SET site_version = site_version + 1, updated_at = datetime('now') WHERE key = ?", [VERSION_KEY])
+    const timestamp = req.body?.timestamp || new Date().toISOString()
+    await run("UPDATE app_versions SET site_version = site_version + 1, updated_at = ? WHERE key = ?", [timestamp, VERSION_KEY])
     const versions = await get("SELECT * FROM app_versions WHERE key = ?", [VERSION_KEY])
     res.json(versions)
   } catch (e) { res.status(500).json({error: e.message}); }
@@ -357,7 +358,8 @@ app.post('/api/versions/site', async (req, res) => {
 // Update DB version
 app.post('/api/versions/db', async (req, res) => {
   try {
-    await run("UPDATE app_versions SET db_version = db_version + 1, updated_at = datetime('now') WHERE key = ?", [VERSION_KEY])
+    const timestamp = req.body?.timestamp || new Date().toISOString()
+    await run("UPDATE app_versions SET db_version = db_version + 1, updated_at = ? WHERE key = ?", [timestamp, VERSION_KEY])
     const versions = await get("SELECT * FROM app_versions WHERE key = ?", [VERSION_KEY])
     res.json(versions)
   } catch (e) { res.status(500).json({error: e.message}); }
