@@ -165,9 +165,9 @@ function App() {
 
   // Filter helpers for calendar
   const filterCalendarEvents = (events: any[]) => {
-    // If no filters selected, show nothing (user must enable filters to see events)
+    // If no filters selected, show all events
     if (calendarFilters.designers.length === 0 && calendarFilters.projects.length === 0 && calendarFilters.brands.length === 0) {
-      return []
+      return events
     }
     return events.filter(event => {
       // Designer filter - shows ONLY time off (not projects)
