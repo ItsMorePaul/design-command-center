@@ -219,6 +219,36 @@ function App() {
     }
   }
 
+  // Version tracking
+  const [siteVersion, setSiteVersion] = useState(() => {
+    const saved = localStorage.getItem('dcc-site-version')
+    return saved ? JSON.parse(saved) : { version: 1, builtAt: new Date().toISOString() }
+  })
+  const [dbVersion, setDbVersion] = useState(() => {
+    const saved = localStorage.getItem('dcc-db-version')
+    return saved ? JSON.parse(saved) : { version: 1, savedAt: new Date().toISOString() }
+  })
+  
+  // Update DB version on data save
+  const updateDbVersion = () => {
+    const newVersion = { version: dbVersion.version + 1, savedAt: new Date().toISOString() }
+    setDbVersion(newVersion)
+    localStorage.setItem('dcc-db-version', JSON.stringify(newVersion))
+  }
+  
+  // Increment site version on each page load (simulates code build)
+  useEffect(() => {
+    const currentBuild = localStorage.getItem('dcc-site-build')
+    const now = Date.now()
+    // If last build was > 5 minutes ago, treat as new build
+    if (!currentBuild || now - parseInt(currentBuild) > 5 * 60 * 1000) {
+      const newVersion = { version: siteVersion.version + 1, builtAt: now.toString() }
+      setSiteVersion(newVersion)
+      localStorage.setItem('dcc-site-version', JSON.stringify(newVersion))
+      localStorage.setItem('dcc-site-build', now.toString())
+    }
+  }, [])
+
   // Load initial data from API
   useEffect(() => {
     const init = async () => {
@@ -453,6 +483,7 @@ function App() {
       setProjects([...projects, newProject])
       refreshCalendar()
     }
+    updateDbVersion()
     setShowProjectModal(false)
   }
 
@@ -769,6 +800,7 @@ function App() {
       setTeam([...team, newMember])
       refreshCalendar()
     }
+    updateDbVersion()
     setShowModal(false)
   }
 
@@ -809,11 +841,16 @@ function App() {
         </nav>
 
         <div className="sidebar-footer">
-          <div className="user-profile">
-            <div className="avatar">PM</div>
-            <div className="user-info">
-              <span className="user-name">Paul More</span>
-              <span className="user-role">Design Director</span>
+          <div className="version-info">
+            <div className="version-row">
+              <span className="version-label">Site</span>
+              <span className="version-num">v{siteVersion.version}</span>
+              <span className="version-time">{new Date(siteVersion.builtAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+            </div>
+            <div className="version-row">
+              <span className="version-label">DB</span>
+              <span className="version-num">v{dbVersion.version}</span>
+              <span className="version-time">{new Date(dbVersion.savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
             </div>
           </div>
         </div>

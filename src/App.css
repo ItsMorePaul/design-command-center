@@ -91,30 +91,37 @@
   border-top: 1px solid var(--color-border);
 }
 
-.user-profile {
+.version-info {
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
+  flex-direction: column;
+  gap: 0.25rem;
   padding: 0.5rem;
 }
 
-.avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+.version-row {
   display: flex;
   align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  font-size: 0.875rem;
-  color: white;
+  gap: 0.5rem;
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
 }
 
-.user-info {
-  display: flex;
-  flex-direction: column;
+.version-label {
+  font-weight: 500;
+  min-width: 20px;
 }
+
+.version-num {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.version-time {
+  margin-left: auto;
+  opacity: 0.7;
+}
+
+/* Avatar in modals */
 
 .user-name {
   font-weight: 500;
