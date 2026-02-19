@@ -1934,8 +1934,6 @@ input:checked + .slider:before {
   gap: 2px;
   width: 100%;
   box-sizing: border-box;
-  max-height: 70px; /* Limit height to prevent grid breaking */
-  overflow: hidden;
 }
 
 .event-tag {

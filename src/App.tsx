@@ -1402,13 +1402,11 @@ function App() {
                                 color: '#6b7280' // gray for holidays
                               })
                             }
-                            const visibleEvents = dayEvents.slice(0, 2)
-                            const extraCount = dayEvents.length - 2
                             return (
                             <div key={idx} className={`day-cell ${dayEvents.length > 0 ? 'has-events' : ''} ${isToday ? 'today' : ''} ${day.dayName === 'Sat' || day.dayName === 'Sun' ? 'weekend' : ''}`}>
                               <span className="day-number">{isToday ? '★ ' : ''}{day.day}</span>
                               <div className="day-events">
-                                {visibleEvents.map((event: any, eIdx: number) => (
+                                {dayEvents.map((event: any, eIdx: number) => (
                                   <div 
                                     key={eIdx} 
                                     className={`event-tag ${event.type === 'timeoff' ? 'timeoff' : event.type === 'holiday' ? 'holiday' : 'project'}`}
@@ -1426,9 +1424,6 @@ function App() {
                                     )}
                                   </div>
                                 ))}
-                                {extraCount > 0 && (
-                                  <div className="more-events">+{extraCount} more</div>
-                                )}
                               </div>
                             </div>
                           )})}
