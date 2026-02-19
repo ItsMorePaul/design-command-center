@@ -330,14 +330,17 @@ if (isProduction) {
 }
 
 // ============ VERSION TRACKING ============
-// Version: vYYMMDD (e.g., v260219)
-// Time: hhmmss (e.g., 121500)
+// Site version: manually updated in code when commits are made (vYYMMDD.hhmm)
+// DB version: stored in DB, auto-updates on data changes
+
+const SITE_VERSION = 'v260219.1329'  // Manual update on code changes
+const SITE_TIME = '1329'
 
 const VERSION_KEY = 'dcc_versions'
 
-// Generate version number (vYYMMDD) and time (hhmm) from timestamp
-const generateVersionParts = (timestamp: string | Date) => {
-  const d = timestamp instanceof Date ? timestamp : new Date(timestamp)
+// Generate version parts for DB updates
+const generateDbVersionParts = () => {
+  const d = new Date()
   const yy = String(d.getFullYear()).slice(-2)
   const mm = String(d.getMonth() + 1).padStart(2, '0')
   const dd = String(d.getDate()).padStart(2, '0')
@@ -349,12 +352,9 @@ const generateVersionParts = (timestamp: string | Date) => {
   }
 }
 
-// Get current version parts
-const getCurrentVersionParts = () => generateVersionParts(new Date())
-
 // Update DB version helper
 const updateDbVersion = async () => {
-  const { versionNumber, versionTime } = getCurrentVersionParts()
+  const { versionNumber, versionTime } = generateDbVersionParts()
   await run("UPDATE app_versions SET db_version = ?, db_time = ?, updated_at = datetime('now') WHERE key = ?", [versionNumber, versionTime, VERSION_KEY])
 }
 
@@ -363,9 +363,8 @@ const initVersions = async () => {
   try {
     const existing = await get("SELECT * FROM app_versions WHERE key = ?", [VERSION_KEY])
     if (!existing) {
-      // Only initialize DB version, not site version (site version comes from local deployments)
-      const { versionNumber, versionTime } = getCurrentVersionParts()
-      await run("INSERT INTO app_versions (key, site_version, site_time, db_version, db_time, site_commit, updated_at) VALUES (?, NULL, NULL, ?, ?, NULL, datetime('now'))", 
+      const { versionNumber, versionTime } = generateDbVersionParts()
+      await run("INSERT INTO app_versions (key, db_version, db_time, updated_at) VALUES (?, ?, ?, datetime('now'))", 
         [VERSION_KEY, versionNumber, versionTime])
     }
   } catch (e) {
@@ -374,46 +373,18 @@ const initVersions = async () => {
 }
 
 // Ensure table exists
-run("CREATE TABLE IF NOT EXISTS app_versions (key TEXT PRIMARY KEY, site_version TEXT, site_time TEXT, db_version TEXT, db_time TEXT, site_commit TEXT, updated_at TEXT)").then(() => initVersions())
+run("CREATE TABLE IF NOT EXISTS app_versions (key TEXT PRIMARY KEY, db_version TEXT, db_time TEXT, updated_at TEXT)").then(() => initVersions())
 
-// Get current git commit hash
-import { execSync } from 'child_process'
-
-const getGitCommit = (): string => {
-  try {
-    const commit = execSync('git rev-parse HEAD', { encoding: 'utf8', cwd: process.cwd() }).trim().slice(0, 7)
-    return commit
-  } catch {
-    return ''
-  }
-}
-
-// Get versions - auto-updates site version when git commit changes (code changes)
+// Get versions - returns site version from code, DB version from database
 app.get('/api/versions', async (req, res) => {
   try {
-    const { versionNumber, versionTime } = getCurrentVersionParts()
     const existing = await get("SELECT * FROM app_versions WHERE key = ?", [VERSION_KEY])
-    const currentCommit = getGitCommit()
-    
-    // Update if git commit changed (code was modified)
-    if (existing && existing.site_commit !== currentCommit && currentCommit) {
-      await run("UPDATE app_versions SET site_version = ?, site_time = ?, site_commit = ?, updated_at = datetime('now') WHERE key = ?", 
-        [versionNumber, versionTime, currentCommit, VERSION_KEY])
-    }
-    
-    const versions = await get("SELECT * FROM app_versions WHERE key = ?", [VERSION_KEY])
-    res.json(versions || { site_version: versionNumber, site_time: versionTime, db_version: versionNumber, db_time: versionTime, site_commit: currentCommit })
-  } catch (e) { res.status(500).json({error: e.message}); }
-})
-
-// Update site version - call this when you deploy code changes
-app.post('/api/versions/site', async (req, res) => {
-  try {
-    const timestamp = req.body?.timestamp ? new Date(req.body.timestamp) : new Date()
-    const { versionNumber, versionTime } = generateVersionParts(timestamp)
-    await run("UPDATE app_versions SET site_version = ?, site_time = ?, updated_at = datetime('now') WHERE key = ?", [versionNumber, versionTime, VERSION_KEY])
-    const versions = await get("SELECT * FROM app_versions WHERE key = ?", [VERSION_KEY])
-    res.json(versions)
+    res.json({
+      site_version: SITE_VERSION,
+      site_time: SITE_TIME,
+      db_version: existing?.db_version || '',
+      db_time: existing?.db_time || ''
+    })
   } catch (e) { res.status(500).json({error: e.message}); }
 })
 
