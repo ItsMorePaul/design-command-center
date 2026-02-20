@@ -58,6 +58,15 @@ Connected to GitHub → Railway auto-deploys on push.
    curl -s https://design-command-center-production.up.railway.app/api/versions
    ```
 
+### Git hook enforcement (version rule)
+
+This repo uses a pre-push hook to enforce version metadata updates before push:
+
+- Hook path: `.githooks/pre-push`
+- Enabled via: `git config core.hooksPath .githooks`
+- Behavior: blocks push if `SITE_VERSION` and `SITE_TIME` in `server.ts` are unchanged vs `origin/main`.
+
+
 ## License
 
 Private — Dow Jones Internal Use Only
