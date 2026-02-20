@@ -85,6 +85,50 @@ interface Notification {
   read: boolean
 }
 
+interface CalendarEvent {
+  type: 'project' | 'timeoff' | 'holiday'
+  name: string
+  color?: string
+  person?: string
+  projectName?: string
+  startDate?: string
+  endDate?: string
+}
+
+interface CalendarDay {
+  day: number
+  date: string
+  dayName: string
+  events: CalendarEvent[]
+}
+
+interface CalendarMonth {
+  name: string
+  year: number
+  month: number
+  days: CalendarDay[]
+}
+
+interface CalendarData {
+  months: CalendarMonth[]
+}
+
+interface CapacityMember {
+  id: string
+  name: string
+  weekly_hours?: number
+}
+
+interface CapacityAssignment {
+  designer_id: string
+  allocation_percent?: number
+}
+
+interface CapacityData {
+  team: CapacityMember[]
+  assignments: CapacityAssignment[]
+}
+
 // Use data from data.json for default brand options
 const defaultBrandOptions = initialData.brandOptions.sort()
 
@@ -112,8 +156,8 @@ function App() {
   const [team, setTeam] = useState<TeamMember[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [brandOptions, setBrandOptions] = useState<string[]>(defaultBrandOptions)
-  const [calendarData, setCalendarData] = useState<{ months: any[] } | null>(null)
-  const [capacityData, setCapacityData] = useState<{ team: any[]; assignments: any[] } | null>(null)
+  const [calendarData, setCalendarData] = useState<CalendarData | null>(null)
+  const [capacityData, setCapacityData] = useState<CapacityData | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null)
   const [formData, setFormData] = useState({ name: '', role: '', brands: ["Barron's"] as string[], status: 'offline' as TeamMember['status'], slack: '', email: '', timeOff: [] as { name: string; startDate: string; endDate: string; id: string }[] })
@@ -145,7 +189,7 @@ function App() {
   const [editingTimeline, setEditingTimeline] = useState<TimelineRange | null>(null)
   
   // Calendar day modal state
-  const [selectedDay, setSelectedDay] = useState<{ date: string; events: any[]; dayName: string } | null>(null)
+  const [selectedDay, setSelectedDay] = useState<{ date: string; events: CalendarEvent[]; dayName: string } | null>(null)
   const [timelineFormData, setTimelineFormData] = useState({ name: '', startDate: '', endDate: '' })
   
   const [isLoaded, setIsLoaded] = useState(false)
@@ -164,19 +208,19 @@ function App() {
   const [showFilters, setShowFilters] = useState(false)
 
   // Filter helpers for calendar
-  const filterCalendarEvents = (events: any[]) => {
+  const filterCalendarEvents = (events: CalendarEvent[]) => {
     // If no filters selected, show all events
     if (calendarFilters.designers.length === 0 && calendarFilters.projects.length === 0 && calendarFilters.brands.length === 0) {
       return events
     }
     return events.filter(event => {
       // Designer filter - shows ONLY time off (not projects)
-      if (calendarFilters.designers.length > 0 && event.type === 'timeoff') {
+      if (calendarFilters.designers.length > 0 && event.type === 'timeoff' && event.person) {
         const matchesPerson = calendarFilters.designers.includes(event.person)
         if (matchesPerson) return true
       }
       // Project filter - shows ONLY projects
-      if (calendarFilters.projects.length > 0 && event.type === 'project') {
+      if (calendarFilters.projects.length > 0 && event.type === 'project' && event.projectName) {
         if (calendarFilters.projects.includes(event.projectName)) {
           return true
         }
@@ -273,7 +317,7 @@ function App() {
       }
       loadCalendar()
     }
-  }, [activeTab])
+  }, [activeTab, calendarData])
 
   // Load capacity data when capacity tab is active
   useEffect(() => {
@@ -330,7 +374,7 @@ function App() {
   }
 
   // Handle clicking a project event in day modal - switch to projects page
-  const handleEventClick = (event: any) => {
+  const handleEventClick = (event: CalendarEvent) => {
     if (event.type === 'project' && event.projectName) {
       setSelectedDay(null)
       setProjectFilters({
@@ -493,7 +537,14 @@ function App() {
 
   
   if (!isLoaded) {
-    return <div className="loading">Loading...</div>
+    return (
+      <div className="loading" role="status" aria-live="polite">
+        <div className="loading-shell">
+          <div className="loading-title">WandiHub</div>
+          <div className="loading-subtitle">Loading dashboard…</div>
+        </div>
+      </div>
+    )
   }
 
   const unreadCount = notifications.filter(n => !n.read).length
@@ -640,19 +691,22 @@ function App() {
         return a.name.localeCompare(b.name)
       case 'businessLine':
         return (a.businessLine || '').localeCompare(b.businessLine || '')
-      case 'designer':
+      case 'designer': {
         const designerA = a.designers?.[0] || ''
         const designerB = b.designers?.[0] || ''
         return designerA.localeCompare(designerB)
-      case 'dueDate':
+      }
+      case 'dueDate': {
         const dateA = a.endDate || 'zzz'
         const dateB = b.endDate || 'zzz'
         return dateA.localeCompare(dateB)
-      case 'status':
+      }
+      case 'status': {
         // Primary: status, Secondary: name
         const statusCompare = a.status.localeCompare(b.status)
         if (statusCompare !== 0) return statusCompare
         return a.name.localeCompare(b.name)
+      }
       default:
         return 0
     }
@@ -864,6 +918,7 @@ function App() {
               {activeTab === 'projects' && 'Projects'}
               {activeTab === 'team' && 'Team'}
               {activeTab === 'calendar' && 'Calendar'}
+              {activeTab === 'capacity' && 'Capacity'}
             </h1>
             <p className="date">{getTodayFormatted()}</p>
           </div>
@@ -1419,7 +1474,7 @@ function App() {
                     )}
                   </div>
 
-                  {calendarData.months.map((month: any, idx: number) => (
+                  {calendarData.months.map((month: CalendarMonth, idx: number) => (
                     <div key={idx} className="calendar-month">
                       <h3 className="month-title">{month.name}</h3>
                       <div className="month-grid">
@@ -1436,11 +1491,11 @@ function App() {
                             const emptyDays = Array(firstDayIdx).fill(null);
                             return emptyDays.map((_, i) => <div key={`empty-${i}`} className="day-cell empty"></div>);
                           })()}
-                          {month.days.map((day: any, idx: number) => {
+                          {month.days.map((day: CalendarDay, idx: number) => {
                             const isWeekend = day.dayName === 'Sat' || day.dayName === 'Sun'
                             // Filter out project/brand events on weekends, keep holidays and time off
                             const weekendAwareEvents = isWeekend 
-                              ? day.events.filter((e: any) => e.type === 'timeoff' || e.type === 'holiday')
+                              ? day.events.filter((e: CalendarEvent) => e.type === 'timeoff' || e.type === 'holiday')
                               : day.events
                             const filteredEvents = filterCalendarEvents(weekendAwareEvents)
                             const isToday = day.date === getTodayStr()
@@ -1462,7 +1517,7 @@ function App() {
                             >
                               <span className="day-number">{isToday ? '★ ' : ''}{day.day}</span>
                               <div className="day-events">
-                                {dayEvents.map((event: any, eIdx: number) => (
+                                {dayEvents.map((event: CalendarEvent, eIdx: number) => (
                                   <div 
                                     key={eIdx} 
                                     className={`event-tag ${event.type === 'timeoff' ? 'timeoff' : event.type === 'holiday' ? 'holiday' : 'project'}`}
@@ -1491,6 +1546,64 @@ function App() {
               )}
             </div>
           )}
+      {/* Capacity Page - inside content div */}
+      {activeTab === 'capacity' && capacityData && (
+        <div className="capacity-page">
+          <div className="capacity-dashboard">
+            <h2>Capacity Dashboard</h2>
+            
+            <div className="capacity-stats">
+              <div className="capacity-stat-card">
+                <span className="capacity-stat-value">
+                  {capacityData.team.reduce((sum: number, m: CapacityMember) => sum + (m.weekly_hours || 40), 0)}
+                </span>
+                <span className="capacity-stat-label">Total Team Hours</span>
+              </div>
+              <div className="capacity-stat-card">
+                <span className="capacity-stat-value">
+                  {capacityData.team.reduce((sum: number, m: CapacityMember) => {
+                    const assigned = capacityData.assignments
+                      .filter((a: CapacityAssignment) => a.designer_id === m.id)
+                      .reduce((s: number, a: CapacityAssignment) => s + (a.allocation_percent || 0), 0)
+                    return sum + ((m.weekly_hours || 40) * assigned / 100)
+                  }, 0).toFixed(0)}
+                </span>
+                <span className="capacity-stat-label">Allocated Hours</span>
+              </div>
+            </div>
+
+            <div className="capacity-section">
+              <h3>Designer Availability</h3>
+              <div className="designers-grid">
+                {capacityData.team.map((member: CapacityMember) => {
+                  const assignments = capacityData.assignments.filter((a: CapacityAssignment) => a.designer_id === member.id)
+                  const allocated = assignments.reduce((sum: number, a: CapacityAssignment) => sum + (a.allocation_percent || 0), 0)
+                  const available = member.weekly_hours || 40
+                  const utilization = Math.round((allocated / 100) * 100)
+                  const isOver = utilization > 100
+                  
+                  return (
+                    <div key={member.id} className={`designer-card ${isOver ? 'over-capacity' : ''}`}>
+                      <div className="designer-name">{member.name}</div>
+                      <div className="designer-hours">{available} hrs/week</div>
+                      <div className="designer-utilization">
+                        <div className="utilization-bar">
+                          <div 
+                            className={`utilization-fill ${isOver ? 'over' : ''}`}
+                            style={{ width: `${Math.min(utilization, 100)}%` }}
+                          />
+                        </div>
+                        <span className={isOver ? 'over-text' : ''}>{utilization}%</span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
         </div>
       </main>
 
@@ -2001,7 +2114,7 @@ function App() {
               <button className="close-btn" onClick={() => setSelectedDay(null)}>×</button>
             </div>
             <div className="day-modal-content">
-              {selectedDay.events.map((event: any, idx: number) => (
+              {selectedDay.events.map((event: CalendarEvent, idx: number) => (
                 <div 
                   key={idx} 
                   className={`day-modal-event ${event.type === 'timeoff' ? 'timeoff' : event.type === 'holiday' ? 'holiday' : 'project'} ${event.type === 'project' ? 'clickable' : ''}`}
@@ -2034,63 +2147,6 @@ function App() {
         </div>
       )}
 
-      {/* Capacity Page */}
-      {activeTab === 'capacity' && capacityData && (
-        <div className="capacity-page">
-          <div className="capacity-dashboard">
-            <h2>Capacity Dashboard</h2>
-            
-            <div className="capacity-stats">
-              <div className="capacity-stat-card">
-                <span className="capacity-stat-value">
-                  {capacityData.team.reduce((sum: number, m: any) => sum + (m.weekly_hours || 40), 0)}
-                </span>
-                <span className="capacity-stat-label">Total Team Hours</span>
-              </div>
-              <div className="capacity-stat-card">
-                <span className="capacity-stat-value">
-                  {capacityData.team.reduce((sum: number, m: any) => {
-                    const assigned = capacityData.assignments
-                      .filter((a: any) => a.designer_id === m.id)
-                      .reduce((s: number, a: any) => s + (a.allocation_percent || 0), 0)
-                    return sum + ((m.weekly_hours || 40) * assigned / 100)
-                  }, 0).toFixed(0)}
-                </span>
-                <span className="capacity-stat-label">Allocated Hours</span>
-              </div>
-            </div>
-
-            <div className="capacity-section">
-              <h3>Designer Availability</h3>
-              <div className="designers-grid">
-                {capacityData.team.map((member: any) => {
-                  const assignments = capacityData.assignments.filter((a: any) => a.designer_id === member.id)
-                  const allocated = assignments.reduce((sum: number, a: any) => sum + (a.allocation_percent || 0), 0)
-                  const available = member.weekly_hours || 40
-                  const utilization = Math.round((allocated / 100) * 100)
-                  const isOver = utilization > 100
-                  
-                  return (
-                    <div key={member.id} className={`designer-card ${isOver ? 'over-capacity' : ''}`}>
-                      <div className="designer-name">{member.name}</div>
-                      <div className="designer-hours">{available} hrs/week</div>
-                      <div className="designer-utilization">
-                        <div className="utilization-bar">
-                          <div 
-                            className={`utilization-fill ${isOver ? 'over' : ''}`}
-                            style={{ width: `${Math.min(utilization, 100)}%` }}
-                          />
-                        </div>
-                        <span className={isOver ? 'over-text' : ''}>{utilization}%</span>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

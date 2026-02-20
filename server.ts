@@ -7,6 +7,30 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const DB_PATH = process.env.DB_PATH || path.join(process.cwd(), 'data', 'shared.db');
 
+interface CalendarEvent {
+  type: 'project' | 'timeoff'
+  name: string
+  color: string
+  projectName?: string
+  person?: string
+  startDate?: string
+  endDate?: string
+}
+
+interface CalendarDay {
+  day: number
+  date: string
+  dayName: string
+  events: CalendarEvent[]
+}
+
+interface CalendarMonth {
+  name: string
+  year: number
+  month: number
+  days: CalendarDay[]
+}
+
 app.use(cors());
 app.use(express.json());
 
@@ -208,7 +232,7 @@ app.get('/api/calendar', async (req, res) => {
     maxDate.setMonth(maxDate.getMonth() + 3);
     
     // Generate months
-    const months: any[] = [];
+    const months: CalendarMonth[] = [];
     // Start from the month of minDate
     const startMonth = minDate.getMonth();
     const startYear = minDate.getFullYear();
@@ -217,13 +241,13 @@ app.get('/api/calendar', async (req, res) => {
       const monthName = current.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
       const daysInMonth = new Date(current.getFullYear(), current.getMonth() + 1, 0).getDate();
       
-      const days: any[] = [];
+      const days: CalendarDay[] = [];
       for (let d = 1; d <= daysInMonth; d++) {
         const dateStr = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
         const dayOfWeek = new Date(current.getFullYear(), current.getMonth(), d).getDay();
         const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayOfWeek];
         
-        const events: any[] = [];
+        const events: CalendarEvent[] = [];
         
         // Add project timeline events
         projects.forEach(proj => {
@@ -334,7 +358,7 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 
 const SITE_VERSION = 'v260219'  // Manual update on code changes
-const SITE_TIME = '1845'
+const SITE_TIME = '2102'
 
 const VERSION_KEY = 'dcc_versions'
 
