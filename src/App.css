@@ -878,9 +878,18 @@
 @media (max-width: 768px) {
   .app {
     flex-direction: column;
-    height: 100svh;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+    min-height: 100dvh;
+    height: auto;
+    overflow: visible;
+  }
+
+  .main {
+    overflow: visible;
+  }
+
+  .content {
+    overflow: visible;
+    -webkit-overflow-scrolling: auto;
   }
   
   .sidebar {
@@ -933,7 +942,19 @@
     padding: 0.75rem 1rem;
     flex-shrink: 0;
   }
-  
+
+  /* Prioritize content on mobile */
+  .content {
+    padding: 0.75rem;
+  }
+
+  .projects-grid,
+  .team-grid,
+  .calendar-view,
+  .capacity-page {
+    max-width: none;
+    margin: 0;
+  }  
   .header-title h1 {
     font-size: 1.1rem;
   }
@@ -1022,6 +1043,18 @@
   .project-row {
     grid-template-columns: 1fr 1fr;
     gap: 0.5rem;
+  }
+
+  /* No hover on mobile: always show row/card actions */
+  .project-actions,
+  .member-actions {
+    opacity: 1;
+  }
+
+  .project-row .project-actions .action-btn,
+  .team-card .member-actions .action-btn {
+    min-width: 36px;
+    min-height: 36px;
   }
   
   .list-header span:nth-child(3),

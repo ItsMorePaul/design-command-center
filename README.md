@@ -43,6 +43,21 @@ Open http://localhost:5173
 
 Connected to GitHub → Railway auto-deploys on push.
 
+### Required deploy checklist
+
+1. Update release metadata in `server.ts` before push:
+   - `SITE_VERSION`
+   - `SITE_TIME`
+2. Verify local API returns updated values:
+   ```bash
+   curl -s http://localhost:3001/api/versions
+   ```
+3. Push to `main` (triggers Railway deploy).
+4. Verify production matches:
+   ```bash
+   curl -s https://design-command-center-production.up.railway.app/api/versions
+   ```
+
 ## License
 
 Private — Dow Jones Internal Use Only
