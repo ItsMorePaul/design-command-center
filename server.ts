@@ -422,7 +422,7 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 
 const SITE_VERSION = 'v260219'  // Manual update on code changes
-const SITE_TIME = '2200'
+const SITE_TIME = '2204'
 
 const VERSION_KEY = 'dcc_versions'
 
@@ -518,11 +518,8 @@ app.get('/api/capacity', async (req, res) => {
       ORDER BY p.name, t.name
     `)
     
-    // Get calendar data for time off calculations
-    const calendarRes = await fetch('http://localhost:3001/api/calendar')
-    const calendarData = calendarRes.ok ? await calendarRes.json() : { month: [] }
-    
-    res.json({ team: teamWithHours, assignments, calendar: calendarData })
+    // Note: avoid self-fetching /api/calendar in production (can fail on Railway runtime networking)
+    res.json({ team: teamWithHours, assignments })
   } catch (e) { res.status(500).json({error: e.message}); }
 })
 
