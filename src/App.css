@@ -579,6 +579,20 @@
   font-size: 1.25rem;
 }
 
+.confirm-message {
+  margin: -0.5rem 0 1rem;
+  color: var(--color-text-muted);
+  font-size: 0.92rem;
+}
+
+.danger-btn {
+  background-color: #dc2626;
+}
+
+.danger-btn:hover {
+  background-color: #b91c1c;
+}
+
 /* Day Modal */
 .day-modal {
   max-width: 400px;
@@ -1037,6 +1051,15 @@
   
   .stats-row {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .assignment-form {
+    grid-template-columns: 1fr;
+  }
+
+  .assignment-row {
+    align-items: flex-start;
+    gap: 0.5rem;
   }
   
   .list-header,
@@ -2318,6 +2341,104 @@ input:checked + .slider:before {
 .capacity-section h3 {
   font-size: 1.1rem;
   margin-bottom: 1rem;
+}
+
+.assignment-form {
+  display: grid;
+  grid-template-columns: 2fr 2fr 120px auto;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.assignment-form select,
+.assignment-form input {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
+  padding: 0.55rem 0.7rem;
+}
+
+.assignment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.assignment-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.6rem 0.7rem;
+  background: var(--color-bg-secondary);
+}
+
+.assignment-main {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.assignment-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.assignment-percent-input {
+  width: 72px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  padding: 0.25rem 0.45rem;
+}
+
+.assignment-designer {
+  font-weight: 600;
+}
+
+.assignment-project {
+  color: var(--color-text-muted);
+}
+
+.assignment-percent {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.assignment-empty {
+  color: var(--color-text-muted);
+}
+
+.designer-hours-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.65rem;
+}
+
+.hours-input {
+  width: 72px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  padding: 0.3rem 0.45rem;
+}
+
+.capacity-mini-btn {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+  border-radius: 6px;
+  padding: 0.28rem 0.5rem;
+  font-size: 0.75rem;
+  cursor: pointer;
 }
 
 .designers-grid {

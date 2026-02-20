@@ -66,6 +66,66 @@ const get = (sql, params = []) => new Promise((resolve, reject) => {
   });
 });
 
+interface TeamIdentity {
+  id: string
+  name: string
+}
+
+const syncProjectDesignersToAssignments = async (projectId: string, designerNames: string[]) => {
+  const teamRows = await all('SELECT id, name FROM team') as TeamIdentity[]
+  const normalizedNames = Array.from(new Set((designerNames || []).map(n => n.trim()).filter(Boolean)))
+  const matchingTeam = teamRows.filter(t => normalizedNames.includes(t.name))
+  const matchingIds = matchingTeam.map(t => t.id)
+
+  for (const team of matchingTeam) {
+    const assignmentId = `${projectId}_${team.id}`
+    await run(
+      `INSERT OR IGNORE INTO project_assignments (id, project_id, designer_id, allocation_percent, created_at)
+       VALUES (?, ?, ?, 0, datetime('now'))`,
+      [assignmentId, projectId, team.id]
+    )
+  }
+
+  if (matchingIds.length > 0) {
+    const placeholders = matchingIds.map(() => '?').join(',')
+    await run(
+      `DELETE FROM project_assignments WHERE project_id = ? AND designer_id NOT IN (${placeholders})`,
+      [projectId, ...matchingIds]
+    )
+  } else {
+    await run('DELETE FROM project_assignments WHERE project_id = ?', [projectId])
+  }
+}
+
+const syncAssignmentToProjectDesigners = async (projectId: string, designerId: string, add: boolean) => {
+  const projectRow = await get('SELECT designers FROM projects WHERE id = ?', [projectId]) as { designers?: string } | undefined
+  const teamRow = await get('SELECT name FROM team WHERE id = ?', [designerId]) as { name?: string } | undefined
+  const designerName = teamRow?.name
+  if (!designerName) return
+
+  const currentDesigners = projectRow?.designers ? JSON.parse(projectRow.designers) as string[] : []
+  const set = new Set(currentDesigners)
+
+  if (add) {
+    set.add(designerName)
+  } else {
+    set.delete(designerName)
+  }
+
+  await run(
+    `UPDATE projects SET designers = ?, updatedAt = datetime('now') WHERE id = ?`,
+    [JSON.stringify(Array.from(set)), projectId]
+  )
+}
+
+const reconcileProjectDesignerAssignments = async () => {
+  const projects = await all('SELECT id, designers FROM projects') as Array<{ id: string; designers?: string }>
+  for (const project of projects) {
+    const designers = project.designers ? JSON.parse(project.designers) as string[] : []
+    await syncProjectDesignersToAssignments(project.id, designers)
+  }
+}
+
 // ============ PROJECTS ============
 app.get('/api/projects', async (req, res) => {
   try {
@@ -92,6 +152,9 @@ app.post('/api/projects', async (req, res) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
       [projectId, name, status || 'active', dueDate, assignee, url, description, businessLine, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinksJson, designersJson, startDate, endDate, timelineJson]
     );
+
+    await syncProjectDesignersToAssignments(projectId, designers || [])
+
     // Update DB version
     await updateDbVersion()
     res.json({id: projectId, ...req.body});
@@ -101,6 +164,7 @@ app.post('/api/projects', async (req, res) => {
 app.delete('/api/projects/:id', async (req, res) => {
   try {
     await run('DELETE FROM projects WHERE id = ?', [req.params.id]);
+    await run('DELETE FROM project_assignments WHERE project_id = ?', [req.params.id]);
     await updateDbVersion()
     res.json({success: true});
   } catch (e) { res.status(500).json({error: e.message}); }
@@ -121,14 +185,14 @@ app.get('/api/team', async (req, res) => {
 
 app.post('/api/team', async (req, res) => {
   try {
-    const { id, name, role, brands, status, slack, email, avatar, timeOff } = req.body;
+    const { id, name, role, brands, status, slack, email, avatar, timeOff, weekly_hours } = req.body;
     const memberId = id || Date.now().toString();
     const brandsJson = JSON.stringify(brands || []);
     const timeOffJson = JSON.stringify(timeOff || []);
     await run(
-      `INSERT OR REPLACE INTO team (id, name, role, brands, status, slack, email, avatar, timeOff, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-      [memberId, name, role, brandsJson, status || 'offline', slack, email, avatar, timeOffJson]
+      `INSERT OR REPLACE INTO team (id, name, role, brands, status, slack, email, avatar, timeOff, weekly_hours, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+      [memberId, name, role, brandsJson, status || 'offline', slack, email, avatar, timeOffJson, weekly_hours ?? 35]
     );
     await updateDbVersion()
     res.json({id: memberId, ...req.body});
@@ -329,8 +393,8 @@ app.post('/api/seed', async (req, res) => {
     if (team) {
       await run('DELETE FROM team')
       for (const t of team) {
-        await run(`INSERT INTO team (id, name, role, brands, status, slack, email, avatar, timeOff) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [t.id, t.name, t.role || '', JSON.stringify(t.brands || []), t.status || 'offline', t.slack || '', t.email || '', t.avatar || '', JSON.stringify(t.timeOff || [])])
+        await run(`INSERT INTO team (id, name, role, brands, status, slack, email, avatar, timeOff, weekly_hours) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [t.id, t.name, t.role || '', JSON.stringify(t.brands || []), t.status || 'offline', t.slack || '', t.email || '', t.avatar || '', JSON.stringify(t.timeOff || []), t.weekly_hours ?? 35])
       }
     }
     
@@ -358,7 +422,7 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 
 const SITE_VERSION = 'v260219'  // Manual update on code changes
-const SITE_TIME = '2121'
+const SITE_TIME = '2200'
 
 const VERSION_KEY = 'dcc_versions'
 
@@ -399,6 +463,20 @@ const initVersions = async () => {
 // Ensure table exists
 run("CREATE TABLE IF NOT EXISTS app_versions (key TEXT PRIMARY KEY, db_version TEXT, db_time TEXT, updated_at TEXT)").then(() => initVersions())
 
+// Capacity schema safety
+run(`CREATE TABLE IF NOT EXISTS project_assignments (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  designer_id TEXT NOT NULL,
+  allocation_percent INTEGER DEFAULT 100,
+  created_at TEXT DEFAULT (datetime('now'))
+)`).catch((e) => console.error('project_assignments init error:', e.message))
+
+run("ALTER TABLE team ADD COLUMN weekly_hours INTEGER DEFAULT 35")
+  .catch(() => {
+    // Column already exists in established databases
+  })
+
 // Get versions - returns site version from code, DB version from database
 app.get('/api/versions', async (req, res) => {
   try {
@@ -419,11 +497,14 @@ app.get('/api/versions', async (req, res) => {
 // Get all capacity data: team availability + project assignments
 app.get('/api/capacity', async (req, res) => {
   try {
+    // Keep project designer selections and capacity assignments in sync
+    await reconcileProjectDesignerAssignments()
+
     // Get team with weekly hours
     const team = await all('SELECT * FROM team ORDER BY name')
     const teamWithHours = team.map(m => ({
       ...m,
-      weekly_hours: m.weekly_hours || 40,
+      weekly_hours: m.weekly_hours || 35,
       timeOff: m.timeOff ? JSON.parse(m.timeOff) : []
     }))
     
@@ -453,8 +534,9 @@ app.post('/api/capacity/assignments', async (req, res) => {
     await run(
       `INSERT OR REPLACE INTO project_assignments (id, project_id, designer_id, allocation_percent, created_at)
        VALUES (?, ?, ?, ?, datetime('now'))`,
-      [id, project_id, designer_id, allocation_percent || 100]
+      [id, project_id, designer_id, allocation_percent ?? 0]
     )
+    await syncAssignmentToProjectDesigners(project_id, designer_id, true)
     await updateDbVersion()
     res.json({ success: true, id })
   } catch (e) { res.status(500).json({error: e.message}); }
@@ -463,7 +545,11 @@ app.post('/api/capacity/assignments', async (req, res) => {
 // Delete project assignment
 app.delete('/api/capacity/assignments/:id', async (req, res) => {
   try {
+    const existing = await get('SELECT project_id, designer_id FROM project_assignments WHERE id = ?', [req.params.id]) as { project_id?: string; designer_id?: string } | undefined
     await run('DELETE FROM project_assignments WHERE id = ?', [req.params.id])
+    if (existing?.project_id && existing?.designer_id) {
+      await syncAssignmentToProjectDesigners(existing.project_id, existing.designer_id, false)
+    }
     await updateDbVersion()
     res.json({ success: true })
   } catch (e) { res.status(500).json({error: e.message}); }
@@ -474,7 +560,7 @@ app.put('/api/capacity/availability/:designerId', async (req, res) => {
   try {
     const { weekly_hours } = req.body
     await run('UPDATE team SET weekly_hours = ?, updatedAt = datetime("now") WHERE id = ?', 
-      [weekly_hours || 40, req.params.designerId])
+      [weekly_hours || 35, req.params.designerId])
     await updateDbVersion()
     res.json({ success: true })
   } catch (e) { res.status(500).json({error: e.message}); }

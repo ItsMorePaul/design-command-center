@@ -120,8 +120,14 @@ interface CapacityMember {
 }
 
 interface CapacityAssignment {
+  id: string
+  project_id: string
   designer_id: string
   allocation_percent?: number
+  project_name?: string
+  designer_name?: string
+  project_status?: string
+  businessLine?: string
 }
 
 interface CapacityData {
@@ -206,6 +212,15 @@ function App() {
     brands: [] as string[]
   })
   const [showFilters, setShowFilters] = useState(false)
+  const [assignmentForm, setAssignmentForm] = useState({ project_id: '', designer_id: '', allocation_percent: 0 })
+  const [hoursDraft, setHoursDraft] = useState<Record<string, number>>({})
+  const [assignmentDraft, setAssignmentDraft] = useState<Record<string, number>>({})
+  const [confirmModal, setConfirmModal] = useState<{ open: boolean; title: string; message: string; onConfirm: (() => Promise<void> | void) | null }>({
+    open: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+  })
 
   // Filter helpers for calendar
   const filterCalendarEvents = (events: CalendarEvent[]) => {
@@ -327,6 +342,11 @@ function App() {
           const res = await fetch('/api/capacity')
           const data = await res.json()
           setCapacityData(data)
+          const initialHours = (data.team || []).reduce((acc: Record<string, number>, m: CapacityMember) => {
+            acc[m.id] = m.weekly_hours || 35
+            return acc
+          }, {})
+          setHoursDraft(initialHours)
         } catch (err) {
           console.error('Error loading capacity:', err)
         }
@@ -346,6 +366,69 @@ function App() {
         console.error('Error refreshing calendar:', err)
       }
     }
+  }
+
+  const refreshCapacity = async () => {
+    try {
+      const res = await fetch('/api/capacity')
+      const data = await res.json()
+      setCapacityData(data)
+      const initialHours = (data.team || []).reduce((acc: Record<string, number>, m: CapacityMember) => {
+        acc[m.id] = m.weekly_hours || 35
+        return acc
+      }, {})
+      setHoursDraft(initialHours)
+    } catch (err) {
+      console.error('Error refreshing capacity:', err)
+    }
+  }
+
+  const saveCapacityAssignment = async () => {
+    if (!assignmentForm.project_id || !assignmentForm.designer_id) {
+      alert('Select both a project and a designer')
+      return
+    }
+    await fetch('/api/capacity/assignments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(assignmentForm)
+    })
+    await refreshCapacity()
+  }
+
+  const saveAssignmentAllocation = async (assignment: CapacityAssignment, allocationPercent: number) => {
+    await fetch('/api/capacity/assignments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        project_id: assignment.project_id,
+        designer_id: assignment.designer_id,
+        allocation_percent: allocationPercent,
+      })
+    })
+    await refreshCapacity()
+  }
+
+  const removeCapacityAssignment = async (id: string) => {
+    await fetch(`/api/capacity/assignments/${id}`, { method: 'DELETE' })
+    await refreshCapacity()
+  }
+
+  const openConfirmModal = (title: string, message: string, onConfirm: () => Promise<void> | void) => {
+    setConfirmModal({ open: true, title, message, onConfirm })
+  }
+
+  const closeConfirmModal = () => {
+    setConfirmModal({ open: false, title: '', message: '', onConfirm: null })
+  }
+
+  const updateWeeklyHours = async (designerId: string, weeklyHours: number) => {
+    await fetch(`/api/capacity/availability/${designerId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ weekly_hours: weeklyHours })
+    })
+    await refreshCapacity()
   }
 
   // API helper functions
@@ -421,15 +504,17 @@ function App() {
   }
 
   const handleDeleteProject = async (id: string) => {
-    if (confirm('Are you sure you want to delete this project?')) {
+    openConfirmModal('Delete project?', 'This will permanently remove the project and related capacity assignments.', async () => {
       try {
         await deleteProject(id)
         setProjects(projects.filter(p => p.id !== id))
       } catch (err) {
         console.error('Delete failed:', err)
         alert('Failed to delete project')
+      } finally {
+        closeConfirmModal()
       }
-    }
+    })
   }
 
   // Timeline management
@@ -446,9 +531,12 @@ function App() {
   }
 
   const handleDeleteTimeline = (id: string) => {
-    setProjectFormData({
-      ...projectFormData,
-      timeline: projectFormData.timeline.filter(t => t.id !== id)
+    openConfirmModal('Delete timeline range?', 'This will remove the timeline range from this project.', () => {
+      setProjectFormData({
+        ...projectFormData,
+        timeline: projectFormData.timeline.filter(t => t.id !== id)
+      })
+      closeConfirmModal()
     })
   }
 
@@ -815,10 +903,11 @@ function App() {
   }
 
   const handleDeleteMember = async (id: string) => {
-    if (confirm('Are you sure you want to remove this team member?')) {
+    openConfirmModal('Remove team member?', 'This will remove the team member and related assignment links.', async () => {
       await deleteTeamMember(id)
       setTeam(team.filter(m => m.id !== id))
-    }
+      closeConfirmModal()
+    })
   }
 
   const handleSave = async () => {
@@ -1550,14 +1639,14 @@ function App() {
       {activeTab === 'capacity' && capacityData && (
         <div className="capacity-page">
           <div className="capacity-dashboard">
-            <h2>Capacity Dashboard</h2>
-            
             <div className="capacity-stats">
               <div className="capacity-stat-card">
                 <span className="capacity-stat-value">
-                  {capacityData.team.reduce((sum: number, m: CapacityMember) => sum + (m.weekly_hours || 40), 0)}
+                  {Math.round(
+                    capacityData.team.reduce((sum: number, m: CapacityMember) => sum + (m.weekly_hours || 35), 0) * 13
+                  )}
                 </span>
-                <span className="capacity-stat-label">Total Team Hours</span>
+                <span className="capacity-stat-label">Total Team Capacity (Quarter hrs)</span>
               </div>
               <div className="capacity-stat-card">
                 <span className="capacity-stat-value">
@@ -1565,10 +1654,42 @@ function App() {
                     const assigned = capacityData.assignments
                       .filter((a: CapacityAssignment) => a.designer_id === m.id)
                       .reduce((s: number, a: CapacityAssignment) => s + (a.allocation_percent || 0), 0)
-                    return sum + ((m.weekly_hours || 40) * assigned / 100)
+                    return sum + ((m.weekly_hours || 35) * assigned / 100)
                   }, 0).toFixed(0)}
                 </span>
                 <span className="capacity-stat-label">Allocated Hours</span>
+              </div>
+              <div className="capacity-stat-card">
+                <span className="capacity-stat-value">
+                  {(() => {
+                    const totalWeekly = capacityData.team.reduce((sum: number, m: CapacityMember) => sum + (m.weekly_hours || 35), 0)
+                    const allocatedWeekly = capacityData.team.reduce((sum: number, m: CapacityMember) => {
+                      const assigned = capacityData.assignments
+                        .filter((a: CapacityAssignment) => a.designer_id === m.id)
+                        .reduce((s: number, a: CapacityAssignment) => s + (a.allocation_percent || 0), 0)
+                      return sum + ((m.weekly_hours || 35) * assigned / 100)
+                    }, 0)
+                    if (totalWeekly === 0) return '0%'
+                    return `${Math.round((allocatedWeekly / totalWeekly) * 100)}%`
+                  })()}
+                </span>
+                <span className="capacity-stat-label">Allocated Capacity (%)</span>
+              </div>
+              <div className="capacity-stat-card">
+                <span className="capacity-stat-value">
+                  {Math.round(
+                    (
+                      capacityData.team.reduce((sum: number, m: CapacityMember) => sum + (m.weekly_hours || 35), 0) -
+                      capacityData.team.reduce((sum: number, m: CapacityMember) => {
+                        const assigned = capacityData.assignments
+                          .filter((a: CapacityAssignment) => a.designer_id === m.id)
+                          .reduce((s: number, a: CapacityAssignment) => s + (a.allocation_percent || 0), 0)
+                        return sum + ((m.weekly_hours || 35) * assigned / 100)
+                      }, 0)
+                    ) * 13
+                  )}
+                </span>
+                <span className="capacity-stat-label">Unallocated Capacity (Quarter hrs)</span>
               </div>
             </div>
 
@@ -1578,14 +1699,30 @@ function App() {
                 {capacityData.team.map((member: CapacityMember) => {
                   const assignments = capacityData.assignments.filter((a: CapacityAssignment) => a.designer_id === member.id)
                   const allocated = assignments.reduce((sum: number, a: CapacityAssignment) => sum + (a.allocation_percent || 0), 0)
-                  const available = member.weekly_hours || 40
+                  const available = member.weekly_hours || 35
                   const utilization = Math.round((allocated / 100) * 100)
                   const isOver = utilization > 100
                   
                   return (
                     <div key={member.id} className={`designer-card ${isOver ? 'over-capacity' : ''}`}>
                       <div className="designer-name">{member.name}</div>
-                      <div className="designer-hours">{available} hrs/week</div>
+                      <div className="designer-hours-row">
+                        <input
+                          type="number"
+                          min={0}
+                          max={80}
+                          className="hours-input"
+                          value={hoursDraft[member.id] ?? available}
+                          onChange={e => setHoursDraft({ ...hoursDraft, [member.id]: Number(e.target.value) })}
+                        />
+                        <span className="designer-hours">hrs/week</span>
+                        <button
+                          className="capacity-mini-btn"
+                          onClick={() => updateWeeklyHours(member.id, hoursDraft[member.id] ?? available)}
+                        >
+                          Save
+                        </button>
+                      </div>
                       <div className="designer-utilization">
                         <div className="utilization-bar">
                           <div 
@@ -1598,6 +1735,80 @@ function App() {
                     </div>
                   )
                 })}
+              </div>
+            </div>
+
+            <div className="capacity-section">
+              <h3>Project Assignments</h3>
+              <div className="assignment-form">
+                <select
+                  value={assignmentForm.project_id}
+                  onChange={e => setAssignmentForm({ ...assignmentForm, project_id: e.target.value })}
+                >
+                  <option value="">Select project</option>
+                  {projects.map(project => (
+                    <option key={project.id} value={project.id}>{project.name}</option>
+                  ))}
+                </select>
+                <select
+                  value={assignmentForm.designer_id}
+                  onChange={e => setAssignmentForm({ ...assignmentForm, designer_id: e.target.value })}
+                >
+                  <option value="">Select designer</option>
+                  {capacityData.team.map(member => (
+                    <option key={member.id} value={member.id}>{member.name}</option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={assignmentForm.allocation_percent}
+                  onChange={e => setAssignmentForm({ ...assignmentForm, allocation_percent: Number(e.target.value) })}
+                />
+                <button className="primary-btn" onClick={saveCapacityAssignment}>Assign</button>
+              </div>
+
+              <div className="assignment-list">
+                {capacityData.assignments.length === 0 ? (
+                  <p className="assignment-empty">No assignments yet.</p>
+                ) : (
+                  capacityData.assignments.map((assignment: CapacityAssignment) => (
+                    <div key={assignment.id} className="assignment-row">
+                      <div className="assignment-main">
+                        <span className="assignment-designer">{assignment.designer_name || 'Designer'}</span>
+                        <span className="assignment-project">→ {assignment.project_name || 'Project'}</span>
+                        <div className="assignment-edit">
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            className="assignment-percent-input"
+                            value={assignmentDraft[assignment.id] ?? (assignment.allocation_percent || 0)}
+                            onChange={e => setAssignmentDraft({ ...assignmentDraft, [assignment.id]: Number(e.target.value) })}
+                          />
+                          <span className="assignment-percent">%</span>
+                          <button
+                            className="capacity-mini-btn"
+                            onClick={() => saveAssignmentAllocation(assignment, assignmentDraft[assignment.id] ?? (assignment.allocation_percent || 0))}
+                          >
+                            Save
+                          </button>
+                        </div>
+                      </div>
+                      <button
+                        className="action-btn delete"
+                        onClick={() => openConfirmModal('Delete assignment?', 'This will remove the designer from this project in capacity and project views.', async () => {
+                          await removeCapacityAssignment(assignment.id)
+                          closeConfirmModal()
+                        })}
+                        aria-label="Delete assignment"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -1921,10 +2132,11 @@ function App() {
                   <button
                     type="button"
                     className="remove-link-btn"
-                    onClick={() => {
-                      const newLinks = projectFormData.customLinks.filter((_, i) => i !== idx);
-                      setProjectFormData({ ...projectFormData, customLinks: newLinks });
-                    }}
+                    onClick={() => openConfirmModal('Remove custom link?', 'This link will be removed from the project.', () => {
+                      const newLinks = projectFormData.customLinks.filter((_, i) => i !== idx)
+                      setProjectFormData({ ...projectFormData, customLinks: newLinks })
+                      closeConfirmModal()
+                    })}
                   >
                     ×
                   </button>
@@ -2142,6 +2354,28 @@ function App() {
                   )}
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmModal.open && (
+        <div className="modal-overlay" onClick={closeConfirmModal}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h2>{confirmModal.title}</h2>
+            <p className="confirm-message">{confirmModal.message}</p>
+            <div className="modal-actions">
+              <button className="secondary-btn" onClick={closeConfirmModal}>Cancel</button>
+              <button
+                className="primary-btn danger-btn"
+                onClick={async () => {
+                  if (confirmModal.onConfirm) {
+                    await confirmModal.onConfirm()
+                  }
+                }}
+              >
+                Delete
+              </button>
             </div>
           </div>
         </div>
