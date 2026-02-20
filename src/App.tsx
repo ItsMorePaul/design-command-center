@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Bell } from 'lucide-react'
+import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Bell, Gauge } from 'lucide-react'
 import './App.css'
 import initialData from './data.json'
 
@@ -107,12 +107,13 @@ const loadDataFromAPI = async () => {
 }
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'projects' | 'team' | 'calendar'>('projects')
+  const [activeTab, setActiveTab] = useState<'projects' | 'team' | 'calendar' | 'capacity'>('projects')
   const [notifications] = useState(mockNotifications)
   const [team, setTeam] = useState<TeamMember[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [brandOptions, setBrandOptions] = useState<string[]>(defaultBrandOptions)
   const [calendarData, setCalendarData] = useState<{ months: any[] } | null>(null)
+  const [capacityData, setCapacityData] = useState<{ team: any[]; assignments: any[] } | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null)
   const [formData, setFormData] = useState({ name: '', role: '', brands: ["Barron's"] as string[], status: 'offline' as TeamMember['status'], slack: '', email: '', timeOff: [] as { name: string; startDate: string; endDate: string; id: string }[] })
@@ -271,6 +272,22 @@ function App() {
         }
       }
       loadCalendar()
+    }
+  }, [activeTab])
+
+  // Load capacity data when capacity tab is active
+  useEffect(() => {
+    if (activeTab === 'capacity') {
+      const loadCapacity = async () => {
+        try {
+          const res = await fetch('/api/capacity')
+          const data = await res.json()
+          setCapacityData(data)
+        } catch (err) {
+          console.error('Error loading capacity:', err)
+        }
+      }
+      loadCapacity()
     }
   }, [activeTab])
 
@@ -811,6 +828,14 @@ function App() {
           >
             <span className="nav-icon"><Calendar size={18} /></span>
             <span>Calendar</span>
+          </button>
+          <button 
+            className={`nav-item ${activeTab === 'capacity' ? 'active' : ''}`}
+            onClick={() => setActiveTab('capacity')}
+            aria-label="Capacity"
+          >
+            <span className="nav-icon"><Gauge size={18} /></span>
+            <span>Capacity</span>
           </button>
         </nav>
 
@@ -2004,6 +2029,64 @@ function App() {
                   )}
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Capacity Page */}
+      {activeTab === 'capacity' && capacityData && (
+        <div className="capacity-page">
+          <div className="capacity-dashboard">
+            <h2>Capacity Dashboard</h2>
+            
+            <div className="capacity-stats">
+              <div className="capacity-stat-card">
+                <span className="capacity-stat-value">
+                  {capacityData.team.reduce((sum: number, m: any) => sum + (m.weekly_hours || 40), 0)}
+                </span>
+                <span className="capacity-stat-label">Total Team Hours</span>
+              </div>
+              <div className="capacity-stat-card">
+                <span className="capacity-stat-value">
+                  {capacityData.team.reduce((sum: number, m: any) => {
+                    const assigned = capacityData.assignments
+                      .filter((a: any) => a.designer_id === m.id)
+                      .reduce((s: number, a: any) => s + (a.allocation_percent || 0), 0)
+                    return sum + ((m.weekly_hours || 40) * assigned / 100)
+                  }, 0).toFixed(0)}
+                </span>
+                <span className="capacity-stat-label">Allocated Hours</span>
+              </div>
+            </div>
+
+            <div className="capacity-section">
+              <h3>Designer Availability</h3>
+              <div className="designers-grid">
+                {capacityData.team.map((member: any) => {
+                  const assignments = capacityData.assignments.filter((a: any) => a.designer_id === member.id)
+                  const allocated = assignments.reduce((sum: number, a: any) => sum + (a.allocation_percent || 0), 0)
+                  const available = member.weekly_hours || 40
+                  const utilization = Math.round((allocated / 100) * 100)
+                  const isOver = utilization > 100
+                  
+                  return (
+                    <div key={member.id} className={`designer-card ${isOver ? 'over-capacity' : ''}`}>
+                      <div className="designer-name">{member.name}</div>
+                      <div className="designer-hours">{available} hrs/week</div>
+                      <div className="designer-utilization">
+                        <div className="utilization-bar">
+                          <div 
+                            className={`utilization-fill ${isOver ? 'over' : ''}`}
+                            style={{ width: `${Math.min(utilization, 100)}%` }}
+                          />
+                        </div>
+                        <span className={isOver ? 'over-text' : ''}>{utilization}%</span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           </div>
         </div>

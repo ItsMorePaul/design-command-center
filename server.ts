@@ -334,7 +334,7 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 
 const SITE_VERSION = 'v260219'  // Manual update on code changes
-const SITE_TIME = '1352'
+const SITE_TIME = '1845'
 
 const VERSION_KEY = 'dcc_versions'
 
@@ -389,6 +389,72 @@ app.get('/api/versions', async (req, res) => {
 })
 
 // Update DB version (automatic on data changes - handled in individual endpoints)
+
+// ============ CAPACITY MANAGEMENT ============
+
+// Get all capacity data: team availability + project assignments
+app.get('/api/capacity', async (req, res) => {
+  try {
+    // Get team with weekly hours
+    const team = await all('SELECT * FROM team ORDER BY name')
+    const teamWithHours = team.map(m => ({
+      ...m,
+      weekly_hours: m.weekly_hours || 40,
+      timeOff: m.timeOff ? JSON.parse(m.timeOff) : []
+    }))
+    
+    // Get project assignments with project and designer details
+    const assignments = await all(`
+      SELECT pa.*, p.name as project_name, p.businessLine, p.status as project_status,
+             t.name as designer_name, t.role as designer_role
+      FROM project_assignments pa
+      JOIN projects p ON pa.project_id = p.id
+      JOIN team t ON pa.designer_id = t.id
+      ORDER BY p.name, t.name
+    `)
+    
+    // Get calendar data for time off calculations
+    const calendarRes = await fetch('http://localhost:3001/api/calendar')
+    const calendarData = calendarRes.ok ? await calendarRes.json() : { month: [] }
+    
+    res.json({ team: teamWithHours, assignments, calendar: calendarData })
+  } catch (e) { res.status(500).json({error: e.message}); }
+})
+
+// Add or update project assignment
+app.post('/api/capacity/assignments', async (req, res) => {
+  try {
+    const { project_id, designer_id, allocation_percent } = req.body
+    const id = `${project_id}_${designer_id}`
+    await run(
+      `INSERT OR REPLACE INTO project_assignments (id, project_id, designer_id, allocation_percent, created_at)
+       VALUES (?, ?, ?, ?, datetime('now'))`,
+      [id, project_id, designer_id, allocation_percent || 100]
+    )
+    await updateDbVersion()
+    res.json({ success: true, id })
+  } catch (e) { res.status(500).json({error: e.message}); }
+})
+
+// Delete project assignment
+app.delete('/api/capacity/assignments/:id', async (req, res) => {
+  try {
+    await run('DELETE FROM project_assignments WHERE id = ?', [req.params.id])
+    await updateDbVersion()
+    res.json({ success: true })
+  } catch (e) { res.status(500).json({error: e.message}); }
+})
+
+// Update designer's weekly hours
+app.put('/api/capacity/availability/:designerId', async (req, res) => {
+  try {
+    const { weekly_hours } = req.body
+    await run('UPDATE team SET weekly_hours = ?, updatedAt = datetime("now") WHERE id = ?', 
+      [weekly_hours || 40, req.params.designerId])
+    await updateDbVersion()
+    res.json({ success: true })
+  } catch (e) { res.status(500).json({error: e.message}); }
+})
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`API server running on http://localhost:${PORT}`);
