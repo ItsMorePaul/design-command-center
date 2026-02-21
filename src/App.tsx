@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Bell, Gauge } from 'lucide-react'
+import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Bell, Gauge, ChevronDown } from 'lucide-react'
 import './App.css'
 import initialData from './data.json'
 
@@ -22,6 +22,20 @@ const usHolidays2026 = [
 const getTodayStr = () => {
   const today = new Date()
   return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+}
+
+const getDjFiscalLabel = (monthNumber: number, year: number) => {
+  // Dow Jones fiscal year starts July 1
+  const fiscalYear = monthNumber >= 7 ? year + 1 : year
+  const fy = String(fiscalYear).slice(-2)
+
+  let quarter = 1
+  if (monthNumber >= 7 && monthNumber <= 9) quarter = 1
+  else if (monthNumber >= 10 && monthNumber <= 12) quarter = 2
+  else if (monthNumber >= 1 && monthNumber <= 3) quarter = 3
+  else quarter = 4
+
+  return `Q${quarter}-FY${fy}`
 }
 
 const DAY_MS = 1000 * 60 * 60 * 24
@@ -1046,7 +1060,7 @@ function App() {
         </header>
 
         {/* Content Area */}
-        <div className="content">
+        <div className={`content ${activeTab === 'calendar' ? 'content-calendar' : ''}`}>
           {activeTab === 'projects' && (
             <div className="projects-grid">
               <div className="stats-row">
@@ -1465,18 +1479,23 @@ function App() {
                       
                       {/* Filter Toggle - Right */}
                       <button 
-                        className="filter-toggle"
+                        className={`filter-toggle ${showFilters ? 'open' : ''}`}
                         onClick={() => setShowFilters(!showFilters)}
+                        aria-expanded={showFilters}
+                        aria-controls="calendar-filters-panel"
                       >
-                        <span className="filter-toggle-icon">{showFilters ? '▼' : '▶'}</span>
+                        <ChevronDown className={`filter-toggle-icon ${showFilters ? 'open' : ''}`} size={14} />
                         Filters {calendarFilters.designers.length + calendarFilters.projects.length + calendarFilters.brands.length > 0 && `(${calendarFilters.designers.length + calendarFilters.projects.length + calendarFilters.brands.length})`}
                       </button>
                     </div>
 
                     {/* Panel Content - Collapsible */}
-                    {showFilters && (
-                      <div className="calendar-panel-content">
-                        <div className="calendar-filters">
+                    <div
+                      id="calendar-filters-panel"
+                      className={`calendar-panel-content ${showFilters ? 'open' : 'closed'}`}
+                      aria-hidden={!showFilters}
+                    >
+                      <div className="calendar-filters">
                           {/* Designer Filter */}
                           <div className="filter-group">
                             <div className="filter-header">
@@ -1595,12 +1614,13 @@ function App() {
                           </div>
                         </div>
                       </div>
-                    )}
-                  </div>
+                    </div>
 
                   {calendarData.months.map((month: CalendarMonth, idx: number) => (
                     <div key={idx} className="calendar-month">
-                      <h3 className="month-title">{month.name}</h3>
+                      <h3 className="month-title">
+                        {month.name} <span className="month-fiscal">({getDjFiscalLabel(month.month, month.year)})</span>
+                      </h3>
                       <div className="month-grid">
                         <div className="day-headers">
                           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (

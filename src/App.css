@@ -228,6 +228,11 @@
   background-color: var(--color-bg);
 }
 
+/* Calendar tab needs panel to sit directly under page header */
+.content.content-calendar {
+  padding-top: 0;
+}
+
 /* Projects Grid */
 .stats-row {
   display: grid;
@@ -484,9 +489,9 @@
 /* Calendar View */
 .calendar-view {
   display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 400px;
+  justify-content: flex-start;
+  align-items: stretch;
+  min-height: 0;
 }
 
 .calendar-placeholder {
@@ -977,14 +982,25 @@
     font-size: 0.75rem;
   }
   
-  /* Calendar - fix clipping on mobile */
-  .calendar-panel {
-    position: relative;
+  /* Calendar - keep legend/filter row visible while filters scroll under it */
+  .calendar-view .calendar-panel {
+    position: sticky;
     top: 0;
-    overflow: visible;
+    overflow: hidden;
+    max-height: min(70vh, 520px);
+  }
+
+  .calendar-panel-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--color-bg-secondary);
+    border-bottom: 1px solid var(--color-border-subtle);
   }
   
-  .calendar-panel-content {
+  .calendar-panel-content.open {
+    max-height: calc(min(70vh, 520px) - 56px);
+    overflow-y: auto;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
@@ -1949,33 +1965,53 @@
 .calendar-container {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1rem;
   width: 100%;
   max-width: 100%;
 }
 
-/* Calendar Panel - Unified Sticky Panel */
-.calendar-panel {
-  /* Fixed to top */
+/* Calendar Panel - sticky, full-bleed under page header */
+.calendar-view .calendar-panel {
   position: sticky;
   top: 0;
   z-index: 100;
   background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  margin-bottom: 1rem;
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  border-left: none;
+  border-right: none;
+  border-radius: 0;
+  margin: 0 -2rem 0 -2rem;
   overflow: hidden;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.56);
 }
 
 .calendar-panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem 1rem;
+  padding: 0.75rem 2rem;
 }
 
 .calendar-panel-content {
-  padding: 0 1rem 1rem 1rem;
+  padding: 0 2rem;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transform: translateY(-4px);
+  transition: max-height 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 160ms ease, transform 180ms ease, padding-bottom 180ms ease;
+}
+
+.calendar-panel-content.open {
+  max-height: 560px;
+  opacity: 1;
+  transform: translateY(0);
+  padding-bottom: 1rem;
+}
+
+.calendar-panel-content.closed {
+  pointer-events: none;
+  padding-bottom: 0;
 }
 
 /* Legend */
@@ -1986,28 +2022,41 @@
 
 /* Sticky Filter Toggle */
 .filter-toggle {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.75rem 1rem;
+  padding: 0.65rem 0.9rem;
   font-size: 0.875rem;
   font-weight: 600;
-  background: var(--color-bg-secondary);
+  background: color-mix(in srgb, var(--color-bg-secondary) 90%, black 10%);
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: 999px;
   color: var(--color-text);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
   width: fit-content;
 }
 
 .filter-toggle:hover {
   border-color: var(--color-accent);
   background: var(--color-accent-subtle);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+
+.filter-toggle:active {
+  transform: translateY(1px);
 }
 
 .filter-toggle-icon {
-  font-size: 0.75rem;
+  display: inline-block;
+  line-height: 1;
+  transform: rotate(0deg);
+  transform-origin: 50% 50%;
+  transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.filter-toggle-icon.open {
+  transform: rotate(180deg);
 }
 
 .calendar-legend {
@@ -2223,6 +2272,11 @@ input:checked + .slider:before {
   font-weight: 600;
   color: var(--color-text);
   margin: 0 0 1rem 0;
+}
+
+.month-fiscal {
+  color: var(--color-text-dim);
+  font-weight: inherit;
 }
 
 .month-grid {
