@@ -1180,9 +1180,9 @@ function App() {
               <div className="projects-list">
                 <div className="list-header">
                   <span>Project Name</span>
+                  <span>Designer(s)</span>
                   <span>Status</span>
                   <span>Due Date</span>
-                  <span>Designer(s)</span>
                 </div>
                 {filteredProjects.map(project => {
                   const isOverdue = project.endDate && project.status !== 'done' && new Date(project.endDate) < new Date(new Date().toISOString().split('T')[0])
@@ -1203,10 +1203,6 @@ function App() {
                         )}
                         {project.businessLine && <span className="project-business-line">{project.businessLine}</span>}
                       </span>
-                      <span className={`status-badge ${getStatusColor(project.status)}`}>
-                        {getStatusLabel(project.status)}
-                      </span>
-                      <span className="due-date">{formatDate(project.endDate)}</span>
                       <div className="project-designers">
                         {(project.designers || []).map((d, idx) => {
                           const firstName = d.split(' ')[0]
@@ -1230,6 +1226,11 @@ function App() {
                           )
                         })}
                       </div>
+                      <span className="status-badge">
+                        <span className={`status-badge-dot ${getStatusColor(project.status)}`}></span>
+                        {getStatusLabel(project.status)}
+                      </span>
+                      <span className="due-date">{formatDate(project.endDate)}</span>
                     </div>
                     {(project.timeline && project.timeline.length > 0) && (() => {
                         const ganttRange = getGanttRange(project)

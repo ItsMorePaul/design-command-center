@@ -338,15 +338,24 @@
 
 .status-badge {
   display: inline-flex;
-  padding: 0.35rem 0.85rem;
-  border-radius: 999px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: white;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0;
+  border-radius: 0;
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
   width: fit-content;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  letter-spacing: 0;
+  text-transform: none;
+  box-shadow: none;
+}
+
+.status-badge-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
 }
 
 .bg-blue-500 {
@@ -1078,10 +1087,24 @@
     gap: 0.5rem;
   }
   
+  .projects-list {
+    overflow-x: hidden;
+  }
+
   .list-header,
-  .project-row {
-    grid-template-columns: 1fr 1fr;
-    gap: 0.5rem;
+  .project-row .project-info {
+    grid-template-columns: 1.5fr 1fr 1fr 1fr;
+    min-width: 0;
+    gap: 0.4rem;
+  }
+
+  .list-header {
+    font-size: 0.62rem;
+    padding: 0.75rem 0.75rem;
+  }
+
+  .project-row .project-info {
+    padding: 0.85rem 0.75rem;
   }
 
   /* No hover on mobile: always show row/card actions */
@@ -1096,11 +1119,17 @@
     min-height: 36px;
   }
   
-  .list-header span:nth-child(3),
-  .list-header span:nth-child(4),
-  .project-row .due-date,
-  .project-row .assignee {
-    display: none;
+  /* keep all columns visible on narrow breakpoints */
+  .project-name,
+  .project-name-link,
+  .due-date,
+  .designer-link,
+  .status-badge {
+    font-size: 0.78rem;
+  }
+
+  .project-designers {
+    gap: 0.15rem;
   }
   
   /* Day modal - full screen on mobile */
