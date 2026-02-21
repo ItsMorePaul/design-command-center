@@ -67,6 +67,12 @@ const formatDateRange = (startDate: string, endDate: string) => {
   return `${startStr} - ${endStr}`
 }
 
+const formatDateLong = (dateStr: string) => {
+  const d = parseLocalDate(dateStr)
+  if (!d) return dateStr
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
 // Format date like "Jan 12" for gantt bar labels
 const formatMonthDay = (dateStr: string) => {
   const d = parseLocalDate(dateStr)
@@ -684,9 +690,9 @@ function App() {
 
   const getStatusColor = (status: Project['status']) => {
     switch (status) {
-      case 'active': return 'bg-blue-500'
+      case 'active': return 'bg-green-500'
       case 'review': return 'bg-yellow-500'
-      case 'done': return 'bg-green-500'
+      case 'done': return 'bg-gray-500'
       case 'blocked': return 'bg-red-500'
     }
   }
@@ -1654,10 +1660,11 @@ function App() {
                                 color: '#6b7280' // gray for holidays
                               })
                             }
+                            const hasHolidayEvent = dayEvents.some((event: CalendarEvent) => event.type === 'holiday')
                             return (
                             <div 
                               key={idx} 
-                              className={`day-cell ${dayEvents.length > 0 ? 'has-events' : ''} ${isToday ? 'today' : ''} ${day.dayName === 'Sat' || day.dayName === 'Sun' ? 'weekend' : ''}`}
+                              className={`day-cell ${dayEvents.length > 0 ? 'has-events' : ''} ${hasHolidayEvent ? 'has-holiday-event' : ''} ${isToday ? 'today' : ''} ${day.dayName === 'Sat' || day.dayName === 'Sun' ? 'weekend' : ''}`}
                               onClick={() => dayEvents.length > 0 && setSelectedDay({ date: day.date, events: dayEvents, dayName: day.dayName })}
                             >
                               <span className="day-number">{isToday ? '★ ' : ''}{day.day}</span>
@@ -1666,7 +1673,10 @@ function App() {
                                   <div 
                                     key={eIdx} 
                                     className={`event-tag ${event.type === 'timeoff' ? 'timeoff' : event.type === 'holiday' ? 'holiday' : 'project'}`}
-                                    style={{ backgroundColor: event.color }}
+                                    style={{
+                                      backgroundColor: event.type === 'timeoff' ? '#410606' : event.type === 'holiday' ? '#101017' : event.color,
+                                      ...(event.type === 'project' ? { backgroundImage: 'linear-gradient(90deg, #D4AF37 0%, #A88524 100%)' } : {})
+                                    }}
                                     title={`${event.name}${event.person ? ` - ${event.person}` : ''}${event.projectName ? ` (${event.projectName})` : ''}`}
                                   >
                                     <span className="event-text">
@@ -2220,7 +2230,7 @@ function App() {
                   className={`status-option ${projectFormData.status === 'active' ? 'active' : ''}`}
                   onClick={() => setProjectFormData({ ...projectFormData, status: 'active' })}
                 >
-                  <span className="status-dot bg-blue-500"></span>
+                  <span className="status-dot bg-green-500"></span>
                   Active
                 </button>
                 <button
@@ -2236,7 +2246,7 @@ function App() {
                   className={`status-option ${projectFormData.status === 'done' ? 'active' : ''}`}
                   onClick={() => setProjectFormData({ ...projectFormData, status: 'done' })}
                 >
-                  <span className="status-dot bg-green-500"></span>
+                  <span className="status-dot bg-gray-500"></span>
                   Done
                 </button>
                 <button
@@ -2281,7 +2291,7 @@ function App() {
                     <div key={range.id} className="timeline-item">
                       <div className="timeline-info">
                         <span className="timeline-name">{range.name}</span>
-                        <span className="timeline-dates">{range.startDate} → {range.endDate}</span>
+                        <span className="timeline-dates">{formatDateLong(range.startDate)} → {formatDateLong(range.endDate)}</span>
                       </div>
                       <div className="timeline-actions">
                         <button type="button" className="action-btn" onClick={() => handleEditTimeline(range)}><Pencil size={14} /></button>
