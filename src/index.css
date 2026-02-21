@@ -1,32 +1,31 @@
 @import "tailwindcss";
 
 :root {
-  --color-bg: #08090A;
-  --color-bg-secondary: #121314;
-  --color-bg-tertiary: #1A1B1C;
-  --color-text: #FFFFFF;
-  --color-text-muted: #8E8E93;
-  --color-text-dim: #48484A;
-  --color-accent: #D4AF37;
-  --color-accent-hover: #F1D67A;
-  --color-accent-subtle: rgba(212, 175, 55, 0.18);
-  --color-border: #2C2C2E;
-  --color-border-subtle: #222326;
-  --color-success: #B2FF8A;
-  --color-warning: #D4AF37;
-  --color-danger: #FF6961;
-  --color-dcc-blue: #D4AF37;
-  --color-gantt-1: #D4AF37;
-  --color-gantt-2: #D4AF37;
-  --color-gantt-3: #D4AF37;
-  --color-gantt-4: #D4AF37;
-  --color-gantt-5: #D4AF37;
+  --color-bg: #0a0a0f;
+  --color-bg-secondary: #12121a;
+  --color-bg-tertiary: #1a1a24;
+  --color-text: #f0f0f5;
+  --color-text-muted: #6b6b7a;
+  --color-text-dim: #4a4a55;
+  --color-accent: #6366f1;
+  --color-accent-hover: #818cf8;
+  --color-accent-subtle: rgba(99, 102, 241, 0.15);
+  --color-border: #2a2a35;
+  --color-border-subtle: #1e1e28;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-gantt-1: #6366f1;
+  --color-gantt-2: #8b5cf6;
+  --color-gantt-3: #ec4899;
+  --color-gantt-4: #14b8a6;
+  --color-gantt-5: #f59e0b;
   
   /* Modern effects */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 24px rgba(212, 175, 55, 0.18);
+  --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.2);
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
@@ -50,8 +49,8 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-image: 
-    radial-gradient(ellipse at top left, rgba(212, 175, 55, 0.09) 0%, transparent 52%),
-    radial-gradient(ellipse at bottom right, rgba(253, 240, 165, 0.05) 0%, transparent 48%);
+    radial-gradient(ellipse at top left, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at bottom right, rgba(139, 92, 246, 0.05) 0%, transparent 50%);
   background-attachment: fixed;
 }
 
