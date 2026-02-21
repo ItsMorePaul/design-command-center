@@ -421,8 +421,8 @@ if (isProduction) {
 // Site version: manually updated in code when commits are made (vYYMMDD.hhmm)
 // DB version: stored in DB, auto-updates on data changes
 
-const SITE_VERSION = 'v260219'  // Manual update on code changes
-const SITE_TIME = '2204'
+const SITE_VERSION = 'v260220'  // Manual update on code changes
+const SITE_TIME = '1610'
 
 const VERSION_KEY = 'dcc_versions'
 

@@ -1265,53 +1265,139 @@
 
 /* Gantt View in Project Card */
 .project-gantt {
+  --gantt-label-col: 170px;
+  --gantt-col-gap: 10px;
+  --gantt-header-gap: 0.75rem;
+  --gantt-bars-pad: 8px;
+  --gantt-bars-border: 1px;
   grid-column: 1 / -1;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--gantt-header-gap);
   padding: 1rem 1.5rem;
   background: linear-gradient(180deg, rgba(0, 0, 0, 0.15) 0%, transparent 100%);
   border-top: 1px solid var(--color-border-subtle);
 }
 
 .gantt-header {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: var(--gantt-label-col) minmax(0, 1fr);
+  column-gap: var(--gantt-col-gap);
+  align-items: center;
   font-size: 0.65rem;
   color: var(--color-text-dim);
-  padding: 0 0.5rem;
+  padding: 0 8px;
   font-weight: 600;
   letter-spacing: 0.05em;
 }
 
+.gantt-header-spacer {
+  width: var(--gantt-label-col);
+}
+
+.gantt-header-track {
+  display: flex;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.gantt-start,
+.gantt-end {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gantt-start {
+  padding-left: 5px;
+}
+
+.gantt-end {
+  padding-right: 5px;
+}
+
+.gantt-edge-line {
+  position: absolute;
+  width: 1px;
+  top: 0;
+  height: calc(100% + 20px);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-text-dim) 80%, transparent) 0%,
+    color-mix(in srgb, var(--color-text-dim) 55%, transparent) 60%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+.gantt-edge-line-start {
+  left: 0;
+}
+
+.gantt-edge-line-end {
+  right: 0;
+}
+
 .gantt-bars {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 6px;
   background: rgba(255, 255, 255, 0.02);
   border-radius: var(--radius-sm);
-  overflow: hidden;
-  padding: 8px;
-  border: 1px solid var(--color-border-subtle);
+  overflow: visible;
+  padding: var(--gantt-bars-pad);
+  border: var(--gantt-bars-border) solid var(--color-border-subtle);
+}
+
+.gantt-weekly-grid {
+  position: absolute;
+  top: var(--gantt-bars-pad);
+  bottom: var(--gantt-bars-pad);
+  /* Match header start exactly: 8px header pad + label col + col gap */
+  left: calc(8px + var(--gantt-label-col) + var(--gantt-col-gap));
+  right: 8px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.gantt-weekly-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  border-right: 1px dashed rgba(255, 255, 255, 0.12);
 }
 
 .gantt-track {
-  position: relative;
   height: 32px;
   width: 100%;
-  display: flex;
+  display: grid;
+  grid-template-columns: var(--gantt-label-col) minmax(0, 1fr);
+  column-gap: var(--gantt-col-gap);
   align-items: center;
 }
 
 .gantt-track-label {
-  position: absolute;
-  left: 8px;
+  width: var(--gantt-label-col);
   font-size: 0.65rem;
   font-weight: 600;
   color: var(--color-text-muted);
-  z-index: 2;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 25ch;
+}
+
+.gantt-track-bars {
+  position: relative;
+  height: 32px;
+  min-width: 0;
+  overflow: visible;
 }
 
 .gantt-bar {
@@ -1322,6 +1408,7 @@
   display: flex;
   align-items: center;
   padding: 0 0.75rem;
+  box-sizing: border-box;
   border-radius: 4px;
   font-size: 0.7rem;
   overflow: hidden;
@@ -1332,7 +1419,7 @@
 }
 
 .gantt-bar:hover {
-  transform: scale(1.02);
+  filter: brightness(1.08);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   z-index: 5;
 }
@@ -1353,12 +1440,20 @@
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
+.gantt-arrow {
+  opacity: 0.3;
+}
+
 /* Gantt Today Line */
-.gantt-today {
+.gantt-today-global {
   position: absolute;
-  top: 0;
-  bottom: 0;
+  top: var(--gantt-bars-pad);
+  bottom: var(--gantt-bars-pad);
   width: 2px;
+  left: calc(
+    8px + var(--gantt-label-col) + var(--gantt-col-gap) +
+    (100% - 16px - var(--gantt-label-col) - var(--gantt-col-gap)) * var(--today-pos, 0)
+  );
   background: linear-gradient(180deg, transparent 0%, #f59e0b 20%, #f59e0b 80%, transparent 100%);
   z-index: 10;
   pointer-events: none;
@@ -1383,27 +1478,6 @@
 /* Gantt Container */
 .gantt-container {
   position: relative;
-}
-
-/* Gantt Date Grid */
-.gantt-grid {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  pointer-events: none;
-  z-index: 1;
-}
-
-.gantt-grid-line {
-  flex: 1;
-  border-right: 1px dashed rgba(255, 255, 255, 0.05);
-}
-
-.gantt-grid-line:last-child {
-  border-right: none;
 }
 
 /* Project Card Footer */

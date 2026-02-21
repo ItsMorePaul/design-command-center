@@ -24,13 +24,44 @@ const getTodayStr = () => {
   return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 }
 
+const DAY_MS = 1000 * 60 * 60 * 24
+
+// Parse date safely in local time (avoids UTC/date-shift bugs)
+const parseLocalDate = (dateStr: string): Date | null => {
+  if (!dateStr) return null
+
+  // ISO date (YYYY-MM-DD)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    const [y, m, d] = dateStr.split('-').map(Number)
+    return new Date(y, m - 1, d, 12, 0, 0, 0)
+  }
+
+  // Text date (e.g. "Mar 15") -> assume current year
+  const parsed = new Date(`${dateStr} ${new Date().getFullYear()} 12:00:00`)
+  if (isNaN(parsed.getTime())) return null
+  parsed.setHours(12, 0, 0, 0)
+  return parsed
+}
+
 // Format date range like "Feb 2 - Mar 12"
 const formatDateRange = (startDate: string, endDate: string) => {
-  const start = new Date(startDate + 'T12:00:00')
-  const end = new Date(endDate + 'T12:00:00')
+  const start = parseLocalDate(startDate)
+  const end = parseLocalDate(endDate)
+  if (!start || !end) return `${startDate} - ${endDate}`
   const startStr = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   const endStr = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   return `${startStr} - ${endStr}`
+}
+
+// Format date like "Jan 12" for gantt bar labels
+const formatMonthDay = (dateStr: string) => {
+  const d = parseLocalDate(dateStr)
+  if (!d) return dateStr
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+const formatMonthDayFromDate = (d: Date) => {
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 // Get today's formatted date for display
@@ -703,68 +734,55 @@ function App() {
   }
 
   // Gantt chart helper functions
-  const parseDate = (dateStr: string): Date | null => {
-    // Try ISO format first (2026-02-16)
-    let d = new Date(dateStr)
-    if (!isNaN(d.getTime()) && dateStr.includes('-') && dateStr.length === 10) {
-      return d
-    }
-    // Try text format (Mar 15) - assume current year
-    d = new Date(dateStr + ' ' + new Date().getFullYear())
-    if (!isNaN(d.getTime())) {
-      return d
-    }
-    return null
-  }
-
   const getGanttRange = (project: Project) => {
     if (!project.timeline || project.timeline.length === 0) return null
-    
+
     const dates: Date[] = []
     project.timeline.forEach(t => {
-      const start = parseDate(t.startDate)
-      const end = parseDate(t.endDate)
+      const start = parseLocalDate(t.startDate)
+      const end = parseLocalDate(t.endDate)
       if (start) dates.push(start)
       if (end) dates.push(end)
     })
-    
+
     // Add project start and end dates to the range
     if (project.startDate) {
-      const start = parseDate(project.startDate)
+      const start = parseLocalDate(project.startDate)
       if (start) dates.push(start)
     }
     if (project.endDate) {
-      const end = parseDate(project.endDate)
+      const end = parseLocalDate(project.endDate)
       if (end) dates.push(end)
     }
-    
+
     if (dates.length === 0) return null
-    
+
     const minDate = new Date(Math.min(...dates.map(d => d.getTime())))
     const maxDate = new Date(Math.max(...dates.map(d => d.getTime())))
-    
-    // Add padding (2 days before min, 3 days after max)
-    minDate.setDate(minDate.getDate() - 2)
-    maxDate.setDate(maxDate.getDate() + 3)
-    
-    return { start: minDate, end: maxDate, totalDays: (maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24) }
+
+    // No synthetic padding: use real project/timeline boundaries for accurate scale
+    minDate.setHours(12, 0, 0, 0)
+    maxDate.setHours(12, 0, 0, 0)
+
+    const totalDays = Math.max(1, (maxDate.getTime() - minDate.getTime()) / DAY_MS)
+    return { start: minDate, end: maxDate, totalDays }
   }
 
   const getGanttBarStyle = (range: TimelineRange, ganttRange: { start: Date; end: Date; totalDays: number }) => {
-    const start = new Date(range.startDate)
-    const end = new Date(range.endDate)
-    const startOffset = (start.getTime() - ganttRange.start.getTime()) / (1000 * 60 * 60 * 24)
-    const duration = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24) + 1
-    
-    const left = (startOffset / ganttRange.totalDays) * 100
-    const width = (duration / ganttRange.totalDays) * 100
-    
-    return { left: `${Math.max(0, left)}%`, width: `${Math.min(100 - left, width)}%` }
-  }
+    const start = parseLocalDate(range.startDate)
+    const end = parseLocalDate(range.endDate)
+    if (!start || !end) return { left: '0%', width: '0%' }
 
-  const formatGanttDate = (dateStr: string) => {
-    const d = new Date(dateStr)
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    const startOffsetDays = (start.getTime() - ganttRange.start.getTime()) / DAY_MS
+    const durationDays = Math.max(1, (end.getTime() - start.getTime()) / DAY_MS + 1)
+
+    const left = (startOffsetDays / ganttRange.totalDays) * 100
+    const width = (durationDays / ganttRange.totalDays) * 100
+
+    const clampedLeft = Math.max(0, Math.min(100, left))
+    const clampedWidth = Math.max(0, Math.min(100 - clampedLeft, width))
+
+    return { left: `${clampedLeft}%`, width: `${clampedWidth}%` }
   }
 
   // Sort team by name (fixed - no sort UI)
@@ -1202,35 +1220,52 @@ function App() {
                     {(project.timeline && project.timeline.length > 0) && (() => {
                         const ganttRange = getGanttRange(project)
                         if (!ganttRange) return null
-                        
+
                         const today = new Date()
+                        today.setHours(12, 0, 0, 0)
                         const isTodayInRange = today >= ganttRange.start && today <= ganttRange.end
-                        const todayPosition = isTodayInRange 
-                          ? ((today.getTime() - ganttRange.start.getTime()) / (1000 * 60 * 60 * 24) / ganttRange.totalDays) * 100
+                        const todayPosition = isTodayInRange
+                          ? ((today.getTime() - ganttRange.start.getTime()) / DAY_MS / ganttRange.totalDays) * 100
                           : null
+
+                        const weeklyTickCount = Math.max(1, Math.ceil(ganttRange.totalDays / 7))
+                        const weeklyTickPositions = Array.from({ length: weeklyTickCount + 1 }, (_, i) => (i / weeklyTickCount) * 100)
 
                         return (
                           <div className="project-gantt">
                             <div className="gantt-header">
-                              <span className="gantt-start">{formatGanttDate(ganttRange.start.toISOString().split('T')[0])}</span>
-                              <span className="gantt-end">{formatGanttDate(ganttRange.end.toISOString().split('T')[0])}</span>
+                              <span className="gantt-header-spacer" />
+                              <div className="gantt-header-track">
+                                <span className="gantt-start"><span className="gantt-edge-line gantt-edge-line-start" />{formatMonthDayFromDate(ganttRange.start)}</span>
+                                <span className="gantt-end">{formatMonthDayFromDate(ganttRange.end)}<span className="gantt-edge-line gantt-edge-line-end" /></span>
+                              </div>
                             </div>
                             <div className="gantt-container">
-                              {todayPosition !== null && (
-                                <div className="gantt-today" style={{ left: `${todayPosition}%` }}>
-                                  <span className="gantt-today-label">Today</span>
+                              <div
+                                className="gantt-bars"
+                                style={todayPosition !== null ? ({ ['--today-pos' as any]: `${todayPosition / 100}` } as any) : undefined}
+                              >
+                                <div className="gantt-weekly-grid">
+                                  {weeklyTickPositions.map((left, i) => (
+                                    <span key={i} className="gantt-weekly-tick" style={{ left: `${left}%` }} />
+                                  ))}
                                 </div>
-                              )}
-                              <div className="gantt-bars">
+                                {todayPosition !== null && (
+                                  <div className="gantt-today-global">
+                                    <span className="gantt-today-label">Today</span>
+                                  </div>
+                                )}
                                 {project.timeline.map((range, idx) => (
                                   <div key={range.id} className="gantt-track">
-                                    <span className="gantt-track-label">{range.name}</span>
-                                    <div 
-                                      className={`gantt-bar bar-${(idx % 5) + 1}`} 
-                                      style={getGanttBarStyle(range, ganttRange)}
-                                      title={`${range.name}: ${range.startDate} → ${range.endDate}`}
-                                    >
-                                      <span className="gantt-label">{formatDate(range.startDate)} - {formatDate(range.endDate)}</span>
+                                    <span className="gantt-track-label" title={range.name}>{range.name}</span>
+                                    <div className="gantt-track-bars">
+                                      <div
+                                        className={`gantt-bar bar-${(idx % 5) + 1}`}
+                                        style={getGanttBarStyle(range, ganttRange)}
+                                        title={`${range.name}: ${formatMonthDay(range.startDate)} → ${formatMonthDay(range.endDate)}`}
+                                      >
+                                        <span className="gantt-label">{formatMonthDay(range.startDate)} <span className="gantt-arrow">→</span> {formatMonthDay(range.endDate)}</span>
+                                      </div>
                                     </div>
                                   </div>
                                 ))}
