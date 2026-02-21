@@ -422,21 +422,34 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 
 const SITE_VERSION = 'v260220'  // Manual update on code changes
-const SITE_TIME = '1610'
+const SITE_TIME = '1626'
 
 const VERSION_KEY = 'dcc_versions'
 
 // Generate version parts for DB updates
 const generateDbVersionParts = () => {
-  const d = new Date()
-  const yy = String(d.getFullYear()).slice(-2)
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  const hh = String(d.getHours()).padStart(2, '0')
-  const min = String(d.getMinutes()).padStart(2, '0')
-  return { 
-    versionNumber: `v${yy}${mm}${dd}`, 
-    versionTime: `${hh}${min}` 
+  // Keep DB version clock in Pacific Time so it is directly comparable to local build/version workflow
+  const now = new Date()
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles',
+    year: '2-digit',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(now)
+
+  const get = (type: string) => parts.find(p => p.type === type)?.value || '00'
+  const yy = get('year')
+  const mm = get('month')
+  const dd = get('day')
+  const hh = get('hour')
+  const min = get('minute')
+
+  return {
+    versionNumber: `v${yy}${mm}${dd}`,
+    versionTime: `${hh}${min}`,
   }
 }
 
