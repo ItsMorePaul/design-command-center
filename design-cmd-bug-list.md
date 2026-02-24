@@ -20,4 +20,19 @@
 
 ## Features (To Be Added)
 
-*None currently listed*
+### 1. Gemini Notes Integration
+**Date:** 2026-02-24
+**Status:** Planned
+**Description:** Link Gemini Notes meeting data to DCC team, projects, and capacity sections
+**Components:**
+- **Team Integration:** Display meeting attendance, action items assigned to each team member
+- **Projects Integration:** Link projects mentioned in meetings to project cards, show project-related meeting history
+- **Capacity Section:** Show meeting load per designer, action item counts per person
+
+**Data to Import from Gemini Notes:**
+- Meeting attendance (who attended which meetings)
+- Action items with owners and due dates
+- Project tags from each meeting (Backstory, Market Data, Search Redesign, etc.)
+- Meeting summaries linked to relevant projects/teams
+
+**Notes:** Requires new database tables (action_items, meeting_history, project_meetings)

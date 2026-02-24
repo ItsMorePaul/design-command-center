@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host",
     "dev:all": "concurrently \"vite --host\" \"npm run server\"",
-    "server": "npx tsx server.ts",
+    "server": "npx tsx watch server.ts",
     "build": "tsc -b && vite build",
     "start": "npx tsx server.ts",
     "lint": "eslint .",

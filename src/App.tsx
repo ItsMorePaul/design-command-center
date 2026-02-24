@@ -1297,7 +1297,7 @@ function App() {
                             target="_blank"
                             rel="noopener noreferrer"
                             className="project-link-icon" 
-                            data-tooltip={project.deckName || 'Design Deck'}
+                            data-tooltip={`Deck: ${project.deckName || 'Design Deck'}`}
                           >
                             <Presentation size={14} className="link-icon" />
                           </a>
@@ -1308,7 +1308,7 @@ function App() {
                             target="_blank"
                             rel="noopener noreferrer"
                             className="project-link-icon" 
-                            data-tooltip={project.prdName || 'PRD'}
+                            data-tooltip={`PRD: ${project.prdName || 'PRD'}`}
                           >
                             <FileText size={14} className="link-icon" />
                           </a>
@@ -1319,7 +1319,7 @@ function App() {
                             target="_blank"
                             rel="noopener noreferrer"
                             className="project-link-icon" 
-                            data-tooltip={project.briefName || 'Design Brief'}
+                            data-tooltip={`Brief: ${project.briefName || 'Design Brief'}`}
                           >
                             <FileEdit size={14} className="link-icon" />
                           </a>
@@ -1330,7 +1330,7 @@ function App() {
                             target="_blank"
                             rel="noopener noreferrer"
                             className="project-link-icon" 
-                            data-tooltip="Figma"
+                            data-tooltip="Figma: Figma"
                           >
                             <Figma size={14} className="link-icon" />
                           </a>
@@ -1342,7 +1342,7 @@ function App() {
                             target="_blank"
                             rel="noopener noreferrer"
                             className="project-link-icon"
-                            data-tooltip={link.name}
+                            data-tooltip={`Link: ${link.name}`}
                           >
                             <LinkIcon size={14} className="link-icon" />
                           </a>
