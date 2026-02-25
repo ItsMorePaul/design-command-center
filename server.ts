@@ -244,7 +244,7 @@ app.delete('/api/team/:id', async (req, res) => {
 // ============ BRAND OPTIONS ============
 app.get('/api/brandOptions', async (req, res) => {
   try {
-    const brands = await all('SELECT name FROM brand_options ORDER BY name');
+    const brands = await all('SELECT name FROM business_lines ORDER BY name');
     res.json(brands.map(b => b.name));
   } catch (e) { res.status(500).json({error: e.message}); }
 });
@@ -263,7 +263,7 @@ app.get('/api/data', async (req, res) => {
       brands: JSON.parse(t.brands || '[]'),
       timeOff: t.timeOff ? JSON.parse(t.timeOff) : []
     })));
-    const brands = await all('SELECT name FROM brand_options ORDER BY name').then(b => b.map(x => x.name));
+    const brands = await all('SELECT name FROM business_lines ORDER BY name').then(b => b.map(x => x.name));
     res.json({ projects, team, brandOptions: brands });
   } catch (e) { res.status(500).json({error: e.message}); }
 });
@@ -456,7 +456,7 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 
 const SITE_VERSION = 'v260225'  // Manual update on code changes
-const SITE_TIME = '0842'
+const SITE_TIME = '0856'
 
 const VERSION_KEY = 'dcc_versions'
 
@@ -538,6 +538,22 @@ run(`CREATE TABLE IF NOT EXISTS business_lines (
   createdAt TEXT DEFAULT (datetime('now')),
   updatedAt TEXT DEFAULT (datetime('now'))
 )`).catch((e) => console.error('business_lines init error:', e.message))
+
+// Seed default business lines if empty
+const seedBusinessLines = async () => {
+  const existing = await get('SELECT COUNT(*) as count FROM business_lines')
+  if (existing?.count === 0) {
+    const defaultLines = [
+      "Barron's", "FN London", "IBD", "Mansion Global", "Market Data", 
+      "MarketWatch", "Messaging", "Mobile Apps", "PEN", "The Wall Street Journal"
+    ]
+    for (const name of defaultLines) {
+      await run('INSERT INTO business_lines (id, name) VALUES (?, ?)', [name.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase(), name])
+    }
+    console.log('Seeded default business lines')
+  }
+}
+seedBusinessLines().catch(e => console.error('Seed error:', e.message))
 
 // Get versions - returns site version from code, DB version from database
 app.get('/api/versions', async (req, res) => {
