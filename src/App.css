@@ -2711,6 +2711,7 @@ input:checked + .slider:before {
   flex-direction: column;
   gap: 0.15rem;
   min-width: 90px;
+  max-width: 200px;
 }
 
 .designer-card-name {
@@ -2745,6 +2746,7 @@ input:checked + .slider:before {
   flex-direction: column;
   gap: 0.15rem;
   flex-shrink: 0;
+  width: 120px;
   margin-left: auto;
 }
 
@@ -2761,10 +2763,9 @@ input:checked + .slider:before {
 }
 
 .designer-card-bar {
-  flex-shrink: 0;
+  flex: auto;
   width: 80px;
-  min-width: 60px;
-  max-width: 100px;
+  min-width: 50px;
   height: 6px;
   background: var(--color-border);
   border-radius: 3px;
