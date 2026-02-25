@@ -2525,6 +2525,7 @@ function App() {
                 type="date"
                 value={projectFormData.startDate}
                 onChange={e => setProjectFormData({ ...projectFormData, startDate: e.target.value })}
+                onClick={e => (e.target as HTMLInputElement).showPicker?.()}
               />
             </div>
 
@@ -2535,6 +2536,7 @@ function App() {
                 type="date"
                 value={projectFormData.endDate}
                 onChange={e => setProjectFormData({ ...projectFormData, endDate: e.target.value })}
+                onClick={e => (e.target as HTMLInputElement).showPicker?.()}
               />
             </div>
 
@@ -2616,6 +2618,7 @@ function App() {
                 type="date"
                 value={timelineFormData.startDate}
                 onChange={e => setTimelineFormData({ ...timelineFormData, startDate: e.target.value })}
+                onClick={e => (e.target as HTMLInputElement).showPicker?.()}
               />
             </div>
 
@@ -2626,6 +2629,7 @@ function App() {
                 type="date"
                 value={timelineFormData.endDate}
                 onChange={e => setTimelineFormData({ ...timelineFormData, endDate: e.target.value })}
+                onClick={e => (e.target as HTMLInputElement).showPicker?.()}
               />
             </div>
 
