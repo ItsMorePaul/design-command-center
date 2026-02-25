@@ -804,54 +804,6 @@
   }
 }
 
-/* Force calendar picker - hide date input text, show picker only */
-.form-group input[type="date"]::-webkit-calendar-picker-indicator {
-  cursor: pointer;
-  filter: invert(0.5);
-  opacity: 0.7;
-}
-
-.form-group input[type="date"]::-webkit-calendar-picker-indicator:hover {
-  opacity: 1;
-}
-
-@media (prefers-color-scheme: dark) {
-  .form-group input[type="date"]::-webkit-calendar-picker-indicator {
-    filter: invert(1);
-    opacity: 0.8;
-  }
-}
-
-/* Date input wrapper for icon */
-.date-input-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.date-input-wrapper input[type="date"] {
-  padding-right: 2.5rem;
-}
-
-.date-input-wrapper .calendar-icon {
-  position: absolute;
-  right: 0.75rem;
-  pointer-events: none;
-  color: var(--color-text-muted);
-}
-
-/* Date picker styling - visible but not duplicated */
-.date-picker-force {
-  user-select: none;
-  cursor: pointer;
-}
-
-/* Make date picker more prominent */
-.date-picker-force:focus {
-  border-color: var(--color-accent);
-  background-color: var(--color-bg-tertiary, #f1f5f9);
-}
-
 .status-options {
   display: flex;
   gap: 0.75rem;

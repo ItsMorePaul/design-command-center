@@ -2519,34 +2519,22 @@ function App() {
             </div>
 
             <div className="form-group">
-              <label 
-                htmlFor="start-date"
-                className="clickable-label"
-              >
-                Start Date <span className="label-hint">(click to select)</span>
-              </label>
+              <label>Start Date</label>
               <input
                 id="start-date"
                 type="date"
                 value={projectFormData.startDate}
                 onChange={e => setProjectFormData({ ...projectFormData, startDate: e.target.value })}
-                className="date-picker-force"
               />
             </div>
 
             <div className="form-group">
-              <label 
-                htmlFor="end-date"
-                className="clickable-label"
-              >
-                End Date <span className="label-hint">(click to select)</span>
-              </label>
+              <label>End Date</label>
               <input
                 id="end-date"
                 type="date"
                 value={projectFormData.endDate}
                 onChange={e => setProjectFormData({ ...projectFormData, endDate: e.target.value })}
-                className="date-picker-force"
               />
             </div>
 
@@ -2622,34 +2610,22 @@ function App() {
             </div>
 
             <div className="form-group">
-              <label 
-                htmlFor="timeline-start"
-                className="clickable-label"
-              >
-                Start Date <span className="label-hint">(click to select)</span>
-              </label>
+              <label>Start Date</label>
               <input
                 id="timeline-start"
                 type="date"
                 value={timelineFormData.startDate}
                 onChange={e => setTimelineFormData({ ...timelineFormData, startDate: e.target.value })}
-                className="date-picker-force"
               />
             </div>
 
             <div className="form-group">
-              <label 
-                htmlFor="timeline-end"
-                className="clickable-label"
-              >
-                End Date <span className="label-hint">(click to select)</span>
-              </label>
+              <label>End Date</label>
               <input
                 id="timeline-end"
                 type="date"
                 value={timelineFormData.endDate}
                 onChange={e => setTimelineFormData({ ...timelineFormData, endDate: e.target.value })}
-                className="date-picker-force"
               />
             </div>
 
