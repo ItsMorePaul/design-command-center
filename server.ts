@@ -130,27 +130,29 @@ const reconcileProjectDesignerAssignments = async () => {
 app.get('/api/projects', async (req, res) => {
   try {
     const projects = await all('SELECT * FROM projects ORDER BY createdAt DESC');
-    // Parse timeline, customLinks, and designers JSON
+    // Parse timeline, customLinks, designers, and businessLines JSON
     res.json(projects.map(p => ({
       ...p, 
       timeline: p.timeline ? JSON.parse(p.timeline) : [],
       customLinks: p.customLinks ? JSON.parse(p.customLinks) : [],
-      designers: p.designers ? JSON.parse(p.designers) : []
+      designers: p.designers ? JSON.parse(p.designers) : [],
+      businessLines: p.businessLine ? JSON.parse(p.businessLine) : []
     })));
   } catch (e) { res.status(500).json({error: e.message}); }
 });
 
 app.post('/api/projects', async (req, res) => {
   try {
-    const { id, name, status, dueDate, assignee, url, description, businessLine, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinks, designers, startDate, endDate, timeline } = req.body;
+    const { id, name, status, dueDate, assignee, url, description, businessLines, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinks, designers, startDate, endDate, timeline } = req.body;
     const projectId = id || Date.now().toString();
     const timelineJson = JSON.stringify(timeline || []);
     const customLinksJson = JSON.stringify(customLinks || []);
     const designersJson = JSON.stringify(designers || []);
+    const businessLinesJson = JSON.stringify(businessLines || []);
     await run(
       `INSERT OR REPLACE INTO projects (id, name, status, dueDate, assignee, url, description, businessLine, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinks, designers, startDate, endDate, timeline, updatedAt)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-      [projectId, name, status || 'active', dueDate, assignee, url, description, businessLine, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinksJson, designersJson, startDate, endDate, timelineJson]
+      [projectId, name, status || 'active', dueDate, assignee, url, description, businessLinesJson, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinksJson, designersJson, startDate, endDate, timelineJson]
     );
 
     await syncProjectDesignersToAssignments(projectId, designers || [])
@@ -189,10 +191,16 @@ app.post('/api/business-lines', async (req, res) => {
     
     // Check if this is a rename (name changed but same id)
     if (originalName && originalName !== name) {
-      // Update all projects that reference the old name
-      const projects = await all("SELECT id, businessLine FROM projects WHERE businessLine = ?", [originalName]);
-      for (const p of projects) {
-        await run("UPDATE projects SET businessLine = ? WHERE id = ?", [name, p.id]);
+      // Update all projects that have the old name in their businessLines array
+      const allProjects = await all("SELECT id, businessLine FROM projects");
+      for (const p of allProjects) {
+        if (p.businessLine) {
+          const bls = JSON.parse(p.businessLine) as string[];
+          if (bls.includes(originalName)) {
+            const updated = bls.map((b: string) => b === originalName ? name : b);
+            await run("UPDATE projects SET businessLine = ? WHERE id = ?", [JSON.stringify(updated), p.id]);
+          }
+        }
       }
       // Update all team members that reference the old name in their brands
       const members = await all("SELECT id, brands FROM team");
@@ -284,11 +292,12 @@ app.get('/api/search', async (req, res) => {
     const projects = await all('SELECT * FROM projects').then(p => p.map(proj => {
       const customLinks = proj.customLinks ? JSON.parse(proj.customLinks) : [];
       const designers = proj.designers ? JSON.parse(proj.designers) : [];
+      const businessLines = proj.businessLine ? JSON.parse(proj.businessLine) : [];
       
       // Check if main fields match
       const matchesMainFields = 
         normalize(proj.name).includes(query) ||
-        normalize(proj.businessLine || '').includes(query) ||
+        businessLines.some((bl: string) => normalize(bl).includes(query)) ||
         normalize(proj.description || '').includes(query) ||
         (Array.isArray(designers) && designers.some((d: string) => normalize(d).includes(query)));
       
@@ -326,11 +335,12 @@ app.get('/api/search', async (req, res) => {
         timeline: proj.timeline ? JSON.parse(proj.timeline) : [],
         customLinks: customLinks,
         matchedLinks: matchedLinks,
-        designers: designers
+        designers: designers,
+        businessLines: businessLines
       };
     }).filter(proj => 
       normalize(proj.name).includes(query) ||
-      normalize(proj.businessLine || '').includes(query) ||
+      (proj.businessLines || []).some((bl: string) => normalize(bl).includes(query)) ||
       normalize(proj.description || '').includes(query) ||
       (Array.isArray(proj.designers) && proj.designers.some((d: string) => normalize(d).includes(query))) ||
       (proj as any).matchedLinks?.length > 0
@@ -404,7 +414,8 @@ app.get('/api/data', async (req, res) => {
       ...proj, 
       timeline: proj.timeline ? JSON.parse(proj.timeline) : [],
       customLinks: proj.customLinks ? JSON.parse(proj.customLinks) : [],
-      designers: proj.designers ? JSON.parse(proj.designers) : []
+      designers: proj.designers ? JSON.parse(proj.designers) : [],
+      businessLines: proj.businessLine ? JSON.parse(proj.businessLine) : []
     })));
     const team = await all('SELECT * FROM team ORDER BY name').then(m => m.map(t => ({
       ...t, 
@@ -421,7 +432,8 @@ app.get('/api/calendar', async (req, res) => {
   try {
     const projects = await all('SELECT * FROM projects').then(p => p.map(proj => ({
       ...proj,
-      timeline: proj.timeline ? JSON.parse(proj.timeline) : []
+      timeline: proj.timeline ? JSON.parse(proj.timeline) : [],
+      businessLines: proj.businessLine ? JSON.parse(proj.businessLine) : []
     })));
     const team = await all('SELECT * FROM team').then(m => m.map(t => ({
       ...t,
@@ -604,7 +616,7 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 
 const SITE_VERSION = 'v260225'  // Manual update on code changes
-const SITE_TIME = '1132'
+const SITE_TIME = '1159'
 
 const VERSION_KEY = 'dcc_versions'
 

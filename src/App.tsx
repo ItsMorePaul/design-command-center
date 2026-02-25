@@ -101,7 +101,7 @@ interface Project {
   startDate?: string
   endDate?: string
   designers: string[]
-  businessLine?: string
+  businessLines?: string[]
   deckName?: string
   deckLink?: string
   prdName?: string
@@ -239,7 +239,7 @@ function App() {
     startDate: '',
     endDate: '',
     designers: [] as string[],
-    businessLine: '',
+    businessLines: [] as string[],
     deckName: '',
     deckLink: '',
     prdName: '',
@@ -596,7 +596,7 @@ function App() {
     setEditingProject(null)
     setProjectFormData({
       name: '', url: '', status: 'active', startDate: '', endDate: '', designers: [],
-      businessLine: '',
+      businessLines: [],
       deckName: '', deckLink: '', prdName: '', prdLink: '', briefName: '', briefLink: '', figmaLink: '',
       customLinks: [],
       timeline: []
@@ -613,7 +613,7 @@ function App() {
       startDate: project.startDate || '',
       endDate: project.endDate || '',
       designers: project.designers || [],
-      businessLine: project.businessLine || '',
+      businessLines: project.businessLines || [],
       deckName: project.deckName || '',
       deckLink: project.deckLink || '',
       prdName: project.prdName || '',
@@ -790,12 +790,14 @@ function App() {
     
     // Add project-based business lines
     projects.forEach(project => {
-      if (project.designers?.includes(member.name) && project.businessLine) {
-        if (lines[project.businessLine]) {
-          lines[project.businessLine].count += 1
-        } else {
-          lines[project.businessLine] = { count: 1, isManual: false }
-        }
+      if (project.designers?.includes(member.name) && project.businessLines?.length > 0) {
+        project.businessLines.forEach((bl: string) => {
+          if (lines[bl]) {
+            lines[bl].count += 1
+          } else {
+            lines[bl] = { count: 1, isManual: false }
+          }
+        })
       }
     })
     
@@ -889,7 +891,7 @@ function App() {
       case 'name':
         return a.name.localeCompare(b.name)
       case 'businessLine':
-        return (a.businessLine || '').localeCompare(b.businessLine || '')
+        return (a.businessLines?.[0] || '').localeCompare(b.businessLines?.[0] || '')
       case 'designer': {
         const designerA = a.designers?.[0] || ''
         const designerB = b.designers?.[0] || ''
@@ -920,7 +922,7 @@ function App() {
     
     // Business Line filter
     if (projectSortBy === 'businessLine' && projectFilters.businessLines.length > 0) {
-      if (!project.businessLine || !projectFilters.businessLines.includes(project.businessLine)) {
+      if (!project.businessLines || !project.businessLines.some((bl: string) => projectFilters.businessLines.includes(bl))) {
         return false
       }
     }
@@ -1282,7 +1284,7 @@ function App() {
                         ) : (
                           <span className="project-name">{project.name}</span>
                         )}
-                        {project.businessLine && <span className="project-business-line">{project.businessLine}</span>}
+                        {project.businessLines && project.businessLines.length > 0 && <span className="project-business-line">{project.businessLines.join(', ')}</span>}
                       </span>
                       <div className="project-designers">
                         {(project.designers || []).map((d, idx) => {
@@ -2225,16 +2227,24 @@ function App() {
 
             <div className="form-group">
               <label>Business Line</label>
-              <select
-                id="business-line"
-                value={projectFormData.businessLine}
-                onChange={e => setProjectFormData({ ...projectFormData, businessLine: e.target.value })}
-              >
-                <option value="">Select business line</option>
+              <div className="brand-checkboxes">
                 {brandOptions.map(brand => (
-                  <option key={brand} value={brand}>{brand}</option>
+                  <label key={brand} className={`brand-checkbox ${projectFormData.businessLines.includes(brand) ? 'selected' : ''}`}>
+                    <input
+                      type="checkbox"
+                      checked={projectFormData.businessLines.includes(brand)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setProjectFormData({ ...projectFormData, businessLines: [...projectFormData.businessLines, brand] })
+                        } else {
+                          setProjectFormData({ ...projectFormData, businessLines: projectFormData.businessLines.filter(b => b !== brand) })
+                        }
+                      }}
+                    />
+                    {brand}
+                  </label>
                 ))}
-              </select>
+              </div>
             </div>
 
             <div className="form-group">
@@ -2698,7 +2708,7 @@ function App() {
                       <div className="search-result-item" onClick={() => { setActiveTab('projects'); setProjectFilters({ ...projectFilters, project: project.name }); setShowSearch(false); setSearchQuery(''); }}>
                         <span className="search-result-icon">📋</span>
                         <span className="search-result-name">{project.name}</span>
-                        <span className="search-result-meta">{project.businessLine}</span>
+                        <span className="search-result-meta">{project.businessLines?.join(', ')}</span>
                       </div>
                       {project.matchedLinks && project.matchedLinks.length > 0 && (
                         <div className="search-matched-links">
