@@ -2743,11 +2743,9 @@ input:checked + .slider:before {
 .designer-usage {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  gap: 0;
+  gap: 0.15rem;
   flex-shrink: 0;
   margin-left: auto;
-  line-height: 1.1;
 }
 
 .designer-usage-pct {
@@ -2757,15 +2755,9 @@ input:checked + .slider:before {
 }
 
 .designer-usage-hours {
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   color: var(--color-text-muted);
   white-space: nowrap;
-}
-
-@media (max-width: 500px) {
-  .designer-usage {
-    display: none;
-  }
 }
 
 .designer-card-bar {
