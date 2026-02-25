@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Bell, Gauge, ChevronDown } from 'lucide-react'
+import { Tooltip } from './Tooltip'
 import './App.css'
 import initialData from './data.json'
 
@@ -1292,60 +1293,64 @@ function App() {
                     <div className="project-card-footer">
                       <div className="project-links-footer">
                         {project.deckLink && (
-                          <a 
-                            href={project.deckLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="project-link-icon" 
-                            data-tooltip={`Deck: ${project.deckName || 'Design Deck'}`}
-                          >
-                            <Presentation size={14} className="link-icon" />
-                          </a>
+                          <Tooltip content={`Deck: ${project.deckName || 'Design Deck'}`}>
+                            <a 
+                              href={project.deckLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="project-link-icon"
+                            >
+                              <Presentation size={14} className="link-icon" />
+                            </a>
+                          </Tooltip>
                         )}
                         {project.prdLink && (
-                          <a 
-                            href={project.prdLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="project-link-icon" 
-                            data-tooltip={`PRD: ${project.prdName || 'PRD'}`}
-                          >
-                            <FileText size={14} className="link-icon" />
-                          </a>
+                          <Tooltip content={`PRD: ${project.prdName || 'PRD'}`}>
+                            <a 
+                              href={project.prdLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="project-link-icon"
+                            >
+                              <FileText size={14} className="link-icon" />
+                            </a>
+                          </Tooltip>
                         )}
                         {project.briefLink && (
-                          <a 
-                            href={project.briefLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="project-link-icon" 
-                            data-tooltip={`Brief: ${project.briefName || 'Design Brief'}`}
-                          >
-                            <FileEdit size={14} className="link-icon" />
-                          </a>
+                          <Tooltip content={`Brief: ${project.briefName || 'Design Brief'}`}>
+                            <a 
+                              href={project.briefLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="project-link-icon"
+                            >
+                              <FileEdit size={14} className="link-icon" />
+                            </a>
+                          </Tooltip>
                         )}
                         {project.figmaLink && (
-                          <a 
-                            href={project.figmaLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="project-link-icon" 
-                            data-tooltip="Figma: Figma"
-                          >
-                            <Figma size={14} className="link-icon" />
-                          </a>
+                          <Tooltip content="Figma">
+                            <a 
+                              href={project.figmaLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="project-link-icon"
+                            >
+                              <Figma size={14} className="link-icon" />
+                            </a>
+                          </Tooltip>
                         )}
                         {project.customLinks?.map((link, idx) => (
-                          <a 
-                            key={idx}
-                            href={link.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="project-link-icon"
-                            data-tooltip={`Link: ${link.name}`}
-                          >
-                            <LinkIcon size={14} className="link-icon" />
-                          </a>
+                          <Tooltip key={idx} content={`Link: ${link.name}`}>
+                            <a 
+                              href={link.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="project-link-icon"
+                            >
+                              <LinkIcon size={14} className="link-icon" />
+                            </a>
+                          </Tooltip>
                         ))}
                       </div>
                       <div className="project-actions">
@@ -1398,32 +1403,38 @@ function App() {
                     <div className="team-card-footer">
                       <div className="member-links">
                         {member.slack ? (
-                          <a 
-                            href={member.slack} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="member-link-icon" 
-                            data-tooltip="Slack"
-                          >
-                            <MessageSquare size={14} />
-                          </a>
+                          <Tooltip content="Slack">
+                            <a 
+                              href={member.slack} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="member-link-icon"
+                            >
+                              <MessageSquare size={14} />
+                            </a>
+                          </Tooltip>
                         ) : (
-                          <span className="member-link-icon disabled" data-tooltip="No Slack">
-                            <MessageSquare size={14} />
-                          </span>
+                          <Tooltip content="No Slack">
+                            <span className="member-link-icon disabled">
+                              <MessageSquare size={14} />
+                            </span>
+                          </Tooltip>
                         )}
                         {member.email ? (
-                          <a 
-                            href={member.email.startsWith('mailto:') ? member.email : `mailto:${member.email}`} 
-                            className="member-link-icon" 
-                            data-tooltip="Email"
-                          >
-                            <Mail size={14} />
-                          </a>
+                          <Tooltip content="Email">
+                            <a 
+                              href={member.email.startsWith('mailto:') ? member.email : `mailto:${member.email}`} 
+                              className="member-link-icon"
+                            >
+                              <Mail size={14} />
+                            </a>
+                          </Tooltip>
                         ) : (
-                          <span className="member-link-icon disabled" data-tooltip="No Email">
-                            <Mail size={14} />
-                          </span>
+                          <Tooltip content="No Email">
+                            <span className="member-link-icon disabled">
+                              <Mail size={14} />
+                            </span>
+                          </Tooltip>
                         )}
                       </div>
                       <div className="member-actions">
