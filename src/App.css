@@ -2701,7 +2701,7 @@ select:focus-visible {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-/* Seamless arrow using pseudo-elements - border effect */
+/* Seamless arrow using rotated square - works with Floating UI positioning */
 .tooltip-arrow {
   position: absolute;
   width: 14px;
@@ -2710,12 +2710,11 @@ select:focus-visible {
   border: 1px solid #f59e0b;
   transform: translateX(-50%) translateY(-50%) rotate(45deg);
   z-index: 99998;
+  pointer-events: none;
 }
 
 /* Position arrow to point down (tooltip above target) */
 .tooltip-arrow-down {
-  bottom: -7px;
-  left: 50%;
   border-top: none;
   border-left: none;
   box-shadow: 2px 2px 3px rgba(0, 0, 0, 0.15);
@@ -2723,8 +2722,6 @@ select:focus-visible {
 
 /* Position arrow to point up (tooltip below target) */
 .tooltip-arrow-up {
-  top: -7px;
-  left: 50%;
   border-bottom: none;
   border-right: none;
   box-shadow: -2px -2px 3px rgba(0, 0, 0, 0.15);

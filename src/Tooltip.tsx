@@ -12,7 +12,7 @@ export function Tooltip({ content, children }: TooltipProps) {
   const showTimeoutRef = useRef<number | undefined>(undefined);
   const hideTimeoutRef = useRef<number | undefined>(undefined);
 
-  const { refs, floatingStyles, placement } = useFloating({
+  const { refs, floatingStyles, placement, middlewareData } = useFloating({
     placement: 'top',
     middleware: [
       offset(12),
@@ -28,6 +28,7 @@ export function Tooltip({ content, children }: TooltipProps) {
   // Tooltip above target = arrow points down (top placement)
   // Tooltip below target = arrow points up (bottom placement)
   const isTop = placement === 'top' || placement === 'top-start' || placement === 'top-end';
+  const { arrow: arrowData } = middlewareData;
 
   const handleMouseEnter = () => {
     clearTimeout(hideTimeoutRef.current);
@@ -67,6 +68,10 @@ export function Tooltip({ content, children }: TooltipProps) {
           <div
             ref={arrowRef}
             className={`tooltip-arrow ${isTop ? 'tooltip-arrow-down' : 'tooltip-arrow-up'}`}
+            style={{
+              left: arrowData?.x,
+              top: arrowData?.y,
+            }}
           />
         </div>
       )}

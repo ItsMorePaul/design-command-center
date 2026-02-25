@@ -422,7 +422,7 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 
 const SITE_VERSION = 'v260225'  // Manual update on code changes
-const SITE_TIME = '0806'
+const SITE_TIME = '0808'
 
 const VERSION_KEY = 'dcc_versions'
 
