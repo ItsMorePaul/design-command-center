@@ -110,6 +110,7 @@ interface Project {
   briefLink?: string
   figmaLink?: string
   customLinks?: { name: string; url: string }[]
+  matchedLinks?: { name: string; url: string }[]
   timeline: TimelineRange[]
 }
 
@@ -124,6 +125,7 @@ interface BusinessLine {
   briefLink?: string
   figmaLink?: string
   customLinks?: { name: string; url: string }[]
+  matchedLinks?: { name: string; url: string }[]
 }
 
 interface TeamMember {
@@ -2648,9 +2650,27 @@ function App() {
                 <div className="search-section">
                   <h3>Business Lines</h3>
                   {filteredResults.businessLines.map(bl => (
-                    <div key={bl.id} className="search-result-item" onClick={() => { setActiveTab('settings'); setShowSearch(false); setSearchQuery(''); }}>
-                      <span className="search-result-icon">📁</span>
-                      <span className="search-result-name">{bl.name}</span>
+                    <div key={bl.id}>
+                      <div className="search-result-item" onClick={() => { setActiveTab('settings'); setShowSearch(false); setSearchQuery(''); }}>
+                        <span className="search-result-icon">📁</span>
+                        <span className="search-result-name">{bl.name}</span>
+                      </div>
+                      {bl.matchedLinks && bl.matchedLinks.length > 0 && (
+                        <div className="search-matched-links">
+                          {bl.matchedLinks.map((link, idx) => (
+                            <a 
+                              key={idx} 
+                              href={link.url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="search-matched-link"
+                              onClick={e => e.stopPropagation()}
+                            >
+                              {link.name}
+                            </a>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -2673,10 +2693,28 @@ function App() {
                 <div className="search-section">
                   <h3>Projects</h3>
                   {filteredResults.projects.map(project => (
-                    <div key={project.id} className="search-result-item" onClick={() => { setActiveTab('projects'); setProjectFilters({ ...projectFilters, project: project.name }); setShowSearch(false); setSearchQuery(''); }}>
-                      <span className="search-result-icon">📋</span>
-                      <span className="search-result-name">{project.name}</span>
-                      <span className="search-result-meta">{project.businessLine}</span>
+                    <div key={project.id}>
+                      <div className="search-result-item" onClick={() => { setActiveTab('projects'); setProjectFilters({ ...projectFilters, project: project.name }); setShowSearch(false); setSearchQuery(''); }}>
+                        <span className="search-result-icon">📋</span>
+                        <span className="search-result-name">{project.name}</span>
+                        <span className="search-result-meta">{project.businessLine}</span>
+                      </div>
+                      {project.matchedLinks && project.matchedLinks.length > 0 && (
+                        <div className="search-matched-links">
+                          {project.matchedLinks.map((link, idx) => (
+                            <a 
+                              key={idx} 
+                              href={link.url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="search-matched-link"
+                              onClick={e => e.stopPropagation()}
+                            >
+                              {link.name}
+                            </a>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

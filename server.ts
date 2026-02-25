@@ -281,19 +281,24 @@ app.get('/api/search', async (req, res) => {
     }
 
     // Search projects
-    const projects = await all('SELECT * FROM projects').then(p => p.map(proj => ({
-      ...proj,
-      timeline: proj.timeline ? JSON.parse(proj.timeline) : [],
-      customLinks: proj.customLinks ? JSON.parse(proj.customLinks) : [],
-      designers: proj.designers ? JSON.parse(proj.designers) : []
-    })).filter(proj => 
+    const projects = await all('SELECT * FROM projects').then(p => p.map(proj => {
+      const links = proj.customLinks ? JSON.parse(proj.customLinks) : [];
+      const matchedLinks = links.filter((l: { name: string; url: string }) => 
+        normalize(l.name).includes(query) || normalize(l.url).includes(query)
+      );
+      return {
+        ...proj,
+        timeline: proj.timeline ? JSON.parse(proj.timeline) : [],
+        customLinks: links,
+        matchedLinks: matchedLinks,
+        designers: proj.designers ? JSON.parse(proj.designers) : []
+      };
+    }).filter(proj => 
       normalize(proj.name).includes(query) ||
       normalize(proj.businessLine).includes(query) ||
       normalize(proj.description).includes(query) ||
       proj.designers?.some((d: string) => normalize(d).includes(query)) ||
-      proj.customLinks?.some((l: { name: string; url: string }) => 
-        normalize(l.name).includes(query) || normalize(l.url).includes(query)
-      )
+      (proj as any).matchedLinks?.length > 0
     ));
 
     // Search team members
@@ -308,14 +313,18 @@ app.get('/api/search', async (req, res) => {
     ));
 
     // Search business lines
-    const businessLines = await all('SELECT * FROM business_lines').then(l => l.map(bl => ({
-      ...bl,
-      customLinks: bl.customLinks ? JSON.parse(bl.customLinks) : []
-    })).filter(bl =>
-      normalize(bl.name).includes(query) ||
-      bl.customLinks?.some((l: { name: string; url: string }) => 
+    const businessLines = await all('SELECT * FROM business_lines').then(l => l.map(bl => {
+      const links = bl.customLinks ? JSON.parse(bl.customLinks) : [];
+      const matchedLinks = links.filter((l: { name: string; url: string }) => 
         normalize(l.name).includes(query) || normalize(l.url).includes(query)
-      )
+      );
+      return {
+        ...bl,
+        customLinks: links,
+        matchedLinks: matchedLinks
+      };
+    }).filter(bl =>
+      normalize(bl.name).includes(query) || (bl as any).matchedLinks?.length > 0
     ));
 
     res.json({ projects, team, businessLines });
@@ -529,7 +538,7 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 
 const SITE_VERSION = 'v260225'  // Manual update on code changes
-const SITE_TIME = '1054'
+const SITE_TIME = '1058'
 
 const VERSION_KEY = 'dcc_versions'
 

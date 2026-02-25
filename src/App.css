@@ -2908,3 +2908,24 @@ select:focus-visible {
   color: var(--color-text-muted);
   font-size: 0.75rem;
 }
+
+.search-matched-links {
+  padding-left: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.search-matched-link {
+  display: block;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  border-left: 2px solid var(--color-border);
+  margin-left: 0.75rem;
+  padding-left: 0.5rem;
+}
+
+.search-matched-link:hover {
+  color: var(--color-text-link);
+  border-left-color: var(--color-text-link);
+}
