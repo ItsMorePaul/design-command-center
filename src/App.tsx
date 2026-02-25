@@ -2602,11 +2602,11 @@ function App() {
 
       {/* Search Modal */}
       {showSearch && (
-        <div className="modal-overlay" onClick={() => { setShowSearch(false); setSearchQuery(''); }}>
+        <div className="modal-overlay" onClick={() => { setShowSearch(false); setSearchQuery(''); setSearchResults({ projects: [], team: [], businessLines: [] }); }}>
           <div className="modal search-modal" onClick={e => e.stopPropagation()}>
             <div className="search-header">
               <h2>Search</h2>
-              <button className="close-btn" onClick={() => { setShowSearch(false); setSearchQuery(''); }}>×</button>
+              <button className="close-btn" onClick={() => { setShowSearch(false); setSearchQuery(''); setSearchResults({ projects: [], team: [], businessLines: [] }); }}>×</button>
             </div>
             
             <div className="search-input-wrapper">
