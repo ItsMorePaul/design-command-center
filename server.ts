@@ -183,9 +183,28 @@ app.get('/api/business-lines', async (req, res) => {
 
 app.post('/api/business-lines', async (req, res) => {
   try {
-    const { id, name, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinks } = req.body;
+    const { id, name, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinks, originalName } = req.body;
     const lineId = id || Date.now().toString();
     const customLinksJson = JSON.stringify(customLinks || []);
+    
+    // Check if this is a rename (name changed but same id)
+    if (originalName && originalName !== name) {
+      // Update all projects that reference the old name
+      const projects = await all("SELECT id, businessLine FROM projects WHERE businessLine = ?", [originalName]);
+      for (const p of projects) {
+        await run("UPDATE projects SET businessLine = ? WHERE id = ?", [name, p.id]);
+      }
+      // Update all team members that reference the old name in their brands
+      const members = await all("SELECT id, brands FROM team");
+      for (const m of members) {
+        const brands = JSON.parse(m.brands || '[]');
+        if (brands.includes(originalName)) {
+          const updated = brands.map((b: string) => b === originalName ? name : b);
+          await run("UPDATE team SET brands = ? WHERE id = ?", [JSON.stringify(updated), m.id]);
+        }
+      }
+    }
+    
     await run(
       `INSERT OR REPLACE INTO business_lines (id, name, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinks, updatedAt)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
@@ -456,7 +475,7 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 
 const SITE_VERSION = 'v260225'  // Manual update on code changes
-const SITE_TIME = '0856'
+const SITE_TIME = '0908'
 
 const VERSION_KEY = 'dcc_versions'
 

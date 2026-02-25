@@ -528,16 +528,21 @@ function App() {
   }
 
   // Business Line CRUD
-  const saveBusinessLine = async (line: BusinessLine) => {
+  const saveBusinessLine = async (line: BusinessLine, originalName?: string) => {
     await fetch('/api/business-lines', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(line)
+      body: JSON.stringify({ ...line, originalName })
     })
     // Refresh business lines
     const res = await fetch('/api/business-lines')
     const data = await res.json()
     setBusinessLines(data)
+    // Also refresh team and projects to reflect name changes
+    const dataRes = await fetch('/api/data')
+    const apiData = await dataRes.json()
+    setTeam(apiData.team || [])
+    setProjects(apiData.projects || [])
   }
 
   const deleteBusinessLine = async (id: string) => {
@@ -912,8 +917,8 @@ function App() {
     return true
   })
 
-  // Get unique business lines from projects
-  const projectBusinessLines = [...new Set(projects.map(p => p.businessLine).filter(Boolean))].sort() as string[]
+  // Get unique business lines from projects (use brandOptions for full list)
+  const projectBusinessLines = brandOptions
   
   // Get unique designers from team
   const projectDesigners = [...new Set(team.map(m => m.name))].sort()
@@ -2703,7 +2708,7 @@ function App() {
                   figmaLink: businessLineFormData.figmaLink,
                   customLinks: businessLineFormData.customLinks
                 }
-                await saveBusinessLine(lineToSave)
+                await saveBusinessLine(lineToSave, editingBusinessLine?.name)
                 setShowBusinessLineModal(false)
               }}>
                 {editingBusinessLine ? 'Save Changes' : 'Add Business Line'}
