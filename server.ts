@@ -284,34 +284,34 @@ app.get('/api/search', async (req, res) => {
     const projects = await all('SELECT * FROM projects').then(p => p.map(proj => {
       const customLinks = proj.customLinks ? JSON.parse(proj.customLinks) : [];
       
-      // Check if query matches any field (including link fields)
-      const matchesDeck = proj.deckName && normalize(proj.deckName).includes(query);
-      const matchesPrd = proj.prdName && normalize(proj.prdName).includes(query);
-      const matchesBrief = proj.briefName && normalize(proj.briefName).includes(query);
-      const matchesFigma = proj.figmaLink && normalize(proj.figmaLink).includes(query);
-      const matchesCustom = customLinks.some((l: { name: string; url: string }) => 
-        normalize(l.name).includes(query) || normalize(l.url).includes(query)
-      );
+      // Build all links with their match status
+      const deckLink = proj.deckName ? { name: proj.deckName, url: proj.deckLink || '', type: 'Deck', matches: normalize(proj.deckName).includes(query) } : null;
+      const prdLink = proj.prdName ? { name: proj.prdName, url: proj.prdLink || '', type: 'PRD', matches: normalize(proj.prdName).includes(query) } : null;
+      const briefLink = proj.briefName ? { name: proj.briefName, url: proj.briefLink || '', type: 'Brief', matches: normalize(proj.briefName).includes(query) } : null;
+      const figmaLink = proj.figmaLink ? { name: 'Figma', url: proj.figmaLink, type: 'Figma', matches: normalize(proj.figmaLink).includes(query) } : null;
+      const customLinkList = customLinks.map((l: { name: string; url: string }) => ({ 
+        name: l.name, 
+        url: l.url, 
+        type: 'Link', 
+        matches: normalize(l.name).includes(query) || normalize(l.url).includes(query)
+      }));
       
-      // If matches any asset type, show ALL links
-      const matchesAssetType = matchesDeck || matchesPrd || matchesBrief || matchesFigma || matchesCustom;
+      const allLinks = [deckLink, prdLink, briefLink, figmaLink, ...customLinkList].filter(Boolean);
       
-      // Build all links for this project
-      const allLinks = [
-        proj.deckName ? { name: proj.deckName, url: proj.deckLink || '', type: 'Deck' } : null,
-        proj.prdName ? { name: proj.prdName, url: proj.prdLink || '', type: 'PRD' } : null,
-        proj.briefName ? { name: proj.briefName, url: proj.briefLink || '', type: 'Brief' } : null,
-        proj.figmaLink ? { name: 'Figma', url: proj.figmaLink, type: 'Figma' } : null,
-        ...customLinks.map((l: { name: string; url: string }) => ({ ...l, type: 'Link' }))
-      ].filter(Boolean);
+      // Include project if main fields match OR any link matches
+      const matchesMainFields = 
+        normalize(proj.name).includes(query) ||
+        normalize(proj.businessLine).includes(query) ||
+        normalize(proj.description).includes(query) ||
+        proj.designers?.some((d: string) => normalize(d).includes(query));
+      
+      const matchedLinks = allLinks.filter((l: any) => l.matches);
       
       return {
         ...proj,
         timeline: proj.timeline ? JSON.parse(proj.timeline) : [],
         customLinks: customLinks,
-        matchedLinks: matchesAssetType ? allLinks : allLinks.filter((l: any) => 
-          (l.name && normalize(l.name).includes(query)) || (l.url && normalize(l.url).includes(query))
-        ),
+        matchedLinks: matchedLinks,
         designers: proj.designers ? JSON.parse(proj.designers) : []
       };
     }).filter(proj => 
@@ -341,32 +341,25 @@ app.get('/api/search', async (req, res) => {
     const businessLines = await all('SELECT * FROM business_lines').then(l => l.map(bl => {
       const customLinks = bl.customLinks ? JSON.parse(bl.customLinks) : [];
       
-      // Check if query matches any asset type field
-      const matchesDeck = bl.deckName && normalize(bl.deckName).includes(query);
-      const matchesPrd = bl.prdName && normalize(bl.prdName).includes(query);
-      const matchesBrief = bl.briefName && normalize(bl.briefName).includes(query);
-      const matchesFigma = bl.figmaLink && normalize(bl.figmaLink).includes(query);
-      const matchesCustom = customLinks.some((link: { name: string; url: string }) => 
-        normalize(link.name).includes(query) || normalize(link.url).includes(query)
-      );
+      // Build all links with match status
+      const deckLink = bl.deckName ? { name: bl.deckName, url: bl.deckLink || '', type: 'Deck', matches: normalize(bl.deckName).includes(query) } : null;
+      const prdLink = bl.prdName ? { name: bl.prdName, url: bl.prdLink || '', type: 'PRD', matches: normalize(bl.prdName).includes(query) } : null;
+      const briefLink = bl.briefName ? { name: bl.briefName, url: bl.briefLink || '', type: 'Brief', matches: normalize(bl.briefName).includes(query) } : null;
+      const figmaLink = bl.figmaLink ? { name: 'Figma', url: bl.figmaLink, type: 'Figma', matches: normalize(bl.figmaLink).includes(query) } : null;
+      const customLinkList = customLinks.map((l: { name: string; url: string }) => ({ 
+        name: l.name, 
+        url: l.url, 
+        type: 'Link', 
+        matches: normalize(l.name).includes(query) || normalize(l.url).includes(query)
+      }));
       
-      const matchesAssetType = matchesDeck || matchesPrd || matchesBrief || matchesFigma || matchesCustom;
-      
-      // Build all links
-      const allLinks = [
-        bl.deckName ? { name: bl.deckName, url: bl.deckLink || '', type: 'Deck' } : null,
-        bl.prdName ? { name: bl.prdName, url: bl.prdLink || '', type: 'PRD' } : null,
-        bl.briefName ? { name: bl.briefName, url: bl.briefLink || '', type: 'Brief' } : null,
-        bl.figmaLink ? { name: 'Figma', url: bl.figmaLink, type: 'Figma' } : null,
-        ...customLinks.map((l: { name: string; url: string }) => ({ ...l, type: 'Link' }))
-      ].filter(Boolean);
+      const allLinks = [deckLink, prdLink, briefLink, figmaLink, ...customLinkList].filter(Boolean);
+      const matchedLinks = allLinks.filter((l: any) => l.matches);
       
       return {
         ...bl,
         customLinks: customLinks,
-        matchedLinks: matchesAssetType ? allLinks : allLinks.filter((l: any) => 
-          (l.name && normalize(l.name).includes(query)) || (l.url && normalize(l.url).includes(query))
-        )
+        matchedLinks: matchedLinks
       };
     }).filter(bl =>
       normalize(bl.name).includes(query) ||
@@ -588,7 +581,7 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 
 const SITE_VERSION = 'v260225'  // Manual update on code changes
-const SITE_TIME = '1110'
+const SITE_TIME = '1115'
 
 const VERSION_KEY = 'dcc_versions'
 
