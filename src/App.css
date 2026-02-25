@@ -831,10 +831,22 @@
   color: var(--color-text-muted);
 }
 
-/* Force calendar picker - hide date input text selection */
+/* Force calendar picker - hide native picker indicator */
 .date-picker-force {
   user-select: none;
   cursor: pointer;
+  /* Hide native calendar icon */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+.date-picker-force::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
+.date-picker-force::-moz-calendar-picker-indicator {
+  display: none;
 }
 
 /* Make date picker more prominent */
