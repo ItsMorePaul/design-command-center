@@ -475,7 +475,7 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 
 const SITE_VERSION = 'v260225'  // Manual update on code changes
-const SITE_TIME = '0919'
+const SITE_TIME = '0908'
 
 const VERSION_KEY = 'dcc_versions'
 
@@ -569,8 +569,6 @@ const seedBusinessLines = async () => {
     for (const name of defaultLines) {
       await run('INSERT INTO business_lines (id, name) VALUES (?, ?)', [name.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase(), name])
     }
-    // Add dynamic "X Brands" entry
-    await run('INSERT INTO business_lines (id, name) VALUES (?, ?)', ['x-brands', `${defaultLines.length} Brands`])
     console.log('Seeded default business lines')
   }
 }
