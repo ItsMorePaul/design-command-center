@@ -2520,30 +2520,24 @@ function App() {
 
             <div className="form-group">
               <label>Start Date <span className="label-hint">(select from calendar)</span></label>
-              <div className="date-input-wrapper">
-                <input
-                  id="start-date"
-                  type="date"
-                  value={projectFormData.startDate}
-                  onChange={e => setProjectFormData({ ...projectFormData, startDate: e.target.value })}
-                  className="date-picker-force"
-                />
-                <Calendar size={16} className="calendar-icon" />
-              </div>
+              <input
+                id="start-date"
+                type="date"
+                value={projectFormData.startDate}
+                onChange={e => setProjectFormData({ ...projectFormData, startDate: e.target.value })}
+                className="date-picker-force"
+              />
             </div>
 
             <div className="form-group">
               <label>End Date <span className="label-hint">(select from calendar)</span></label>
-              <div className="date-input-wrapper">
-                <input
-                  id="end-date"
-                  type="date"
-                  value={projectFormData.endDate}
-                  onChange={e => setProjectFormData({ ...projectFormData, endDate: e.target.value })}
-                  className="date-picker-force"
-                />
-                <Calendar size={16} className="calendar-icon" />
-              </div>
+              <input
+                id="end-date"
+                type="date"
+                value={projectFormData.endDate}
+                onChange={e => setProjectFormData({ ...projectFormData, endDate: e.target.value })}
+                className="date-picker-force"
+              />
             </div>
 
             <div className="form-group">
@@ -2619,30 +2613,24 @@ function App() {
 
             <div className="form-group">
               <label>Start Date <span className="label-hint">(select from calendar)</span></label>
-              <div className="date-input-wrapper">
-                <input
-                  id="timeline-start"
-                  type="date"
-                  value={timelineFormData.startDate}
-                  onChange={e => setTimelineFormData({ ...timelineFormData, startDate: e.target.value })}
-                  className="date-picker-force"
-                />
-                <Calendar size={16} className="calendar-icon" />
-              </div>
+              <input
+                id="timeline-start"
+                type="date"
+                value={timelineFormData.startDate}
+                onChange={e => setTimelineFormData({ ...timelineFormData, startDate: e.target.value })}
+                className="date-picker-force"
+              />
             </div>
 
             <div className="form-group">
               <label>End Date <span className="label-hint">(select from calendar)</span></label>
-              <div className="date-input-wrapper">
-                <input
-                  id="timeline-end"
-                  type="date"
-                  value={timelineFormData.endDate}
-                  onChange={e => setTimelineFormData({ ...timelineFormData, endDate: e.target.value })}
-                  className="date-picker-force"
-                />
-                <Calendar size={16} className="calendar-icon" />
-              </div>
+              <input
+                id="timeline-end"
+                type="date"
+                value={timelineFormData.endDate}
+                onChange={e => setTimelineFormData({ ...timelineFormData, endDate: e.target.value })}
+                className="date-picker-force"
+              />
             </div>
 
             <div className="modal-actions">
