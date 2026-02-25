@@ -1930,7 +1930,7 @@ function App() {
                             {utilization}%
                           </span>
                           <span className="designer-usage-hours">
-                            ({allocatedHours.toFixed(1)}h allocated)
+                            {allocatedHours.toFixed(1)}h
                           </span>
                         </div>
                       </div>

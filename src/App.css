@@ -2742,10 +2742,12 @@ input:checked + .slider:before {
 
 .designer-usage {
   display: flex;
-  align-items: baseline;
-  gap: 0.4rem;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0;
   flex-shrink: 0;
   margin-left: auto;
+  line-height: 1.1;
 }
 
 .designer-usage-pct {
@@ -2755,13 +2757,13 @@ input:checked + .slider:before {
 }
 
 .designer-usage-hours {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   color: var(--color-text-muted);
   white-space: nowrap;
 }
 
 @media (max-width: 500px) {
-  .designer-usage-hours {
+  .designer-usage {
     display: none;
   }
 }
