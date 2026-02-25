@@ -268,6 +268,50 @@ app.get('/api/brandOptions', async (req, res) => {
   } catch (e) { res.status(500).json({error: e.message}); }
 });
 
+// ============ SEARCH ============
+app.get('/api/search', async (req, res) => {
+  try {
+    const query = (req.query.q as string || '').toLowerCase().trim();
+    if (!query || query.length < 2) {
+      return res.json({ projects: [], team: [], businessLines: [] });
+    }
+
+    // Search projects
+    const projects = await all('SELECT * FROM projects').then(p => p.map(proj => ({
+      ...proj,
+      timeline: proj.timeline ? JSON.parse(proj.timeline) : [],
+      customLinks: proj.customLinks ? JSON.parse(proj.customLinks) : [],
+      designers: proj.designers ? JSON.parse(proj.designers) : []
+    })).filter(proj => 
+      proj.name?.toLowerCase().includes(query) ||
+      proj.businessLine?.toLowerCase().includes(query) ||
+      proj.description?.toLowerCase().includes(query) ||
+      proj.designers?.some((d: string) => d.toLowerCase().includes(query))
+    ));
+
+    // Search team members
+    const team = await all('SELECT * FROM team').then(m => m.map(t => ({
+      ...t,
+      brands: JSON.parse(t.brands || '[]'),
+      timeOff: t.timeOff ? JSON.parse(t.timeOff) : []
+    })).filter(member =>
+      member.name?.toLowerCase().includes(query) ||
+      member.role?.toLowerCase().includes(query) ||
+      member.brands?.some((b: string) => b.toLowerCase().includes(query))
+    ));
+
+    // Search business lines
+    const businessLines = await all('SELECT * FROM business_lines').then(l => l.map(bl => ({
+      ...bl,
+      customLinks: bl.customLinks ? JSON.parse(bl.customLinks) : []
+    })).filter(bl =>
+      bl.name?.toLowerCase().includes(query)
+    ));
+
+    res.json({ projects, team, businessLines });
+  } catch (e) { res.status(500).json({error: e.message}); }
+});
+
 // ============ COMBINED DATA ============
 app.get('/api/data', async (req, res) => {
   try {
@@ -475,7 +519,7 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 
 const SITE_VERSION = 'v260225'  // Manual update on code changes
-const SITE_TIME = '0956'
+const SITE_TIME = '1010'
 
 const VERSION_KEY = 'dcc_versions'
 

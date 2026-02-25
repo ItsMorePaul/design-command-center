@@ -341,6 +341,12 @@ function App() {
   const [siteVersion, setSiteVersion] = useState({ version: '', time: '' })
   const [dbVersion, setDbVersion] = useState({ version: '', time: '' })
 
+  // Search
+  const [showSearch, setShowSearch] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<{ projects: Project[], team: TeamMember[], businessLines: BusinessLine[] }>({ projects: [], team: [], businessLines: [] })
+  const [searchFilters, setSearchFilters] = useState<{ projects: boolean, team: boolean, businessLines: boolean }>({ projects: true, team: true, businessLines: true })
+
   // Business Lines (Settings)
   const [businessLines, setBusinessLines] = useState<BusinessLine[]>([])
   const [showBusinessLineModal, setShowBusinessLineModal] = useState(false)
@@ -525,6 +531,28 @@ function App() {
 
   const deleteProject = async (id: string) => {
     await fetch(`/api/projects/${id}`, { method: 'DELETE' })
+  }
+
+// Search
+  const handleSearch = async (query: string) => {
+    setSearchQuery(query)
+    if (query.trim().length < 2) {
+      setSearchResults({ projects: [], team: [], businessLines: [] })
+      return
+    }
+    try {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`)
+      const data = await res.json()
+      setSearchResults(data)
+    } catch (e) {
+      console.error('Search error:', e)
+    }
+  }
+
+  const filteredResults = {
+    projects: searchFilters.projects ? searchResults.projects : [],
+    team: searchFilters.team ? searchResults.team : [],
+    businessLines: searchFilters.businessLines ? searchResults.businessLines : []
   }
 
   // Business Line CRUD
@@ -1099,7 +1127,7 @@ function App() {
               <Bell size={18} />
               {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
             </button>
-            <button className="icon-btn" aria-label="Search"><Search size={18} /></button>
+            <button className="icon-btn" aria-label="Search" onClick={() => setShowSearch(true)}><Search size={18} /></button>
             <button className="icon-btn" aria-label="Settings" onClick={() => setActiveTab('settings')}><Settings size={18} /></button>
             {activeTab === 'projects' && (
               <button className="primary-btn" onClick={handleAddProject}>+ New Project</button>
@@ -2555,6 +2583,104 @@ function App() {
               >
                 Delete
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Search Modal */}
+      {showSearch && (
+        <div className="modal-overlay" onClick={() => { setShowSearch(false); setSearchQuery(''); }}>
+          <div className="modal search-modal" onClick={e => e.stopPropagation()}>
+            <div className="search-header">
+              <h2>Search</h2>
+              <button className="close-btn" onClick={() => { setShowSearch(false); setSearchQuery(''); }}>×</button>
+            </div>
+            
+            <div className="search-input-wrapper">
+              <Search size={18} className="search-icon" />
+              <input
+                type="text"
+                className="search-input"
+                placeholder="Search projects, team, business lines..."
+                value={searchQuery}
+                onChange={e => handleSearch(e.target.value)}
+                autoFocus
+              />
+            </div>
+
+            <div className="search-filters">
+              <label className={`search-filter-chip ${searchFilters.projects ? 'active' : ''}`}>
+                <input
+                  type="checkbox"
+                  checked={searchFilters.projects}
+                  onChange={() => setSearchFilters({ ...searchFilters, projects: !searchFilters.projects })}
+                />
+                Projects ({searchResults.projects.length})
+              </label>
+              <label className={`search-filter-chip ${searchFilters.team ? 'active' : ''}`}>
+                <input
+                  type="checkbox"
+                  checked={searchFilters.team}
+                  onChange={() => setSearchFilters({ ...searchFilters, team: !searchFilters.team })}
+                />
+                Team ({searchResults.team.length})
+              </label>
+              <label className={`search-filter-chip ${searchFilters.businessLines ? 'active' : ''}`}>
+                <input
+                  type="checkbox"
+                  checked={searchFilters.businessLines}
+                  onChange={() => setSearchFilters({ ...searchFilters, businessLines: !searchFilters.businessLines })}
+                />
+                Business Lines ({searchResults.businessLines.length})
+              </label>
+            </div>
+
+            <div className="search-results">
+              {filteredResults.projects.length === 0 && filteredResults.team.length === 0 && filteredResults.businessLines.length === 0 && searchQuery.length >= 2 && (
+                <p className="search-empty">No results found</p>
+              )}
+              {searchQuery.length < 2 && (
+                <p className="search-hint">Type at least 2 characters to search</p>
+              )}
+
+              {filteredResults.businessLines.length > 0 && (
+                <div className="search-section">
+                  <h3>Business Lines</h3>
+                  {filteredResults.businessLines.map(bl => (
+                    <div key={bl.id} className="search-result-item" onClick={() => { setActiveTab('settings'); setShowSearch(false); setSearchQuery(''); }}>
+                      <span className="search-result-icon">📁</span>
+                      <span className="search-result-name">{bl.name}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {filteredResults.team.length > 0 && (
+                <div className="search-section">
+                  <h3>Team</h3>
+                  {filteredResults.team.map(member => (
+                    <div key={member.id} className="search-result-item" onClick={() => { setActiveTab('team'); setShowSearch(false); setSearchQuery(''); }}>
+                      <span className="search-result-icon">👤</span>
+                      <span className="search-result-name">{member.name}</span>
+                      <span className="search-result-meta">{member.role}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {filteredResults.projects.length > 0 && (
+                <div className="search-section">
+                  <h3>Projects</h3>
+                  {filteredResults.projects.map(project => (
+                    <div key={project.id} className="search-result-item" onClick={() => { setActiveTab('projects'); setProjectFilters({ ...projectFilters, project: project.name }); setShowSearch(false); setSearchQuery(''); }}>
+                      <span className="search-result-icon">📋</span>
+                      <span className="search-result-name">{project.name}</span>
+                      <span className="search-result-meta">{project.businessLine}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
