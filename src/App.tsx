@@ -346,7 +346,7 @@ function App() {
   const [showBusinessLineModal, setShowBusinessLineModal] = useState(false)
   const [editingBusinessLine, setEditingBusinessLine] = useState<BusinessLine | null>(null)
   const [businessLineFormData, setBusinessLineFormData] = useState({
-    name: '', deckName: '', deckLink: '', prdName: '', prdLink: '', briefName: '', briefLink: '', figmaLink: '', customLinks: [] as { name: string; url: string }[]
+    name: '', customLinks: [] as { name: string; url: string }[]
   })
   
   // Load versions from server on mount
@@ -1940,7 +1940,7 @@ function App() {
               <h2>Business Lines</h2>
               <button className="primary-btn" onClick={() => {
                 setEditingBusinessLine(null)
-                setBusinessLineFormData({ name: '', deckName: '', deckLink: '', prdName: '', prdLink: '', briefName: '', briefLink: '', figmaLink: '', customLinks: [] })
+                setBusinessLineFormData({ name: '', customLinks: [] })
                 setShowBusinessLineModal(true)
               }}>
                 + Add Business Line
@@ -1960,13 +1960,6 @@ function App() {
                           setEditingBusinessLine(line)
                           setBusinessLineFormData({
                             name: line.name,
-                            deckName: line.deckName || '',
-                            deckLink: line.deckLink || '',
-                            prdName: line.prdName || '',
-                            prdLink: line.prdLink || '',
-                            briefName: line.briefName || '',
-                            briefLink: line.briefLink || '',
-                            figmaLink: line.figmaLink || '',
                             customLinks: line.customLinks || []
                           })
                           setShowBusinessLineModal(true)
@@ -1982,34 +1975,6 @@ function App() {
                       </div>
                     </div>
                     <div className="business-line-links">
-                      {line.deckLink && (
-                        <Tooltip content={`Deck: ${line.deckName || 'Design Deck'}`}>
-                          <a href={line.deckLink} target="_blank" rel="noopener noreferrer" className="project-link-icon">
-                            <Presentation size={14} className="link-icon" />
-                          </a>
-                        </Tooltip>
-                      )}
-                      {line.prdLink && (
-                        <Tooltip content={`PRD: ${line.prdName || 'PRD'}`}>
-                          <a href={line.prdLink} target="_blank" rel="noopener noreferrer" className="project-link-icon">
-                            <FileText size={14} className="link-icon" />
-                          </a>
-                        </Tooltip>
-                      )}
-                      {line.briefLink && (
-                        <Tooltip content={`Brief: ${line.briefName || 'Design Brief'}`}>
-                          <a href={line.briefLink} target="_blank" rel="noopener noreferrer" className="project-link-icon">
-                            <FileEdit size={14} className="link-icon" />
-                          </a>
-                        </Tooltip>
-                      )}
-                      {line.figmaLink && (
-                        <Tooltip content="Figma">
-                          <a href={line.figmaLink} target="_blank" rel="noopener noreferrer" className="project-link-icon">
-                            <Figma size={14} className="link-icon" />
-                          </a>
-                        </Tooltip>
-                      )}
                       {line.customLinks?.map((link, idx) => (
                         <Tooltip key={idx} content={`Link: ${link.name}`}>
                           <a href={link.url} target="_blank" rel="noopener noreferrer" className="project-link-icon">
@@ -2017,7 +1982,7 @@ function App() {
                           </a>
                         </Tooltip>
                       ))}
-                      {!line.deckLink && !line.prdLink && !line.briefLink && !line.figmaLink && !line.customLinks?.length && (
+                      {!line.customLinks?.length && (
                         <span className="no-links">No links configured</span>
                       )}
                     </div>
@@ -2612,84 +2577,54 @@ function App() {
               />
             </div>
 
-            <div className="form-row">
-              <div className="form-group">
-                <label>Deck Name</label>
-                <input
-                  id="bl-deck-name"
-                  type="text"
-                  value={businessLineFormData.deckName}
-                  onChange={e => setBusinessLineFormData({ ...businessLineFormData, deckName: e.target.value })}
-                  placeholder="e.g., Q1 Deck"
-                />
-              </div>
-              <div className="form-group">
-                <label>Deck URL</label>
-                <input
-                  id="bl-deck-link"
-                  type="url"
-                  value={businessLineFormData.deckLink}
-                  onChange={e => setBusinessLineFormData({ ...businessLineFormData, deckLink: e.target.value })}
-                  placeholder="https://..."
-                />
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label>PRD Name</label>
-                <input
-                  id="bl-prd-name"
-                  type="text"
-                  value={businessLineFormData.prdName}
-                  onChange={e => setBusinessLineFormData({ ...businessLineFormData, prdName: e.target.value })}
-                  placeholder="e.g., Product Spec"
-                />
-              </div>
-              <div className="form-group">
-                <label>PRD URL</label>
-                <input
-                  id="bl-prd-link"
-                  type="url"
-                  value={businessLineFormData.prdLink}
-                  onChange={e => setBusinessLineFormData({ ...businessLineFormData, prdLink: e.target.value })}
-                  placeholder="https://..."
-                />
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label>Brief Name</label>
-                <input
-                  id="bl-brief-name"
-                  type="text"
-                  value={businessLineFormData.briefName}
-                  onChange={e => setBusinessLineFormData({ ...businessLineFormData, briefName: e.target.value })}
-                  placeholder="e.g., Design Brief"
-                />
-              </div>
-              <div className="form-group">
-                <label>Brief URL</label>
-                <input
-                  id="bl-brief-link"
-                  type="url"
-                  value={businessLineFormData.briefLink}
-                  onChange={e => setBusinessLineFormData({ ...businessLineFormData, briefLink: e.target.value })}
-                  placeholder="https://..."
-                />
-              </div>
-            </div>
-
             <div className="form-group">
-              <label>Figma URL</label>
-              <input
-                id="bl-figma-link"
-                type="url"
-                value={businessLineFormData.figmaLink}
-                onChange={e => setBusinessLineFormData({ ...businessLineFormData, figmaLink: e.target.value })}
-                placeholder="https://figma.com/..."
-              />
+              <label>Custom Links (max 3)</label>
+              {businessLineFormData.customLinks?.map((link, idx) => (
+                <div key={idx} className="custom-link-row">
+                  <input
+                    type="text"
+                    value={link.name}
+                    onChange={e => {
+                      const newLinks = [...businessLineFormData.customLinks];
+                      newLinks[idx].name = e.target.value;
+                      setBusinessLineFormData({ ...businessLineFormData, customLinks: newLinks });
+                    }}
+                    placeholder="Link name"
+                  />
+                  <input
+                    type="url"
+                    value={link.url}
+                    onChange={e => {
+                      const newLinks = [...businessLineFormData.customLinks];
+                      newLinks[idx].url = e.target.value;
+                      setBusinessLineFormData({ ...businessLineFormData, customLinks: newLinks });
+                    }}
+                    placeholder="https://..."
+                  />
+                  <button
+                    type="button"
+                    className="remove-link-btn"
+                    onClick={() => {
+                      const newLinks = businessLineFormData.customLinks.filter((_, i) => i !== idx)
+                      setBusinessLineFormData({ ...businessLineFormData, customLinks: newLinks })
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+              {(!businessLineFormData.customLinks || businessLineFormData.customLinks.length < 3) && (
+                <button
+                  type="button"
+                  className="add-link-btn"
+                  onClick={() => {
+                    const newLinks = [...(businessLineFormData.customLinks || []), { name: '', url: '' }];
+                    setBusinessLineFormData({ ...businessLineFormData, customLinks: newLinks });
+                  }}
+                >
+                  + Add Custom Link
+                </button>
+              )}
             </div>
 
             <div className="modal-actions">
@@ -2699,13 +2634,6 @@ function App() {
                 const lineToSave: BusinessLine = {
                   id: editingBusinessLine?.id || Date.now().toString(),
                   name: businessLineFormData.name,
-                  deckName: businessLineFormData.deckName,
-                  deckLink: businessLineFormData.deckLink,
-                  prdName: businessLineFormData.prdName,
-                  prdLink: businessLineFormData.prdLink,
-                  briefName: businessLineFormData.briefName,
-                  briefLink: businessLineFormData.briefLink,
-                  figmaLink: businessLineFormData.figmaLink,
                   customLinks: businessLineFormData.customLinks
                 }
                 await saveBusinessLine(lineToSave, editingBusinessLine?.name)
