@@ -763,6 +763,15 @@
   margin-left: 0.25rem;
 }
 
+.clickable-label {
+  cursor: pointer;
+}
+
+.clickable-label:hover .label-hint {
+  opacity: 1;
+  text-decoration: underline;
+}
+
 .form-group input {
   width: 100%;
   padding: 0.75rem 1rem;

@@ -2519,7 +2519,12 @@ function App() {
             </div>
 
             <div className="form-group">
-              <label>Start Date <span className="label-hint">(select from calendar)</span></label>
+              <label 
+                htmlFor="start-date"
+                className="clickable-label"
+              >
+                Start Date <span className="label-hint">(click to select)</span>
+              </label>
               <input
                 id="start-date"
                 type="date"
@@ -2530,7 +2535,12 @@ function App() {
             </div>
 
             <div className="form-group">
-              <label>End Date <span className="label-hint">(select from calendar)</span></label>
+              <label 
+                htmlFor="end-date"
+                className="clickable-label"
+              >
+                End Date <span className="label-hint">(click to select)</span>
+              </label>
               <input
                 id="end-date"
                 type="date"
@@ -2612,7 +2622,12 @@ function App() {
             </div>
 
             <div className="form-group">
-              <label>Start Date <span className="label-hint">(select from calendar)</span></label>
+              <label 
+                htmlFor="timeline-start"
+                className="clickable-label"
+              >
+                Start Date <span className="label-hint">(click to select)</span>
+              </label>
               <input
                 id="timeline-start"
                 type="date"
@@ -2623,7 +2638,12 @@ function App() {
             </div>
 
             <div className="form-group">
-              <label>End Date <span className="label-hint">(select from calendar)</span></label>
+              <label 
+                htmlFor="timeline-end"
+                className="clickable-label"
+              >
+                End Date <span className="label-hint">(click to select)</span>
+              </label>
               <input
                 id="timeline-end"
                 type="date"
