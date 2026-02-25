@@ -290,7 +290,10 @@ app.get('/api/search', async (req, res) => {
       normalize(proj.name).includes(query) ||
       normalize(proj.businessLine).includes(query) ||
       normalize(proj.description).includes(query) ||
-      proj.designers?.some((d: string) => normalize(d).includes(query))
+      proj.designers?.some((d: string) => normalize(d).includes(query)) ||
+      proj.customLinks?.some((l: { name: string; url: string }) => 
+        normalize(l.name).includes(query) || normalize(l.url).includes(query)
+      )
     ));
 
     // Search team members
@@ -309,7 +312,10 @@ app.get('/api/search', async (req, res) => {
       ...bl,
       customLinks: bl.customLinks ? JSON.parse(bl.customLinks) : []
     })).filter(bl =>
-      normalize(bl.name).includes(query)
+      normalize(bl.name).includes(query) ||
+      bl.customLinks?.some((l: { name: string; url: string }) => 
+        normalize(l.name).includes(query) || normalize(l.url).includes(query)
+      )
     ));
 
     res.json({ projects, team, businessLines });
@@ -523,7 +529,7 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 
 const SITE_VERSION = 'v260225'  // Manual update on code changes
-const SITE_TIME = '1033'
+const SITE_TIME = '1054'
 
 const VERSION_KEY = 'dcc_versions'
 
