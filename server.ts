@@ -283,24 +283,35 @@ app.get('/api/search', async (req, res) => {
     // Search projects
     const projects = await all('SELECT * FROM projects').then(p => p.map(proj => {
       const customLinks = proj.customLinks ? JSON.parse(proj.customLinks) : [];
-      const matchedCustomLinks = customLinks.filter((l: { name: string; url: string }) => 
+      
+      // Check if query matches any field (including link fields)
+      const matchesDeck = proj.deckName && normalize(proj.deckName).includes(query);
+      const matchesPrd = proj.prdName && normalize(proj.prdName).includes(query);
+      const matchesBrief = proj.briefName && normalize(proj.briefName).includes(query);
+      const matchesFigma = proj.figmaLink && normalize(proj.figmaLink).includes(query);
+      const matchesCustom = customLinks.some((l: { name: string; url: string }) => 
         normalize(l.name).includes(query) || normalize(l.url).includes(query)
       );
       
-      // Build matched links from all link fields
+      // If matches any asset type, show ALL links
+      const matchesAssetType = matchesDeck || matchesPrd || matchesBrief || matchesFigma || matchesCustom;
+      
+      // Build all links for this project
       const allLinks = [
-        ...matchedCustomLinks,
-        proj.deckName && normalize(proj.deckName).includes(query) ? { name: proj.deckName, url: proj.deckLink || '' } : null,
-        proj.prdName && normalize(proj.prdName).includes(query) ? { name: proj.prdName, url: proj.prdLink || '' } : null,
-        proj.briefName && normalize(proj.briefName).includes(query) ? { name: proj.briefName, url: proj.briefLink || '' } : null,
-        proj.figmaLink && (normalize(proj.figmaLink).includes(query)) ? { name: 'Figma', url: proj.figmaLink } : null,
+        proj.deckName ? { name: proj.deckName, url: proj.deckLink || '', type: 'Deck' } : null,
+        proj.prdName ? { name: proj.prdName, url: proj.prdLink || '', type: 'PRD' } : null,
+        proj.briefName ? { name: proj.briefName, url: proj.briefLink || '', type: 'Brief' } : null,
+        proj.figmaLink ? { name: 'Figma', url: proj.figmaLink, type: 'Figma' } : null,
+        ...customLinks.map((l: { name: string; url: string }) => ({ ...l, type: 'Link' }))
       ].filter(Boolean);
       
       return {
         ...proj,
         timeline: proj.timeline ? JSON.parse(proj.timeline) : [],
         customLinks: customLinks,
-        matchedLinks: allLinks,
+        matchedLinks: matchesAssetType ? allLinks : allLinks.filter((l: any) => 
+          (l.name && normalize(l.name).includes(query)) || (l.url && normalize(l.url).includes(query))
+        ),
         designers: proj.designers ? JSON.parse(proj.designers) : []
       };
     }).filter(proj => 
@@ -329,23 +340,33 @@ app.get('/api/search', async (req, res) => {
     // Search business lines
     const businessLines = await all('SELECT * FROM business_lines').then(l => l.map(bl => {
       const customLinks = bl.customLinks ? JSON.parse(bl.customLinks) : [];
-      const matchedCustomLinks = customLinks.filter((link: { name: string; url: string }) => 
+      
+      // Check if query matches any asset type field
+      const matchesDeck = bl.deckName && normalize(bl.deckName).includes(query);
+      const matchesPrd = bl.prdName && normalize(bl.prdName).includes(query);
+      const matchesBrief = bl.briefName && normalize(bl.briefName).includes(query);
+      const matchesFigma = bl.figmaLink && normalize(bl.figmaLink).includes(query);
+      const matchesCustom = customLinks.some((link: { name: string; url: string }) => 
         normalize(link.name).includes(query) || normalize(link.url).includes(query)
       );
       
-      // Build matched links from all link fields
+      const matchesAssetType = matchesDeck || matchesPrd || matchesBrief || matchesFigma || matchesCustom;
+      
+      // Build all links
       const allLinks = [
-        ...matchedCustomLinks,
-        bl.deckName && normalize(bl.deckName).includes(query) ? { name: bl.deckName, url: bl.deckLink || '' } : null,
-        bl.prdName && normalize(bl.prdName).includes(query) ? { name: bl.prdName, url: bl.prdLink || '' } : null,
-        bl.briefName && normalize(bl.briefName).includes(query) ? { name: bl.briefName, url: bl.briefLink || '' } : null,
-        bl.figmaLink && (normalize(bl.figmaLink).includes(query)) ? { name: 'Figma', url: bl.figmaLink } : null,
+        bl.deckName ? { name: bl.deckName, url: bl.deckLink || '', type: 'Deck' } : null,
+        bl.prdName ? { name: bl.prdName, url: bl.prdLink || '', type: 'PRD' } : null,
+        bl.briefName ? { name: bl.briefName, url: bl.briefLink || '', type: 'Brief' } : null,
+        bl.figmaLink ? { name: 'Figma', url: bl.figmaLink, type: 'Figma' } : null,
+        ...customLinks.map((l: { name: string; url: string }) => ({ ...l, type: 'Link' }))
       ].filter(Boolean);
       
       return {
         ...bl,
         customLinks: customLinks,
-        matchedLinks: allLinks
+        matchedLinks: matchesAssetType ? allLinks : allLinks.filter((l: any) => 
+          (l.name && normalize(l.name).includes(query)) || (l.url && normalize(l.url).includes(query))
+        )
       };
     }).filter(bl =>
       normalize(bl.name).includes(query) ||
@@ -567,7 +588,7 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 
 const SITE_VERSION = 'v260225'  // Manual update on code changes
-const SITE_TIME = '1101'
+const SITE_TIME = '1110'
 
 const VERSION_KEY = 'dcc_versions'
 

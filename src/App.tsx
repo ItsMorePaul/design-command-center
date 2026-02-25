@@ -110,7 +110,7 @@ interface Project {
   briefLink?: string
   figmaLink?: string
   customLinks?: { name: string; url: string }[]
-  matchedLinks?: { name: string; url: string }[]
+  matchedLinks?: { name: string; url: string; type?: string }[]
   timeline: TimelineRange[]
 }
 
@@ -125,7 +125,7 @@ interface BusinessLine {
   briefLink?: string
   figmaLink?: string
   customLinks?: { name: string; url: string }[]
-  matchedLinks?: { name: string; url: string }[]
+  matchedLinks?: { name: string; url: string; type?: string }[]
 }
 
 interface TeamMember {
@@ -2666,6 +2666,7 @@ function App() {
                               className="search-matched-link"
                               onClick={e => e.stopPropagation()}
                             >
+                              {link.type && <span className="search-link-type">{link.type}</span>}
                               {link.name}
                             </a>
                           ))}
@@ -2710,6 +2711,7 @@ function App() {
                               className="search-matched-link"
                               onClick={e => e.stopPropagation()}
                             >
+                              {link.type && <span className="search-link-type">{link.type}</span>}
                               {link.name}
                             </a>
                           ))}

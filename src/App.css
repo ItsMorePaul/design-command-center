@@ -2929,3 +2929,15 @@ select:focus-visible {
   color: var(--color-text-link);
   border-left-color: var(--color-text-link);
 }
+
+.search-link-type {
+  display: inline-block;
+  font-size: 0.65rem;
+  padding: 0.1rem 0.3rem;
+  margin-right: 0.4rem;
+  background: var(--color-bg-tertiary);
+  border-radius: 3px;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
