@@ -2708,8 +2708,8 @@ select:focus-visible {
   height: 14px;
   background: var(--color-bg);
   border: 1px solid #f59e0b;
-  /* Compensate for rotated square center offset */
-  transform: translateX(-50%) translateY(-50%) rotate(45deg) translateX(-3px);
+  /* Center the element, then rotate */
+  transform: translateX(-50%) translateY(-50%) rotate(45deg);
   z-index: 99998;
   pointer-events: none;
   box-sizing: border-box;

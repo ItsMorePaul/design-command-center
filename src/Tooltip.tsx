@@ -20,7 +20,7 @@ export function Tooltip({ content, children }: TooltipProps) {
       shift({ padding: 8 }),
       arrow({
         element: arrowRef,
-        padding: 10,
+        padding: 14,
       }),
     ],
   });
