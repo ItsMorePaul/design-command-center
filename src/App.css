@@ -2708,9 +2708,11 @@ select:focus-visible {
   height: 14px;
   background: var(--color-bg);
   border: 1px solid #f59e0b;
-  transform: translateX(-50%) translateY(-50%) rotate(45deg);
+  /* Compensate for rotated square center offset */
+  transform: translateX(-50%) translateY(-50%) rotate(45deg) translateX(-3px);
   z-index: 99998;
   pointer-events: none;
+  box-sizing: border-box;
 }
 
 /* Position arrow to point down (tooltip above target) */
