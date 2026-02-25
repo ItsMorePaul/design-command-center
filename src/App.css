@@ -2686,7 +2686,8 @@ select:focus-visible {
   height: 32px;
   border-radius: var(--radius-sm);
   background: var(--color-bg-tertiary);
-  border: none;
+  border: 1px solid var(--color-border-subtle);
+  color: var(--color-text-muted);
   align-items: center;
   justify-content: center;
   cursor: pointer;
@@ -2695,6 +2696,7 @@ select:focus-visible {
 
 .tooltip-trigger:hover {
   background: var(--color-border);
+  color: var(--color-text);
 }
 
 .tooltip-floating {
