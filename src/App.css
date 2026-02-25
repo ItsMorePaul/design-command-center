@@ -2704,8 +2704,8 @@ select:focus-visible {
 /* Seamless arrow using pseudo-elements - border effect */
 .tooltip-arrow {
   position: absolute;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   background: var(--color-bg);
   border: 1px solid #f59e0b;
   transform: translateX(-50%) translateY(-50%) rotate(45deg);
@@ -2714,18 +2714,18 @@ select:focus-visible {
 
 /* Position arrow to point down (tooltip above target) */
 .tooltip-arrow-down {
-  bottom: -9px;
+  bottom: -7px;
   left: 50%;
   border-top: none;
   border-left: none;
-  box-shadow: 3px 3px 5px rgba(0, 0, 0, 0.2);
+  box-shadow: 2px 2px 3px rgba(0, 0, 0, 0.15);
 }
 
 /* Position arrow to point up (tooltip below target) */
 .tooltip-arrow-up {
-  top: -9px;
+  top: -7px;
   left: 50%;
   border-bottom: none;
   border-right: none;
-  box-shadow: -3px -3px 5px rgba(0, 0, 0, 0.2);
+  box-shadow: -2px -2px 3px rgba(0, 0, 0, 0.15);
 }
