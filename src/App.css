@@ -2681,19 +2681,6 @@ select:focus-visible {
 .tooltip-trigger {
   display: inline-flex;
   position: relative;
-  min-width: 36px;
-  min-height: 36px;
-  width: auto;
-  height: auto;
-  padding: 4px;
-  border-radius: var(--radius-sm);
-  background: var(--color-bg-tertiary);
-  border: 1px solid var(--color-border-subtle);
-  color: var(--color-text-muted);
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
 }
 
 .tooltip-trigger:hover {
