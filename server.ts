@@ -283,6 +283,7 @@ app.get('/api/search', async (req, res) => {
     // Search projects
     const projects = await all('SELECT * FROM projects').then(p => p.map(proj => {
       const customLinks = proj.customLinks ? JSON.parse(proj.customLinks) : [];
+      const designers = proj.designers ? JSON.parse(proj.designers) : [];
       
       // Build all asset links for this project
       const allLinks = [
@@ -296,9 +297,9 @@ app.get('/api/search', async (req, res) => {
       // Include project in results if main fields match OR if any asset link exists
       const matchesMainFields = 
         normalize(proj.name).includes(query) ||
-        normalize(proj.businessLine).includes(query) ||
-        normalize(proj.description).includes(query) ||
-        proj.designers?.some((d: string) => normalize(d).includes(query));
+        normalize(proj.businessLine || '').includes(query) ||
+        normalize(proj.description || '').includes(query) ||
+        (Array.isArray(designers) && designers.some((d: string) => normalize(d).includes(query)));
       
       const hasAssetLinks = allLinks.length > 0;
       
@@ -307,13 +308,13 @@ app.get('/api/search', async (req, res) => {
         timeline: proj.timeline ? JSON.parse(proj.timeline) : [],
         customLinks: customLinks,
         matchedLinks: allLinks,
-        designers: proj.designers ? JSON.parse(proj.designers) : []
+        designers: designers
       };
     }).filter(proj => 
       normalize(proj.name).includes(query) ||
-      normalize(proj.businessLine).includes(query) ||
-      normalize(proj.description).includes(query) ||
-      proj.designers?.some((d: string) => normalize(d).includes(query)) ||
+      normalize(proj.businessLine || '').includes(query) ||
+      normalize(proj.description || '').includes(query) ||
+      (Array.isArray(proj.designers) && proj.designers.some((d: string) => normalize(d).includes(query))) ||
       (proj as any).matchedLinks?.length > 0
     ));
 
@@ -348,9 +349,6 @@ app.get('/api/search', async (req, res) => {
       };
     }).filter(bl =>
       normalize(bl.name).includes(query) ||
-      (bl as any).matchedLinks?.length > 0
-      normalize(bl.briefName || '').includes(query) ||
-      normalize(bl.figmaLink || '').includes(query) ||
       (bl as any).matchedLinks?.length > 0
     ));
 
@@ -565,7 +563,7 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 
 const SITE_VERSION = 'v260225'  // Manual update on code changes
-const SITE_TIME = '1124'
+const SITE_TIME = '1128'
 
 const VERSION_KEY = 'dcc_versions'
 
