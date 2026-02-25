@@ -2745,6 +2745,8 @@ input:checked + .slider:before {
   flex-direction: column;
   gap: 0.15rem;
   flex-shrink: 1;
+  flex-grow: 0;
+  max-width: 80px;
   margin-left: auto;
 }
 
