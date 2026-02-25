@@ -1963,18 +1963,16 @@ function App() {
                                       max={100}
                                       value={assignmentDraft[assignment.id] ?? (assignment.allocation_percent || 0)}
                                       onChange={e => setAssignmentDraft({ ...assignmentDraft, [assignment.id]: Number(e.target.value) })}
+                                      onBlur={(e) => {
+                                        const newVal = Number(e.target.value)
+                                        const oldVal = assignment.allocation_percent || 0
+                                        if (newVal !== oldVal) {
+                                          saveAssignmentAllocation(assignment, newVal)
+                                        }
+                                      }}
                                       onClick={e => e.stopPropagation()}
                                     />
                                     <span className="chip-pct">%</span>
-                                    <button
-                                      className="chip-save"
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        saveAssignmentAllocation(assignment, assignmentDraft[assignment.id] ?? (assignment.allocation_percent || 0))
-                                      }}
-                                    >
-                                      ✓
-                                    </button>
                                     <button
                                       className="chip-delete"
                                       onClick={(e) => {
@@ -2049,13 +2047,13 @@ function App() {
                             max={80}
                             value={hoursDraft[member.id] ?? available}
                             onChange={e => setHoursDraft({ ...hoursDraft, [member.id]: Number(e.target.value) })}
+                            onBlur={(e) => {
+                              const newVal = Number(e.target.value)
+                              if (newVal !== available) {
+                                updateWeeklyHours(member.id, newVal)
+                              }
+                            }}
                           />
-                          <button
-                            className="hours-save"
-                            onClick={() => updateWeeklyHours(member.id, hoursDraft[member.id] ?? available)}
-                          >
-                            Save
-                          </button>
                         </div>
                       </div>
                     )}
