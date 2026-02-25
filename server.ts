@@ -283,35 +283,18 @@ app.get('/api/search', async (req, res) => {
     // Search projects
     const projects = await all('SELECT * FROM projects').then(p => p.map(proj => {
       const customLinks = proj.customLinks ? JSON.parse(proj.customLinks) : [];
-      
-      // Check if query matches main fields (not link-specific)
-      const matchesMainFields = 
-        normalize(proj.name).includes(query) ||
-        normalize(proj.businessLine).includes(query) ||
-        normalize(proj.description).includes(query) ||
-        proj.designers?.some((d: string) => normalize(d).includes(query));
-      
-      // If matches main fields, show ALL existing links
-      // If matches link name/url, show only matched links
       const matchedCustomLinks = customLinks.filter((l: { name: string; url: string }) => 
         normalize(l.name).includes(query) || normalize(l.url).includes(query)
       );
       
-      const allLinks = matchesMainFields
-        ? [
-            ...customLinks,
-            proj.deckName ? { name: proj.deckName, url: proj.deckLink || '' } : null,
-            proj.prdName ? { name: proj.prdName, url: proj.prdLink || '' } : null,
-            proj.briefName ? { name: proj.briefName, url: proj.briefLink || '' } : null,
-            proj.figmaLink ? { name: 'Figma', url: proj.figmaLink } : null,
-          ].filter(Boolean)
-        : [
-            ...matchedCustomLinks,
-            proj.deckName && normalize(proj.deckName).includes(query) ? { name: proj.deckName, url: proj.deckLink || '' } : null,
-            proj.prdName && normalize(proj.prdName).includes(query) ? { name: proj.prdName, url: proj.prdLink || '' } : null,
-            proj.briefName && normalize(proj.briefName).includes(query) ? { name: proj.briefName, url: proj.briefLink || '' } : null,
-            proj.figmaLink && normalize(proj.figmaLink).includes(query) ? { name: 'Figma', url: proj.figmaLink } : null,
-          ].filter(Boolean);
+      // Build matched links from all link fields
+      const allLinks = [
+        ...matchedCustomLinks,
+        proj.deckName && normalize(proj.deckName).includes(query) ? { name: proj.deckName, url: proj.deckLink || '' } : null,
+        proj.prdName && normalize(proj.prdName).includes(query) ? { name: proj.prdName, url: proj.prdLink || '' } : null,
+        proj.briefName && normalize(proj.briefName).includes(query) ? { name: proj.briefName, url: proj.briefLink || '' } : null,
+        proj.figmaLink && (normalize(proj.figmaLink).includes(query)) ? { name: 'Figma', url: proj.figmaLink } : null,
+      ].filter(Boolean);
       
       return {
         ...proj,
@@ -346,31 +329,18 @@ app.get('/api/search', async (req, res) => {
     // Search business lines
     const businessLines = await all('SELECT * FROM business_lines').then(l => l.map(bl => {
       const customLinks = bl.customLinks ? JSON.parse(bl.customLinks) : [];
-      
-      // Check if query matches main field (name)
-      const matchesMainField = normalize(bl.name).includes(query);
-      
-      // If matches main field, show ALL existing links
-      // If matches link name/url, show only matched links
       const matchedCustomLinks = customLinks.filter((link: { name: string; url: string }) => 
         normalize(link.name).includes(query) || normalize(link.url).includes(query)
       );
       
-      const allLinks = matchesMainField
-        ? [
-            ...customLinks,
-            bl.deckName ? { name: bl.deckName, url: bl.deckLink || '' } : null,
-            bl.prdName ? { name: bl.prdName, url: bl.prdLink || '' } : null,
-            bl.briefName ? { name: bl.briefName, url: bl.briefLink || '' } : null,
-            bl.figmaLink ? { name: 'Figma', url: bl.figmaLink } : null,
-          ].filter(Boolean)
-        : [
-            ...matchedCustomLinks,
-            bl.deckName && normalize(bl.deckName).includes(query) ? { name: bl.deckName, url: bl.deckLink || '' } : null,
-            bl.prdName && normalize(bl.prdName).includes(query) ? { name: bl.prdName, url: bl.prdLink || '' } : null,
-            bl.briefName && normalize(bl.briefName).includes(query) ? { name: bl.briefName, url: bl.briefLink || '' } : null,
-            bl.figmaLink && normalize(bl.figmaLink).includes(query) ? { name: 'Figma', url: bl.figmaLink } : null,
-          ].filter(Boolean);
+      // Build matched links from all link fields
+      const allLinks = [
+        ...matchedCustomLinks,
+        bl.deckName && normalize(bl.deckName).includes(query) ? { name: bl.deckName, url: bl.deckLink || '' } : null,
+        bl.prdName && normalize(bl.prdName).includes(query) ? { name: bl.prdName, url: bl.prdLink || '' } : null,
+        bl.briefName && normalize(bl.briefName).includes(query) ? { name: bl.briefName, url: bl.briefLink || '' } : null,
+        bl.figmaLink && (normalize(bl.figmaLink).includes(query)) ? { name: 'Figma', url: bl.figmaLink } : null,
+      ].filter(Boolean);
       
       return {
         ...bl,
@@ -597,7 +567,7 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 
 const SITE_VERSION = 'v260225'  // Manual update on code changes
-const SITE_TIME = '1106'
+const SITE_TIME = '1101'
 
 const VERSION_KEY = 'dcc_versions'
 
