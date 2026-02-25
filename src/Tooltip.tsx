@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { useFloating, offset, flip, shift } from '@floating-ui/react';
+import { useFloating, offset, flip, shift, arrow } from '@floating-ui/react';
 
 interface TooltipProps {
   content: string;
@@ -8,19 +8,29 @@ interface TooltipProps {
 
 export function Tooltip({ content, children }: TooltipProps) {
   const [isMounted, setIsMounted] = useState(false);
+  const arrowRef = useRef<HTMLDivElement>(null);
   const showTimeoutRef = useRef<number | undefined>(undefined);
   const hideTimeoutRef = useRef<number | undefined>(undefined);
 
-  const { refs, floatingStyles, placement } = useFloating({
+  const { refs, floatingStyles, placement, middlewareData } = useFloating({
     placement: 'top',
     middleware: [
       offset(12),
       flip(),
       shift({ padding: 8 }),
+      arrow({
+        element: arrowRef,
+        padding: 6,
+      }),
     ],
   });
 
   const isTop = placement === 'top' || placement === 'top-start' || placement === 'top-end';
+  const { arrow: arrowData } = middlewareData;
+
+  // Calculate arrow position from Floating UI
+  const x = arrowData?.x;
+  const y = arrowData?.y;
 
   const handleMouseEnter = () => {
     clearTimeout(hideTimeoutRef.current);
@@ -57,7 +67,16 @@ export function Tooltip({ content, children }: TooltipProps) {
           onMouseLeave={handleMouseLeave}
         >
           <div className="tooltip-content">{content}</div>
-          <div className={`tooltip-arrow ${isTop ? 'tooltip-arrow-down' : 'tooltip-arrow-up'}`} />
+          <div
+            ref={arrowRef}
+            className={`tooltip-arrow ${isTop ? 'tooltip-arrow-down' : 'tooltip-arrow-up'}`}
+            style={{
+              left: x != null ? `${x}px` : '50%',
+              top: y != null ? `${y}px` : undefined,
+              right: x != null ? undefined : 'auto',
+              bottom: y != null ? undefined : 'auto',
+            }}
+          />
         </div>
       )}
     </>
