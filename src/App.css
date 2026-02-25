@@ -2687,7 +2687,7 @@ input:checked + .slider:before {
 .designer-card-header {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0;
   padding: 1rem;
   cursor: pointer;
   user-select: none;
@@ -2697,88 +2697,80 @@ input:checked + .slider:before {
   background: var(--color-bg-tertiary);
 }
 
-.designer-card-main {
-  flex: 1;
+.designer-card-header-content {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 0.75rem;
+  width: 100%;
   min-width: 0;
-  overflow: hidden;
 }
 
-.designer-info {
+.designer-col-info {
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
-  min-width: 90px;
-  max-width: 200px;
+  min-width: 70px;
+  max-width: 150px;
   flex-shrink: 1;
+  overflow: hidden;
 }
 
-.designer-card-name {
+.designer-name {
   font-weight: 600;
   font-size: 1rem;
   display: flex;
   white-space: nowrap;
 }
 
-.designer-card-name {
-  display: flex;
-  gap: 0.25rem;
-}
-
-.designer-card-name .first-name {
+.designer-name .first-name {
   flex-shrink: 0;
 }
 
-.designer-card-name .last-name {
+.designer-name .last-name {
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.designer-card-hours {
+.designer-hours {
   font-size: 0.8rem;
   color: var(--color-text-muted);
-  white-space: nowrap;
 }
 
-.designer-usage {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  flex-shrink: 0;
-  width: 120px;
-  margin-left: auto;
-}
-
-.designer-usage-pct {
-  font-size: 1.25rem;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.designer-usage-hours {
-  font-size: 0.8rem;
-  color: var(--color-text-muted);
-  white-space: nowrap;
-}
-
-.designer-card-bar {
-  flex: 0 0 auto;
-  width: 80px;
-  min-width: 50px;
-  max-width: 80px;
+.designer-col-bar {
+  flex: 1 1 auto;
+  min-width: 40px;
   height: 6px;
   background: var(--color-border);
   border-radius: 3px;
   overflow: hidden;
 }
 
-.designer-usage-bar {
+.designer-bar-fill {
   height: 100%;
   border-radius: 3px;
   transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+.designer-col-usage {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0;
+  min-width: 70px;
+  flex-shrink: 0;
+}
+
+.usage-pct {
+  font-size: 1.25rem;
+  font-weight: 700;
+  white-space: nowrap;
+  line-height: 1.1;
+}
+
+.usage-hours {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
 }
 
 .expand-toggle {

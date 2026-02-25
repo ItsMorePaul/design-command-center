@@ -1912,38 +1912,31 @@ function App() {
                         setExpandedDesigners(newExpanded)
                       }}
                     >
-                      <div className="designer-card-main">
-                        <div className="designer-info">
-                          <span className="designer-card-name">
+                      <div className="designer-card-header-content">
+                        <div className="designer-col-info">
+                          <span className="designer-name">
                             <span className="first-name">{member.name.split(' ')[0]}</span>
                             {member.name.includes(' ') && (
                               <span className="last-name">{member.name.split(' ').slice(1).join(' ')}</span>
                             )}
                           </span>
-                          <span className="designer-card-hours">{available}h/week</span>
+                          <span className="designer-hours">{available}h/week</span>
                         </div>
-                        <div className="designer-usage">
-                          <span 
-                            className="designer-usage-pct"
-                            style={{ color: getUtilColor() }}
-                          >
-                            {utilization}%
-                          </span>
-                          <span className="designer-usage-hours">
-                            ({allocatedHours.toFixed(1)}h allocated)
-                          </span>
+                        <div className="designer-col-bar">
+                          <div 
+                            className="designer-bar-fill"
+                            style={{ 
+                              width: `${Math.min(utilization, 100)}%`,
+                              backgroundColor: getUtilColor()
+                            }}
+                          />
                         </div>
-                      </div>
-                      <div className="designer-card-bar">
-                        <div 
-                          className="designer-usage-bar"
-                          style={{ 
-                            width: `${Math.min(utilization, 100)}%`,
-                            backgroundColor: getUtilColor()
-                          }}
-                        />
-                      </div>
-                      <button className="expand-toggle">
+                        <div className="designer-col-usage">
+                          <span className="usage-pct" style={{ color: getUtilColor() }}>{utilization}%</span>
+                          <span className="usage-hours">{allocatedHours.toFixed(1)}h</span>
+                        </div>
+                        </div>
+                        <button className="expand-toggle">
                         <ChevronDown 
                           size={18} 
                           className={`expand-icon ${isExpanded ? 'expanded' : ''}`}
