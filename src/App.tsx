@@ -1914,7 +1914,12 @@ function App() {
                     >
                       <div className="designer-card-main">
                         <div className="designer-info">
-                          <span className="designer-card-name">{member.name}</span>
+                          <span className="designer-card-name">
+                            <span className="first-name">{member.name.split(' ')[0]}</span>
+                            {member.name.includes(' ') && (
+                              <span className="last-name"> {member.name.split(' ').slice(1).join(' ')}</span>
+                            )}
+                          </span>
                           <span className="designer-card-hours">{available}h/week</span>
                         </div>
                         <div className="designer-usage">

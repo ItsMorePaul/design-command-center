@@ -2716,7 +2716,15 @@ input:checked + .slider:before {
 .designer-card-name {
   font-weight: 600;
   font-size: 1rem;
+  display: flex;
   white-space: nowrap;
+}
+
+.designer-card-name .first-name {
+  flex-shrink: 0;
+}
+
+.designer-card-name .last-name {
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -2747,7 +2755,8 @@ input:checked + .slider:before {
 }
 
 .designer-card-bar {
-  width: 80px;
+  flex: 1;
+  max-width: 100px;
   min-width: 60px;
   height: 6px;
   background: var(--color-border);
