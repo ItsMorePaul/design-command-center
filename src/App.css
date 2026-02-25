@@ -2720,12 +2720,13 @@ input:checked + .slider:before {
   white-space: nowrap;
 }
 
-.designer-card-name .first-name {
-  flex-shrink: 0;
+.designer-card-name {
+  display: flex;
+  gap: 0.25rem;
 }
 
-.designer-card-name .last-name::before {
-  content: " ";
+.designer-card-name .first-name {
+  flex-shrink: 0;
 }
 
 .designer-card-name .last-name {

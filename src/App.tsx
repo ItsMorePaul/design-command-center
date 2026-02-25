@@ -1917,7 +1917,7 @@ function App() {
                           <span className="designer-card-name">
                             <span className="first-name">{member.name.split(' ')[0]}</span>
                             {member.name.includes(' ') && (
-                              <span className="last-name"> {member.name.split(' ').slice(1).join(' ')}</span>
+                              <span className="last-name">{member.name.split(' ').slice(1).join(' ')}</span>
                             )}
                           </span>
                           <span className="designer-card-hours">{available}h/week</span>
