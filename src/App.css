@@ -2767,14 +2767,14 @@ input:checked + .slider:before {
 }
 
 .designer-card-bar {
-  flex: 1;
-  max-width: 80px;
+  flex: 1 1 auto;
+  width: 60px;
+  max-width: 100px;
   min-width: 40px;
   height: 6px;
   background: var(--color-border);
   border-radius: 3px;
   overflow: hidden;
-  flex-shrink: 0;
 }
 
 @media (max-width: 500px) {
