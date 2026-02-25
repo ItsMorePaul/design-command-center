@@ -170,6 +170,40 @@ app.delete('/api/projects/:id', async (req, res) => {
   } catch (e) { res.status(500).json({error: e.message}); }
 });
 
+// ============ BUSINESS LINES ============
+app.get('/api/business-lines', async (req, res) => {
+  try {
+    const lines = await all('SELECT * FROM business_lines ORDER BY name');
+    res.json(lines.map(l => ({
+      ...l,
+      customLinks: l.customLinks ? JSON.parse(l.customLinks) : []
+    })));
+  } catch (e) { res.status(500).json({error: e.message}); }
+});
+
+app.post('/api/business-lines', async (req, res) => {
+  try {
+    const { id, name, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinks } = req.body;
+    const lineId = id || Date.now().toString();
+    const customLinksJson = JSON.stringify(customLinks || []);
+    await run(
+      `INSERT OR REPLACE INTO business_lines (id, name, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinks, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+      [lineId, name, deckName || '', deckLink || '', prdName || '', prdLink || '', briefName || '', briefLink || '', figmaLink || '', customLinksJson]
+    );
+    await updateDbVersion()
+    res.json({id: lineId, ...req.body});
+  } catch (e) { res.status(500).json({error: e.message}); }
+});
+
+app.delete('/api/business-lines/:id', async (req, res) => {
+  try {
+    await run('DELETE FROM business_lines WHERE id = ?', [req.params.id]);
+    await updateDbVersion()
+    res.json({success: true});
+  } catch (e) { res.status(500).json({error: e.message}); }
+});
+
 // ============ TEAM ============
 app.get('/api/team', async (req, res) => {
   try {
@@ -422,7 +456,7 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 
 const SITE_VERSION = 'v260225'  // Manual update on code changes
-const SITE_TIME = '0826'
+const SITE_TIME = '0842'
 
 const VERSION_KEY = 'dcc_versions'
 
@@ -489,6 +523,21 @@ run("ALTER TABLE team ADD COLUMN weekly_hours INTEGER DEFAULT 35")
   .catch(() => {
     // Column already exists in established databases
   })
+
+run(`CREATE TABLE IF NOT EXISTS business_lines (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  deckName TEXT DEFAULT '',
+  deckLink TEXT DEFAULT '',
+  prdName TEXT DEFAULT '',
+  prdLink TEXT DEFAULT '',
+  briefName TEXT DEFAULT '',
+  briefLink TEXT DEFAULT '',
+  figmaLink TEXT DEFAULT '',
+  customLinks TEXT DEFAULT '[]',
+  createdAt TEXT DEFAULT (datetime('now')),
+  updatedAt TEXT DEFAULT (datetime('now'))
+)`).catch((e) => console.error('business_lines init error:', e.message))
 
 // Get versions - returns site version from code, DB version from database
 app.get('/api/versions', async (req, res) => {

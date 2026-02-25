@@ -2741,3 +2741,84 @@ select:focus-visible {
   border-right: none;
   box-shadow: -2px -2px 3px rgba(0, 0, 0, 0.15);
 }
+
+/* Settings Page */
+.settings-page {
+  padding: 24px;
+  max-width: 900px;
+}
+
+.settings-section {
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-md);
+  padding: 20px;
+}
+
+.settings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.settings-header h2 {
+  font-size: 1.25rem;
+  color: var(--color-text);
+}
+
+.settings-empty {
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  padding: 20px;
+  text-align: center;
+}
+
+/* Business Lines List */
+.business-lines-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.business-line-card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+}
+
+.business-line-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.business-line-header h3 {
+  font-size: 1rem;
+  color: var(--color-text);
+}
+
+.business-line-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.business-line-links {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.no-links {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-style: italic;
+}
+
+/* Form Row */
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}

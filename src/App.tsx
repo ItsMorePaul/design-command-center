@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Bell, Gauge, ChevronDown } from 'lucide-react'
+import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Bell, Gauge, ChevronDown, Settings } from 'lucide-react'
 import { Tooltip } from './Tooltip'
 import './App.css'
 import initialData from './data.json'
@@ -113,6 +113,19 @@ interface Project {
   timeline: TimelineRange[]
 }
 
+interface BusinessLine {
+  id: string
+  name: string
+  deckName?: string
+  deckLink?: string
+  prdName?: string
+  prdLink?: string
+  briefName?: string
+  briefLink?: string
+  figmaLink?: string
+  customLinks?: { name: string; url: string }[]
+}
+
 interface TeamMember {
   id: string
   name: string
@@ -203,7 +216,7 @@ const loadDataFromAPI = async () => {
 }
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'projects' | 'team' | 'calendar' | 'capacity'>('projects')
+  const [activeTab, setActiveTab] = useState<'projects' | 'team' | 'calendar' | 'capacity' | 'settings'>('projects')
   const [notifications] = useState(mockNotifications)
   const [team, setTeam] = useState<TeamMember[]>([])
   const [projects, setProjects] = useState<Project[]>([])
@@ -327,6 +340,14 @@ function App() {
   // Version tracking
   const [siteVersion, setSiteVersion] = useState({ version: '', time: '' })
   const [dbVersion, setDbVersion] = useState({ version: '', time: '' })
+
+  // Business Lines (Settings)
+  const [businessLines, setBusinessLines] = useState<BusinessLine[]>([])
+  const [showBusinessLineModal, setShowBusinessLineModal] = useState(false)
+  const [editingBusinessLine, setEditingBusinessLine] = useState<BusinessLine | null>(null)
+  const [businessLineFormData, setBusinessLineFormData] = useState({
+    name: '', deckName: '', deckLink: '', prdName: '', prdLink: '', briefName: '', briefLink: '', figmaLink: '', customLinks: [] as { name: string; url: string }[]
+  })
   
   // Load versions from server on mount
   useEffect(() => {
@@ -355,6 +376,10 @@ function App() {
             setBrandOptions(data.brandOptions.sort())
           }
         }
+        // Load business lines
+        const blRes = await fetch('/api/business-lines')
+        const blData = await blRes.json()
+        setBusinessLines(blData)
       } catch (err) {
         console.error('Error loading data:', err)
       } finally {
@@ -500,6 +525,24 @@ function App() {
 
   const deleteProject = async (id: string) => {
     await fetch(`/api/projects/${id}`, { method: 'DELETE' })
+  }
+
+  // Business Line CRUD
+  const saveBusinessLine = async (line: BusinessLine) => {
+    await fetch('/api/business-lines', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(line)
+    })
+    // Refresh business lines
+    const res = await fetch('/api/business-lines')
+    const data = await res.json()
+    setBusinessLines(data)
+  }
+
+  const deleteBusinessLine = async (id: string) => {
+    await fetch(`/api/business-lines/${id}`, { method: 'DELETE' })
+    setBusinessLines(businessLines.filter(bl => bl.id !== id))
   }
 
   // Handle clicking a project event in day modal - switch to projects page
@@ -1041,6 +1084,7 @@ function App() {
               {activeTab === 'team' && 'Team'}
               {activeTab === 'calendar' && 'Calendar'}
               {activeTab === 'capacity' && 'Capacity'}
+              {activeTab === 'settings' && 'Settings'}
             </h1>
             <p className="date">{getTodayFormatted()}</p>
           </div>
@@ -1051,6 +1095,7 @@ function App() {
               {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
             </button>
             <button className="icon-btn" aria-label="Search"><Search size={18} /></button>
+            <button className="icon-btn" aria-label="Settings" onClick={() => setActiveTab('settings')}><Settings size={18} /></button>
             {activeTab === 'projects' && (
               <button className="primary-btn" onClick={handleAddProject}>+ New Project</button>
             )}
@@ -1882,6 +1927,103 @@ function App() {
         </div>
       )}
 
+      {/* Settings View */}
+      {activeTab === 'settings' && (
+        <div className="settings-page">
+          <div className="settings-section">
+            <div className="settings-header">
+              <h2>Business Lines</h2>
+              <button className="primary-btn" onClick={() => {
+                setEditingBusinessLine(null)
+                setBusinessLineFormData({ name: '', deckName: '', deckLink: '', prdName: '', prdLink: '', briefName: '', briefLink: '', figmaLink: '', customLinks: [] })
+                setShowBusinessLineModal(true)
+              }}>
+                + Add Business Line
+              </button>
+            </div>
+            
+            {businessLines.length === 0 ? (
+              <p className="settings-empty">No business lines configured. Add one to get started.</p>
+            ) : (
+              <div className="business-lines-list">
+                {businessLines.map(line => (
+                  <div key={line.id} className="business-line-card">
+                    <div className="business-line-header">
+                      <h3>{line.name}</h3>
+                      <div className="business-line-actions">
+                        <button className="action-btn" onClick={() => {
+                          setEditingBusinessLine(line)
+                          setBusinessLineFormData({
+                            name: line.name,
+                            deckName: line.deckName || '',
+                            deckLink: line.deckLink || '',
+                            prdName: line.prdName || '',
+                            prdLink: line.prdLink || '',
+                            briefName: line.briefName || '',
+                            briefLink: line.briefLink || '',
+                            figmaLink: line.figmaLink || '',
+                            customLinks: line.customLinks || []
+                          })
+                          setShowBusinessLineModal(true)
+                        }}>
+                          <Pencil size={14} />
+                        </button>
+                        <button className="action-btn delete" onClick={() => openConfirmModal('Delete business line?', `This will remove "${line.name}" and its links.`, async () => {
+                          await deleteBusinessLine(line.id)
+                          closeConfirmModal()
+                        })}>
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="business-line-links">
+                      {line.deckLink && (
+                        <Tooltip content={`Deck: ${line.deckName || 'Design Deck'}`}>
+                          <a href={line.deckLink} target="_blank" rel="noopener noreferrer" className="project-link-icon">
+                            <Presentation size={14} className="link-icon" />
+                          </a>
+                        </Tooltip>
+                      )}
+                      {line.prdLink && (
+                        <Tooltip content={`PRD: ${line.prdName || 'PRD'}`}>
+                          <a href={line.prdLink} target="_blank" rel="noopener noreferrer" className="project-link-icon">
+                            <FileText size={14} className="link-icon" />
+                          </a>
+                        </Tooltip>
+                      )}
+                      {line.briefLink && (
+                        <Tooltip content={`Brief: ${line.briefName || 'Design Brief'}`}>
+                          <a href={line.briefLink} target="_blank" rel="noopener noreferrer" className="project-link-icon">
+                            <FileEdit size={14} className="link-icon" />
+                          </a>
+                        </Tooltip>
+                      )}
+                      {line.figmaLink && (
+                        <Tooltip content="Figma">
+                          <a href={line.figmaLink} target="_blank" rel="noopener noreferrer" className="project-link-icon">
+                            <Figma size={14} className="link-icon" />
+                          </a>
+                        </Tooltip>
+                      )}
+                      {line.customLinks?.map((link, idx) => (
+                        <Tooltip key={idx} content={`Link: ${link.name}`}>
+                          <a href={link.url} target="_blank" rel="noopener noreferrer" className="project-link-icon">
+                            <LinkIcon size={14} className="link-icon" />
+                          </a>
+                        </Tooltip>
+                      ))}
+                      {!line.deckLink && !line.prdLink && !line.briefLink && !line.figmaLink && !line.customLinks?.length && (
+                        <span className="no-links">No links configured</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
         </div>
       </main>
 
@@ -2442,6 +2584,129 @@ function App() {
                 }}
               >
                 Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Business Line Modal */}
+      {showBusinessLineModal && (
+        <div className="modal-overlay" onClick={() => setShowBusinessLineModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h2>{editingBusinessLine ? 'Edit Business Line' : 'Add Business Line'}</h2>
+            
+            <div className="form-group">
+              <label>Name</label>
+              <input
+                id="bl-name"
+                type="text"
+                value={businessLineFormData.name}
+                onChange={e => setBusinessLineFormData({ ...businessLineFormData, name: e.target.value })}
+                placeholder="e.g., WSJ, Barron's, IBD"
+              />
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Deck Name</label>
+                <input
+                  id="bl-deck-name"
+                  type="text"
+                  value={businessLineFormData.deckName}
+                  onChange={e => setBusinessLineFormData({ ...businessLineFormData, deckName: e.target.value })}
+                  placeholder="e.g., Q1 Deck"
+                />
+              </div>
+              <div className="form-group">
+                <label>Deck URL</label>
+                <input
+                  id="bl-deck-link"
+                  type="url"
+                  value={businessLineFormData.deckLink}
+                  onChange={e => setBusinessLineFormData({ ...businessLineFormData, deckLink: e.target.value })}
+                  placeholder="https://..."
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>PRD Name</label>
+                <input
+                  id="bl-prd-name"
+                  type="text"
+                  value={businessLineFormData.prdName}
+                  onChange={e => setBusinessLineFormData({ ...businessLineFormData, prdName: e.target.value })}
+                  placeholder="e.g., Product Spec"
+                />
+              </div>
+              <div className="form-group">
+                <label>PRD URL</label>
+                <input
+                  id="bl-prd-link"
+                  type="url"
+                  value={businessLineFormData.prdLink}
+                  onChange={e => setBusinessLineFormData({ ...businessLineFormData, prdLink: e.target.value })}
+                  placeholder="https://..."
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Brief Name</label>
+                <input
+                  id="bl-brief-name"
+                  type="text"
+                  value={businessLineFormData.briefName}
+                  onChange={e => setBusinessLineFormData({ ...businessLineFormData, briefName: e.target.value })}
+                  placeholder="e.g., Design Brief"
+                />
+              </div>
+              <div className="form-group">
+                <label>Brief URL</label>
+                <input
+                  id="bl-brief-link"
+                  type="url"
+                  value={businessLineFormData.briefLink}
+                  onChange={e => setBusinessLineFormData({ ...businessLineFormData, briefLink: e.target.value })}
+                  placeholder="https://..."
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Figma URL</label>
+              <input
+                id="bl-figma-link"
+                type="url"
+                value={businessLineFormData.figmaLink}
+                onChange={e => setBusinessLineFormData({ ...businessLineFormData, figmaLink: e.target.value })}
+                placeholder="https://figma.com/..."
+              />
+            </div>
+
+            <div className="modal-actions">
+              <button className="secondary-btn" onClick={() => setShowBusinessLineModal(false)}>Cancel</button>
+              <button className="primary-btn" onClick={async () => {
+                if (!businessLineFormData.name.trim()) return
+                const lineToSave: BusinessLine = {
+                  id: editingBusinessLine?.id || Date.now().toString(),
+                  name: businessLineFormData.name,
+                  deckName: businessLineFormData.deckName,
+                  deckLink: businessLineFormData.deckLink,
+                  prdName: businessLineFormData.prdName,
+                  prdLink: businessLineFormData.prdLink,
+                  briefName: businessLineFormData.briefName,
+                  briefLink: businessLineFormData.briefLink,
+                  figmaLink: businessLineFormData.figmaLink,
+                  customLinks: businessLineFormData.customLinks
+                }
+                await saveBusinessLine(lineToSave)
+                setShowBusinessLineModal(false)
+              }}>
+                {editingBusinessLine ? 'Save Changes' : 'Add Business Line'}
               </button>
             </div>
           </div>
