@@ -2713,6 +2713,7 @@ input:checked + .slider:before {
   gap: 0.15rem;
   min-width: 90px;
   max-width: 200px;
+  flex-shrink: 1;
 }
 
 .designer-card-name {
@@ -2764,9 +2765,10 @@ input:checked + .slider:before {
 }
 
 .designer-card-bar {
-  flex: auto;
+  flex: 0 0 auto;
   width: 80px;
   min-width: 50px;
+  max-width: 80px;
   height: 6px;
   background: var(--color-border);
   border-radius: 3px;
