@@ -276,6 +276,7 @@ function App() {
   const [assignmentForm, setAssignmentForm] = useState({ project_id: '', designer_id: '', allocation_percent: 0 })
   const [hoursDraft, setHoursDraft] = useState<Record<string, number>>({})
   const [assignmentDraft, setAssignmentDraft] = useState<Record<string, number>>({})
+  const [expandedDesigners, setExpandedDesigners] = useState<Set<string>>(new Set())
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; title: string; message: string; onConfirm: (() => Promise<void> | void) | null }>({
     open: false,
     title: '',
@@ -304,8 +305,8 @@ function App() {
       // Brand filter - shows ONLY projects
       if (calendarFilters.brands.length > 0 && event.type === 'project') {
         const proj = projects.find(p => p.name === event.projectName)
-        if (proj && proj.businessLine) {
-          if (calendarFilters.brands.includes(proj.businessLine)) {
+        if (proj && proj.businessLines && proj.businessLines.length > 0) {
+          if (proj.businessLines.some((bl: string) => calendarFilters.brands.includes(bl))) {
             return true
           }
         }
@@ -790,8 +791,9 @@ function App() {
     
     // Add project-based business lines
     projects.forEach(project => {
-      if (project.designers?.includes(member.name) && project.businessLines?.length > 0) {
-        project.businessLines.forEach((bl: string) => {
+      const bizLines = project.businessLines
+      if (project.designers?.includes(member.name) && bizLines && bizLines.length > 0) {
+        bizLines.forEach((bl: string) => {
           if (lines[bl]) {
             lines[bl].count += 1
           } else {
@@ -1788,6 +1790,7 @@ function App() {
       {activeTab === 'capacity' && capacityData && (
         <div className="capacity-page">
           <div className="capacity-dashboard">
+            {/* Summary Stats */}
             <div className="capacity-stats">
               <div className="capacity-stat-card">
                 <span className="capacity-stat-value">
@@ -1842,123 +1845,225 @@ function App() {
               </div>
             </div>
 
-            <div className="capacity-section">
-              <h3>Designer Availability</h3>
-              <div className="designers-grid">
-                {capacityData.team.map((member: CapacityMember) => {
-                  const assignments = capacityData.assignments.filter((a: CapacityAssignment) => a.designer_id === member.id)
-                  const allocated = assignments.reduce((sum: number, a: CapacityAssignment) => sum + (a.allocation_percent || 0), 0)
-                  const available = member.weekly_hours || 35
-                  const utilization = Math.round((allocated / 100) * 100)
-                  const isOver = utilization > 100
-                  
-                  return (
-                    <div key={member.id} className={`designer-card ${isOver ? 'over-capacity' : ''}`}>
-                      <div className="designer-name">{member.name}</div>
-                      <div className="designer-hours-row">
-                        <input
-                          type="number"
-                          min={0}
-                          max={80}
-                          className="hours-input"
-                          value={hoursDraft[member.id] ?? available}
-                          onChange={e => setHoursDraft({ ...hoursDraft, [member.id]: Number(e.target.value) })}
-                        />
-                        <span className="designer-hours">hrs/week</span>
-                        <button
-                          className="capacity-mini-btn"
-                          onClick={() => updateWeeklyHours(member.id, hoursDraft[member.id] ?? available)}
-                        >
-                          Save
-                        </button>
-                      </div>
-                      <div className="designer-utilization">
-                        <div className="utilization-bar">
-                          <div 
-                            className={`utilization-fill ${isOver ? 'over' : ''}`}
-                            style={{ width: `${Math.min(utilization, 100)}%` }}
-                          />
-                        </div>
-                        <span className={isOver ? 'over-text' : ''}>{utilization}%</span>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
+            {/* Quick Add Assignment */}
+            <div className="capacity-quick-add">
+              <span className="quick-add-label">Quick assign:</span>
+              <select
+                className="quick-add-select"
+                value={assignmentForm.project_id}
+                onChange={e => setAssignmentForm({ ...assignmentForm, project_id: e.target.value })}
+              >
+                <option value="">Select project</option>
+                {projects.map(project => (
+                  <option key={project.id} value={project.id}>{project.name}</option>
+                ))}
+              </select>
+              <select
+                className="quick-add-select"
+                value={assignmentForm.designer_id}
+                onChange={e => setAssignmentForm({ ...assignmentForm, designer_id: e.target.value })}
+              >
+                <option value="">Designer</option>
+                {capacityData.team.map(member => (
+                  <option key={member.id} value={member.id}>{member.name}</option>
+                ))}
+              </select>
+              <input
+                type="number"
+                className="quick-add-input"
+                min={0}
+                max={100}
+                placeholder="%"
+                value={assignmentForm.allocation_percent || ''}
+                onChange={e => setAssignmentForm({ ...assignmentForm, allocation_percent: Number(e.target.value) })}
+              />
+              <button className="primary-btn" onClick={saveCapacityAssignment}>Assign</button>
             </div>
 
-            <div className="capacity-section">
-              <h3>Project Assignments</h3>
-              <div className="assignment-form">
-                <select
-                  value={assignmentForm.project_id}
-                  onChange={e => setAssignmentForm({ ...assignmentForm, project_id: e.target.value })}
-                >
-                  <option value="">Select project</option>
-                  {projects.map(project => (
-                    <option key={project.id} value={project.id}>{project.name}</option>
-                  ))}
-                </select>
-                <select
-                  value={assignmentForm.designer_id}
-                  onChange={e => setAssignmentForm({ ...assignmentForm, designer_id: e.target.value })}
-                >
-                  <option value="">Select designer</option>
-                  {capacityData.team.map(member => (
-                    <option key={member.id} value={member.id}>{member.name}</option>
-                  ))}
-                </select>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={assignmentForm.allocation_percent}
-                  onChange={e => setAssignmentForm({ ...assignmentForm, allocation_percent: Number(e.target.value) })}
-                />
-                <button className="primary-btn" onClick={saveCapacityAssignment}>Assign</button>
-              </div>
+            {/* Designer Cards - Expandable */}
+            <div className="designer-cards-grid">
+              {capacityData.team.map((member: CapacityMember) => {
+                const memberAssignments = capacityData.assignments.filter((a: CapacityAssignment) => a.designer_id === member.id)
+                const allocated = memberAssignments.reduce((sum: number, a: CapacityAssignment) => sum + (a.allocation_percent || 0), 0)
+                const available = member.weekly_hours || 35
+                const allocatedHours = (available * allocated) / 100
+                const utilization = Math.round((allocated / 100) * 100)
+                const isOver = utilization > 100
+                const isExpanded = expandedDesigners.has(member.id)
 
-              <div className="assignment-list">
-                {capacityData.assignments.length === 0 ? (
-                  <p className="assignment-empty">No assignments yet.</p>
-                ) : (
-                  capacityData.assignments.map((assignment: CapacityAssignment) => (
-                    <div key={assignment.id} className="assignment-row">
-                      <div className="assignment-main">
-                        <span className="assignment-designer">{assignment.designer_name || 'Designer'}</span>
-                        <span className="assignment-project">→ {assignment.project_name || 'Project'}</span>
-                        <div className="assignment-edit">
+                const getUtilColor = () => {
+                  if (utilization > 100) return 'var(--color-danger, #ef4444)'
+                  if (utilization > 80) return 'var(--color-warning, #f59e0b)'
+                  return 'var(--color-success, #22c55e)'
+                }
+
+                return (
+                  <div key={member.id} className={`designer-expandable-card ${isOver ? 'over-capacity' : ''}`}>
+                    {/* Card Header - Always Visible */}
+                    <div 
+                      className="designer-card-header"
+                      onClick={() => {
+                        const newExpanded = new Set(expandedDesigners)
+                        if (isExpanded) {
+                          newExpanded.delete(member.id)
+                        } else {
+                          newExpanded.add(member.id)
+                        }
+                        setExpandedDesigners(newExpanded)
+                      }}
+                    >
+                      <div className="designer-card-main">
+                        <div className="designer-info">
+                          <span className="designer-card-name">{member.name}</span>
+                          <span className="designer-card-hours">{available}h/week</span>
+                        </div>
+                        <div className="designer-usage">
+                          <span 
+                            className="designer-usage-pct"
+                            style={{ color: getUtilColor() }}
+                          >
+                            {utilization}%
+                          </span>
+                          <span className="designer-usage-hours">
+                            ({allocatedHours.toFixed(1)}h allocated)
+                          </span>
+                        </div>
+                      </div>
+                      <div className="designer-card-bar">
+                        <div 
+                          className="designer-usage-bar"
+                          style={{ 
+                            width: `${Math.min(utilization, 100)}%`,
+                            backgroundColor: getUtilColor()
+                          }}
+                        />
+                      </div>
+                      <button className="expand-toggle">
+                        <ChevronDown 
+                          size={18} 
+                          className={`expand-icon ${isExpanded ? 'expanded' : ''}`}
+                        />
+                      </button>
+                    </div>
+
+                    {/* Expanded Content */}
+                    {isExpanded && (
+                      <div className="designer-card-body">
+                        {memberAssignments.length === 0 ? (
+                          <div className="no-assignments">No projects assigned</div>
+                        ) : (
+                          <div className="assignment-chips">
+                            {memberAssignments.map((assignment: CapacityAssignment) => (
+                              <div key={assignment.id} className="assignment-chip">
+                                <div className="chip-main">
+                                  <span className="chip-project">{assignment.project_name || 'Project'}</span>
+                                  <div className="chip-edit">
+                                    <input
+                                      type="number"
+                                      className="chip-input"
+                                      min={0}
+                                      max={100}
+                                      value={assignmentDraft[assignment.id] ?? (assignment.allocation_percent || 0)}
+                                      onChange={e => setAssignmentDraft({ ...assignmentDraft, [assignment.id]: Number(e.target.value) })}
+                                      onClick={e => e.stopPropagation()}
+                                    />
+                                    <span className="chip-pct">%</span>
+                                    <button
+                                      className="chip-save"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        saveAssignmentAllocation(assignment, assignmentDraft[assignment.id] ?? (assignment.allocation_percent || 0))
+                                      }}
+                                    >
+                                      ✓
+                                    </button>
+                                    <button
+                                      className="chip-delete"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        openConfirmModal('Remove assignment?', `Remove ${assignment.project_name || 'project'} from ${member.name}?`, async () => {
+                                          await removeCapacityAssignment(assignment.id)
+                                          closeConfirmModal()
+                                        })
+                                      }}
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+                                </div>
+                                <div 
+                                  className="chip-bar"
+                                  style={{ 
+                                    width: `${Math.min(assignment.allocation_percent || 0, 100)}%`,
+                                    backgroundColor: getUtilColor()
+                                  }}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Inline Add Project */}
+                        <div className="inline-add">
+                          <select
+                            className="inline-add-select"
+                            value={assignmentForm.project_id}
+                            onChange={e => setAssignmentForm({ ...assignmentForm, project_id: e.target.value, designer_id: member.id })}
+                          >
+                            <option value="">+ Add project</option>
+                            {projects
+                              .filter(p => !memberAssignments.some(a => a.project_name === p.name))
+                              .map(project => (
+                                <option key={project.id} value={project.id}>{project.name}</option>
+                              ))
+                            }
+                          </select>
+                          {assignmentForm.designer_id === member.id && assignmentForm.project_id && (
+                            <>
+                              <input
+                                type="number"
+                                className="inline-add-input"
+                                min={0}
+                                max={100}
+                                placeholder="%"
+                                value={assignmentForm.allocation_percent || ''}
+                                onChange={e => setAssignmentForm({ ...assignmentForm, allocation_percent: Number(e.target.value) })}
+                              />
+                              <button 
+                                className="inline-add-btn"
+                                onClick={async () => {
+                                  await saveCapacityAssignment()
+                                }}
+                              >
+                                Add
+                              </button>
+                            </>
+                          )}
+                        </div>
+
+                        {/* Hours Edit */}
+                        <div className="hours-edit">
+                          <label>Weekly hours:</label>
                           <input
                             type="number"
+                            className="hours-edit-input"
                             min={0}
-                            max={100}
-                            className="assignment-percent-input"
-                            value={assignmentDraft[assignment.id] ?? (assignment.allocation_percent || 0)}
-                            onChange={e => setAssignmentDraft({ ...assignmentDraft, [assignment.id]: Number(e.target.value) })}
+                            max={80}
+                            value={hoursDraft[member.id] ?? available}
+                            onChange={e => setHoursDraft({ ...hoursDraft, [member.id]: Number(e.target.value) })}
                           />
-                          <span className="assignment-percent">%</span>
                           <button
-                            className="capacity-mini-btn"
-                            onClick={() => saveAssignmentAllocation(assignment, assignmentDraft[assignment.id] ?? (assignment.allocation_percent || 0))}
+                            className="hours-save"
+                            onClick={() => updateWeeklyHours(member.id, hoursDraft[member.id] ?? available)}
                           >
                             Save
                           </button>
                         </div>
                       </div>
-                      <button
-                        className="action-btn delete"
-                        onClick={() => openConfirmModal('Delete assignment?', 'This will remove the designer from this project in capacity and project views.', async () => {
-                          await removeCapacityAssignment(assignment.id)
-                          closeConfirmModal()
-                        })}
-                        aria-label="Delete assignment"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </div>
         </div>

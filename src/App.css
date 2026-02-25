@@ -2577,6 +2577,318 @@ input:checked + .slider:before {
 }
 
 /* ==========================================
+   Capacity Page - Expandable Designer Cards
+   ========================================== */
+
+.capacity-quick-add {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: var(--color-bg-subtle);
+  border-radius: var(--radius-md);
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.quick-add-label {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.quick-add-select,
+.quick-add-input {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 0.85rem;
+}
+
+.quick-add-select {
+  min-width: 140px;
+}
+
+.quick-add-input {
+  width: 60px;
+}
+
+.designer-cards-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.designer-expandable-card {
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition: border-color 0.2s ease;
+}
+
+.designer-expandable-card.over-capacity {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.designer-card-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.designer-card-header:hover {
+  background: var(--color-bg-tertiary);
+}
+
+.designer-card-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.designer-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.designer-card-name {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.designer-card-hours {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.designer-usage {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.designer-usage-pct {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.designer-usage-hours {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.designer-card-bar {
+  width: 120px;
+  height: 6px;
+  background: var(--color-border);
+  border-radius: 3px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.designer-usage-bar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+.expand-toggle {
+  background: none;
+  border: none;
+  padding: 0.25rem;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.expand-icon {
+  transition: transform 0.2s ease;
+}
+
+.expand-icon.expanded {
+  transform: rotate(180deg);
+}
+
+/* Expanded Body */
+.designer-card-body {
+  padding: 0 1rem 1rem 1rem;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg);
+}
+
+.no-assignments {
+  padding: 1rem;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.assignment-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-top: 1rem;
+}
+
+.assignment-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.chip-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.chip-project {
+  font-size: 0.9rem;
+  font-weight: 500;
+  flex: 1;
+}
+
+.chip-edit {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.chip-input {
+  width: 50px;
+  padding: 0.25rem 0.35rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 0.8rem;
+  text-align: right;
+}
+
+.chip-pct {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.chip-save,
+.chip-delete {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  color: var(--color-text-muted);
+}
+
+.chip-save:hover {
+  background: var(--color-success, #22c55e);
+  border-color: var(--color-success, #22c55e);
+  color: white;
+}
+
+.chip-delete:hover {
+  background: #ef4444;
+  border-color: #ef4444;
+  color: white;
+}
+
+.chip-bar {
+  height: 3px;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.inline-add {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px dashed var(--color-border);
+}
+
+.inline-add-select {
+  flex: 1;
+  max-width: 200px;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 0.85rem;
+}
+
+.inline-add-input {
+  width: 50px;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 0.85rem;
+}
+
+.inline-add-btn {
+  padding: 0.35rem 0.75rem;
+  background: var(--color-accent);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.hours-edit {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed var(--color-border);
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.hours-edit-input {
+  width: 55px;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 0.85rem;
+}
+
+.hours-save {
+  padding: 0.25rem 0.5rem;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.hours-save:hover {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: white;
+}
+
+/* ==========================================
    UI Consistency Pass (global normalization)
    ========================================== */
 
