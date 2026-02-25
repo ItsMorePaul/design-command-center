@@ -136,7 +136,7 @@ app.get('/api/projects', async (req, res) => {
       timeline: p.timeline ? JSON.parse(p.timeline) : [],
       customLinks: p.customLinks ? JSON.parse(p.customLinks) : [],
       designers: p.designers ? JSON.parse(p.designers) : [],
-      businessLines: p.businessLine ? JSON.parse(p.businessLine) : []
+      businessLines: p.businessLine ? (() => { try { return JSON.parse(p.businessLine); } catch { return [p.businessLine]; } })() : []
     })));
   } catch (e) { res.status(500).json({error: e.message}); }
 });
@@ -195,7 +195,12 @@ app.post('/api/business-lines', async (req, res) => {
       const allProjects = await all("SELECT id, businessLine FROM projects");
       for (const p of allProjects) {
         if (p.businessLine) {
-          const bls = JSON.parse(p.businessLine) as string[];
+          let bls: string[];
+          try {
+            bls = JSON.parse(p.businessLine) as string[];
+          } catch {
+            bls = [p.businessLine];
+          }
           if (bls.includes(originalName)) {
             const updated = bls.map((b: string) => b === originalName ? name : b);
             await run("UPDATE projects SET businessLine = ? WHERE id = ?", [JSON.stringify(updated), p.id]);
@@ -292,7 +297,7 @@ app.get('/api/search', async (req, res) => {
     const projects = await all('SELECT * FROM projects').then(p => p.map(proj => {
       const customLinks = proj.customLinks ? JSON.parse(proj.customLinks) : [];
       const designers = proj.designers ? JSON.parse(proj.designers) : [];
-      const businessLines = proj.businessLine ? JSON.parse(proj.businessLine) : [];
+      const businessLines = proj.businessLine ? (() => { try { return JSON.parse(proj.businessLine); } catch { return [proj.businessLine]; } })() : [];
       
       // Check if main fields match
       const matchesMainFields = 
@@ -415,7 +420,7 @@ app.get('/api/data', async (req, res) => {
       timeline: proj.timeline ? JSON.parse(proj.timeline) : [],
       customLinks: proj.customLinks ? JSON.parse(proj.customLinks) : [],
       designers: proj.designers ? JSON.parse(proj.designers) : [],
-      businessLines: proj.businessLine ? JSON.parse(proj.businessLine) : []
+      businessLines: proj.businessLine ? (() => { try { return JSON.parse(proj.businessLine); } catch { return [proj.businessLine]; } })() : []
     })));
     const team = await all('SELECT * FROM team ORDER BY name').then(m => m.map(t => ({
       ...t, 
@@ -433,7 +438,7 @@ app.get('/api/calendar', async (req, res) => {
     const projects = await all('SELECT * FROM projects').then(p => p.map(proj => ({
       ...proj,
       timeline: proj.timeline ? JSON.parse(proj.timeline) : [],
-      businessLines: proj.businessLine ? JSON.parse(proj.businessLine) : []
+      businessLines: proj.businessLine ? (() => { try { return JSON.parse(proj.businessLine); } catch { return [proj.businessLine]; } })() : []
     })));
     const team = await all('SELECT * FROM team').then(m => m.map(t => ({
       ...t,
@@ -616,7 +621,7 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 
 const SITE_VERSION = 'v260225'  // Manual update on code changes
-const SITE_TIME = '1159'
+const SITE_TIME = '1200'
 
 const VERSION_KEY = 'dcc_versions'
 
