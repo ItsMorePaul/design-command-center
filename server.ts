@@ -269,9 +269,13 @@ app.get('/api/brandOptions', async (req, res) => {
 });
 
 // ============ SEARCH ============
+// Normalize string for loose search (remove apostrophes, hyphens, etc.)
+const normalize = (s: string) => s?.toLowerCase().replace(/['"-]/g, '').replace(/\s+/g, ' ').trim() || '';
+
 app.get('/api/search', async (req, res) => {
   try {
-    const query = (req.query.q as string || '').toLowerCase().trim();
+    const query = normalize(req.query.q as string || '');
+    const queryOriginal = (req.query.q as string || '').toLowerCase().trim();
     if (!query || query.length < 2) {
       return res.json({ projects: [], team: [], businessLines: [] });
     }
@@ -283,10 +287,10 @@ app.get('/api/search', async (req, res) => {
       customLinks: proj.customLinks ? JSON.parse(proj.customLinks) : [],
       designers: proj.designers ? JSON.parse(proj.designers) : []
     })).filter(proj => 
-      proj.name?.toLowerCase().includes(query) ||
-      proj.businessLine?.toLowerCase().includes(query) ||
-      proj.description?.toLowerCase().includes(query) ||
-      proj.designers?.some((d: string) => d.toLowerCase().includes(query))
+      normalize(proj.name).includes(query) ||
+      normalize(proj.businessLine).includes(query) ||
+      normalize(proj.description).includes(query) ||
+      proj.designers?.some((d: string) => normalize(d).includes(query))
     ));
 
     // Search team members
@@ -295,9 +299,9 @@ app.get('/api/search', async (req, res) => {
       brands: JSON.parse(t.brands || '[]'),
       timeOff: t.timeOff ? JSON.parse(t.timeOff) : []
     })).filter(member =>
-      member.name?.toLowerCase().includes(query) ||
-      member.role?.toLowerCase().includes(query) ||
-      member.brands?.some((b: string) => b.toLowerCase().includes(query))
+      normalize(member.name).includes(query) ||
+      normalize(member.role).includes(query) ||
+      member.brands?.some((b: string) => normalize(b).includes(query))
     ));
 
     // Search business lines
@@ -305,7 +309,7 @@ app.get('/api/search', async (req, res) => {
       ...bl,
       customLinks: bl.customLinks ? JSON.parse(bl.customLinks) : []
     })).filter(bl =>
-      bl.name?.toLowerCase().includes(query)
+      normalize(bl.name).includes(query)
     ));
 
     res.json({ projects, team, businessLines });
@@ -519,7 +523,7 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 
 const SITE_VERSION = 'v260225'  // Manual update on code changes
-const SITE_TIME = '1010'
+const SITE_TIME = '1020'
 
 const VERSION_KEY = 'dcc_versions'
 
