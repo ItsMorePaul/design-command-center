@@ -282,15 +282,25 @@ app.get('/api/search', async (req, res) => {
 
     // Search projects
     const projects = await all('SELECT * FROM projects').then(p => p.map(proj => {
-      const links = proj.customLinks ? JSON.parse(proj.customLinks) : [];
-      const matchedLinks = links.filter((l: { name: string; url: string }) => 
+      const customLinks = proj.customLinks ? JSON.parse(proj.customLinks) : [];
+      const matchedCustomLinks = customLinks.filter((l: { name: string; url: string }) => 
         normalize(l.name).includes(query) || normalize(l.url).includes(query)
       );
+      
+      // Build matched links from all link fields
+      const allLinks = [
+        ...matchedCustomLinks,
+        proj.deckName && normalize(proj.deckName).includes(query) ? { name: proj.deckName, url: proj.deckLink || '' } : null,
+        proj.prdName && normalize(proj.prdName).includes(query) ? { name: proj.prdName, url: proj.prdLink || '' } : null,
+        proj.briefName && normalize(proj.briefName).includes(query) ? { name: proj.briefName, url: proj.briefLink || '' } : null,
+        proj.figmaLink && (normalize(proj.figmaLink).includes(query)) ? { name: 'Figma', url: proj.figmaLink } : null,
+      ].filter(Boolean);
+      
       return {
         ...proj,
         timeline: proj.timeline ? JSON.parse(proj.timeline) : [],
-        customLinks: links,
-        matchedLinks: matchedLinks,
+        customLinks: customLinks,
+        matchedLinks: allLinks,
         designers: proj.designers ? JSON.parse(proj.designers) : []
       };
     }).filter(proj => 
@@ -298,6 +308,10 @@ app.get('/api/search', async (req, res) => {
       normalize(proj.businessLine).includes(query) ||
       normalize(proj.description).includes(query) ||
       proj.designers?.some((d: string) => normalize(d).includes(query)) ||
+      normalize(proj.deckName || '').includes(query) ||
+      normalize(proj.prdName || '').includes(query) ||
+      normalize(proj.briefName || '').includes(query) ||
+      normalize(proj.figmaLink || '').includes(query) ||
       (proj as any).matchedLinks?.length > 0
     ));
 
@@ -314,17 +328,32 @@ app.get('/api/search', async (req, res) => {
 
     // Search business lines
     const businessLines = await all('SELECT * FROM business_lines').then(l => l.map(bl => {
-      const links = bl.customLinks ? JSON.parse(bl.customLinks) : [];
-      const matchedLinks = links.filter((l: { name: string; url: string }) => 
-        normalize(l.name).includes(query) || normalize(l.url).includes(query)
+      const customLinks = bl.customLinks ? JSON.parse(bl.customLinks) : [];
+      const matchedCustomLinks = customLinks.filter((link: { name: string; url: string }) => 
+        normalize(link.name).includes(query) || normalize(link.url).includes(query)
       );
+      
+      // Build matched links from all link fields
+      const allLinks = [
+        ...matchedCustomLinks,
+        bl.deckName && normalize(bl.deckName).includes(query) ? { name: bl.deckName, url: bl.deckLink || '' } : null,
+        bl.prdName && normalize(bl.prdName).includes(query) ? { name: bl.prdName, url: bl.prdLink || '' } : null,
+        bl.briefName && normalize(bl.briefName).includes(query) ? { name: bl.briefName, url: bl.briefLink || '' } : null,
+        bl.figmaLink && (normalize(bl.figmaLink).includes(query)) ? { name: 'Figma', url: bl.figmaLink } : null,
+      ].filter(Boolean);
+      
       return {
         ...bl,
-        customLinks: links,
-        matchedLinks: matchedLinks
+        customLinks: customLinks,
+        matchedLinks: allLinks
       };
     }).filter(bl =>
-      normalize(bl.name).includes(query) || (bl as any).matchedLinks?.length > 0
+      normalize(bl.name).includes(query) ||
+      normalize(bl.deckName || '').includes(query) ||
+      normalize(bl.prdName || '').includes(query) ||
+      normalize(bl.briefName || '').includes(query) ||
+      normalize(bl.figmaLink || '').includes(query) ||
+      (bl as any).matchedLinks?.length > 0
     ));
 
     res.json({ projects, team, businessLines });
@@ -538,7 +567,7 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 
 const SITE_VERSION = 'v260225'  // Manual update on code changes
-const SITE_TIME = '1058'
+const SITE_TIME = '1101'
 
 const VERSION_KEY = 'dcc_versions'
 
