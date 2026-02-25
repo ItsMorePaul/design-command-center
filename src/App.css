@@ -2710,7 +2710,7 @@ input:checked + .slider:before {
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
-  min-width: 0;
+  min-width: 90px; /* Max first name ~6 chars */
 }
 
 .designer-card-name {
@@ -2745,6 +2745,7 @@ input:checked + .slider:before {
   align-items: baseline;
   gap: 0.4rem;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 .designer-usage-pct {
@@ -2759,15 +2760,27 @@ input:checked + .slider:before {
   white-space: nowrap;
 }
 
+@media (max-width: 500px) {
+  .designer-usage-hours {
+    display: none;
+  }
+}
+
 .designer-card-bar {
   flex: 1;
-  max-width: 100px;
-  min-width: 60px;
+  max-width: 80px;
+  min-width: 40px;
   height: 6px;
   background: var(--color-border);
   border-radius: 3px;
   overflow: hidden;
   flex-shrink: 0;
+}
+
+@media (max-width: 500px) {
+  .designer-card-bar {
+    display: none;
+  }
 }
 
 .designer-usage-bar {
