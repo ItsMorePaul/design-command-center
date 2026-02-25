@@ -2704,6 +2704,7 @@ input:checked + .slider:before {
   justify-content: space-between;
   gap: 0.75rem;
   min-width: 0;
+  overflow: hidden;
 }
 
 .designer-info {
