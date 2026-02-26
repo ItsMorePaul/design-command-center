@@ -429,6 +429,12 @@ function App() {
             return acc
           }, {})
           setHoursDraft(initialHours)
+          // Load excluded designers from team data
+          const initialExcluded = new Set<string>()
+          ;(data.team || []).forEach((m: CapacityMember) => {
+            if (m.excluded) initialExcluded.add(m.id)
+          })
+          setExcludedDesigners(initialExcluded)
         } catch (err) {
           console.error('Error loading capacity:', err)
         }
@@ -509,6 +515,15 @@ function App() {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ weekly_hours: weeklyHours })
+    })
+    await refreshCapacity()
+  }
+
+  const updateExcludedStatus = async (designerId: string, excluded: boolean) => {
+    await fetch(`/api/capacity/availability/${designerId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ excluded })
     })
     await refreshCapacity()
   }
@@ -2093,6 +2108,7 @@ function App() {
                                     newExcluded.delete(member.id)
                                   }
                                   setExcludedDesigners(newExcluded)
+                                  updateExcludedStatus(member.id, e.target.checked)
                                 }}
                               />
                               <span className="slider"></span>

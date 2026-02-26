@@ -244,21 +244,22 @@ app.get('/api/team', async (req, res) => {
     res.json(team.map(m => ({
       ...m, 
       brands: JSON.parse(m.brands || '[]'),
-      timeOff: m.timeOff ? JSON.parse(m.timeOff) : []
+      timeOff: m.timeOff ? JSON.parse(m.timeOff) : [],
+      excluded: !!m.excluded
     })));
   } catch (e) { res.status(500).json({error: e.message}); }
 });
 
 app.post('/api/team', async (req, res) => {
   try {
-    const { id, name, role, brands, status, slack, email, avatar, timeOff, weekly_hours } = req.body;
+    const { id, name, role, brands, status, slack, email, avatar, timeOff, weekly_hours, excluded } = req.body;
     const memberId = id || Date.now().toString();
     const brandsJson = JSON.stringify(brands || []);
     const timeOffJson = JSON.stringify(timeOff || []);
     await run(
-      `INSERT OR REPLACE INTO team (id, name, role, brands, status, slack, email, avatar, timeOff, weekly_hours, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-      [memberId, name, role, brandsJson, status || 'offline', slack, email, avatar, timeOffJson, weekly_hours ?? 35]
+      `INSERT OR REPLACE INTO team (id, name, role, brands, status, slack, email, avatar, timeOff, weekly_hours, excluded, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+      [memberId, name, role, brandsJson, status || 'offline', slack, email, avatar, timeOffJson, weekly_hours ?? 35, excluded ? 1 : 0]
     );
     await updateDbVersion()
     res.json({id: memberId, ...req.body});
@@ -748,6 +749,7 @@ app.get('/api/capacity', async (req, res) => {
     const teamWithHours = team.map(m => ({
       ...m,
       weekly_hours: m.weekly_hours || 35,
+      excluded: !!m.excluded,
       timeOff: m.timeOff ? JSON.parse(m.timeOff) : []
     }))
     
@@ -798,9 +800,9 @@ app.delete('/api/capacity/assignments/:id', async (req, res) => {
 // Update designer's weekly hours
 app.put('/api/capacity/availability/:designerId', async (req, res) => {
   try {
-    const { weekly_hours } = req.body
-    await run('UPDATE team SET weekly_hours = ?, updatedAt = datetime("now") WHERE id = ?', 
-      [weekly_hours || 35, req.params.designerId])
+    const { weekly_hours, excluded } = req.body
+    await run('UPDATE team SET weekly_hours = ?, excluded = ?, updatedAt = datetime("now") WHERE id = ?', 
+      [weekly_hours || 35, excluded !== undefined ? (excluded ? 1 : 0) : 0, req.params.designerId])
     await updateDbVersion()
     res.json({ success: true })
   } catch (e) { res.status(500).json({error: e.message}); }
