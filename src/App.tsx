@@ -593,6 +593,17 @@ function App() {
     setProjects(apiData.projects || [])
   }
 
+  // Refresh projects list from server
+  const refreshProjects = async () => {
+    try {
+      const res = await fetch('/api/projects')
+      const data = await res.json()
+      setProjects(data)
+    } catch (err) {
+      console.error('Error refreshing projects:', err)
+    }
+  }
+
   const deleteBusinessLine = async (id: string) => {
     await fetch(`/api/business-lines/${id}`, { method: 'DELETE' })
     setBusinessLines(businessLines.filter(bl => bl.id !== id))
@@ -753,6 +764,8 @@ function App() {
       await saveProject(updated)
       setProjects(projects.map(p => p.id === editingProject.id ? updated : p))
       refreshCalendar()
+      refreshCapacity()
+      refreshProjects()
     } else {
       const newProject: Project = {
         ...projectFormData,
@@ -761,6 +774,8 @@ function App() {
       await saveProject(newProject)
       setProjects([...projects, newProject])
       refreshCalendar()
+      refreshCapacity()
+      refreshProjects()
     }
     setShowProjectModal(false)
   }
