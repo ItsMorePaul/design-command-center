@@ -1677,7 +1677,7 @@ function App() {
                               </label>
                             </div>
                             <div className="filter-pills">
-                              {projects.map(p => (
+                              {projects.slice().sort((a, b) => a.name.localeCompare(b.name)).map(p => (
                                 <button
                                   key={p.id}
                                   className={`filter-pill ${calendarFilters.projects.includes(p.name) ? 'active' : ''}`}
@@ -1899,7 +1899,7 @@ function App() {
                 onChange={e => setAssignmentForm({ ...assignmentForm, project_id: e.target.value })}
               >
                 <option value="">Select project</option>
-                {projects.map(project => (
+                {projects.slice().sort((a, b) => a.name.localeCompare(b.name)).map(project => (
                   <option key={project.id} value={project.id}>{project.name}</option>
                 ))}
               </select>
@@ -2061,6 +2061,7 @@ function App() {
                           >
                             <option value="">+ Add project</option>
                             {projects
+                              .slice().sort((a, b) => a.name.localeCompare(b.name))
                               .filter(p => !memberAssignments.some(a => a.project_name === p.name))
                               .map(project => (
                                 <option key={project.id} value={project.id}>{project.name}</option>
