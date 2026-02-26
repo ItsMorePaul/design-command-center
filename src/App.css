@@ -2457,13 +2457,28 @@ input:checked + .slider:before {
   display: flex;
   align-items: center;
   gap: 3rem;
-  padding: 2rem;
+  padding: 1.5rem 2rem 2rem 2rem;
   background: var(--color-bg-subtle);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   margin-bottom: 2rem;
   flex-wrap: wrap;
   justify-content: center;
+  position: relative;
+}
+
+.gauge-header {
+  position: absolute;
+  top: 0.75rem;
+  left: 1.5rem;
+}
+
+.gauge-quarter {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .capacity-gauge {
@@ -2479,7 +2494,7 @@ input:checked + .slider:before {
 
 .gauge-center {
   position: absolute;
-  bottom: 5px;
+  bottom: 10px;
   left: 50%;
   transform: translateX(-50%);
   text-align: center;
@@ -2501,7 +2516,10 @@ input:checked + .slider:before {
 
 .capacity-gauge-stats {
   display: flex;
-  gap: 2.5rem;
+  gap: 2rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  min-width: 200px;
 }
 
 .gauge-stat {
@@ -2859,10 +2877,9 @@ input:checked + .slider:before {
 }
 
 .usage-pct {
-  font-size: 1.25rem;
+  font-size: 1rem;
   font-weight: 700;
   white-space: nowrap;
-  line-height: 1.1;
 }
 
 .usage-hours {

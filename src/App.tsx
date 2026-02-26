@@ -1805,9 +1805,6 @@ function App() {
               const pct = availableQuarter > 0 ? Math.round((allocatedQuarter / availableQuarter) * 100) : 0
               const remaining = Math.round(availableQuarter - allocatedQuarter)
               
-              // Calculate rotation for speedometer (-90deg to 90deg for half circle)
-              const rotation = -90 + (pct / 100) * 180
-              
               const getGaugeColor = () => {
                 if (pct > 100) return 'var(--color-danger, #ef4444)'
                 if (pct > 85) return 'var(--color-warning, #f59e0b)'
@@ -1816,6 +1813,9 @@ function App() {
               
               return (
                 <div className="capacity-gauge-container">
+                  <div className="gauge-header">
+                    <span className="gauge-quarter">Q3 / FY26</span>
+                  </div>
                   <div className="capacity-gauge">
                     <svg viewBox="0 0 200 120" className="gauge-svg">
                       {/* Background arc */}
@@ -1836,19 +1836,6 @@ function App() {
                         strokeDasharray={`${(pct / 100) * 251.2} 251.2`}
                         style={{ transition: 'stroke-dasharray 0.5s ease' }}
                       />
-                      {/* Needle */}
-                      <line
-                        x1="100"
-                        y1="100"
-                        x2={100 + 60 * Math.cos((rotation - 90) * Math.PI / 180)}
-                        y2={100 + 60 * Math.sin((rotation - 90) * Math.PI / 180)}
-                        stroke="var(--color-text)"
-                        strokeWidth="3"
-                        strokeLinecap="round"
-                        style={{ transition: 'transform 0.5s ease' }}
-                      />
-                      {/* Center dot */}
-                      <circle cx="100" cy="100" r="6" fill="var(--color-text)" />
                     </svg>
                     <div className="gauge-center">
                       <span className="gauge-pct" style={{ color: getGaugeColor() }}>{pct}%</span>
