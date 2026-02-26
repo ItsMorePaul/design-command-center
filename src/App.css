@@ -2453,6 +2453,75 @@ input:checked + .slider:before {
   color: color-mix(in srgb, var(--color-text) 80%, var(--color-text-muted));
 }
 
+.capacity-gauge-container {
+  display: flex;
+  align-items: center;
+  gap: 3rem;
+  padding: 2rem;
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.capacity-gauge {
+  position: relative;
+  width: 200px;
+  height: 120px;
+}
+
+.gauge-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.gauge-center {
+  position: absolute;
+  bottom: 5px;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+}
+
+.gauge-pct {
+  display: block;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.gauge-label {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.capacity-gauge-stats {
+  display: flex;
+  gap: 2.5rem;
+}
+
+.gauge-stat {
+  text-align: center;
+}
+
+.gauge-stat-value {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.gauge-stat-label {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 .capacity-section {
   margin-bottom: 2rem;
 }
@@ -2584,9 +2653,9 @@ input:checked + .slider:before {
 }
 
 .designer-hours {
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   color: var(--color-text-muted);
-  margin-bottom: 0.75rem;
+  line-height: 1.1;
 }
 
 .designer-utilization {
@@ -2625,14 +2694,7 @@ input:checked + .slider:before {
    ========================================== */
 
 .capacity-quick-add {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 1rem;
-  background: var(--color-bg-subtle);
-  border-radius: var(--radius-md);
-  margin-bottom: 1.5rem;
-  flex-wrap: wrap;
+  display: none;
 }
 
 .quick-add-label {
@@ -2684,6 +2746,10 @@ input:checked + .slider:before {
   background: rgba(239, 68, 68, 0.05);
 }
 
+.designer-expandable-card.excluded {
+  opacity: 0.3;
+}
+
 .designer-card-header {
   display: flex;
   align-items: center;
@@ -2708,7 +2774,7 @@ input:checked + .slider:before {
 .designer-col-info {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0;
   min-width: 70px;
   max-width: 150px;
   flex-shrink: 1;
@@ -2737,18 +2803,35 @@ input:checked + .slider:before {
   color: var(--color-text-muted);
 }
 
-.exclude-toggle {
+.hours-edit {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
-  font-size: 0.7rem;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  margin-top: 0.25rem;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed var(--color-border);
+  flex-wrap: wrap;
 }
 
-.exclude-toggle input {
-  cursor: pointer;
+.hours-edit-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.hours-edit .exclude-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.exclude-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: nowrap;
 }
 
 .designer-col-bar {
@@ -2853,6 +2936,22 @@ input:checked + .slider:before {
   text-overflow: ellipsis;
 }
 
+.chip-project-link {
+  font-size: 0.9rem;
+  font-weight: 500;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: inherit;
+  cursor: pointer;
+}
+
+.chip-project-link:hover {
+  text-decoration: underline;
+}
+
 .chip-edit {
   display: flex;
   align-items: center;
@@ -2947,18 +3046,6 @@ input:checked + .slider:before {
   border-radius: 6px;
   font-size: 0.8rem;
   cursor: pointer;
-}
-
-.hours-edit {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
-  padding-top: 0.75rem;
-  border-top: 1px dashed var(--color-border);
-  font-size: 0.85rem;
-  color: var(--color-text-muted);
-  flex-wrap: wrap;
 }
 
 .hours-edit-input {

@@ -1792,36 +1792,82 @@ function App() {
       {activeTab === 'capacity' && capacityData && (
         <div className="capacity-page">
           <div className="capacity-dashboard">
-            {/* Summary Stats */}
+            {/* Summary Stats - Speedometer Style */}
             {(() => {
               const activeTeam = capacityData.team.filter((m: CapacityMember) => !excludedDesigners.has(m.id))
-              const totalQuarter = Math.round(activeTeam.reduce((sum: number, m: CapacityMember) => sum + (m.weekly_hours || 35), 0) * 13)
-              const allocatedHours = activeTeam.reduce((sum: number, m: CapacityMember) => {
+              const availableQuarter = activeTeam.reduce((sum: number, m: CapacityMember) => sum + (m.weekly_hours || 35) * 13, 0)
+              const allocatedQuarter = activeTeam.reduce((sum: number, m: CapacityMember) => {
                 const assigned = capacityData.assignments
                   .filter((a: CapacityAssignment) => a.designer_id === m.id)
                   .reduce((s: number, a: CapacityAssignment) => s + (a.allocation_percent || 0), 0)
-                return sum + ((m.weekly_hours || 35) * assigned / 100)
+                return sum + ((m.weekly_hours || 35) * assigned / 100 * 13)
               }, 0)
-              const totalWeekly = activeTeam.reduce((sum: number, m: CapacityMember) => sum + (m.weekly_hours || 35), 0)
-              const pct = totalWeekly > 0 ? Math.round((allocatedHours / totalWeekly) * 100) : 0
-              const unallocated = Math.round((totalWeekly - allocatedHours) * 13)
+              const pct = availableQuarter > 0 ? Math.round((allocatedQuarter / availableQuarter) * 100) : 0
+              const remaining = Math.round(availableQuarter - allocatedQuarter)
+              
+              // Calculate rotation for speedometer (-90deg to 90deg for half circle)
+              const rotation = -90 + (pct / 100) * 180
+              
+              const getGaugeColor = () => {
+                if (pct > 100) return 'var(--color-danger, #ef4444)'
+                if (pct > 85) return 'var(--color-warning, #f59e0b)'
+                return 'var(--color-success, #22c55e)'
+              }
+              
               return (
-                <div className="capacity-stats">
-                  <div className="capacity-stat-card">
-                    <span className="capacity-stat-value">{totalQuarter}</span>
-                    <span className="capacity-stat-label">Total Team Capacity (Quarter hrs)</span>
+                <div className="capacity-gauge-container">
+                  <div className="capacity-gauge">
+                    <svg viewBox="0 0 200 120" className="gauge-svg">
+                      {/* Background arc */}
+                      <path
+                        d="M 20 100 A 80 80 0 0 1 180 100"
+                        fill="none"
+                        stroke="var(--color-border)"
+                        strokeWidth="12"
+                        strokeLinecap="round"
+                      />
+                      {/* Filled arc */}
+                      <path
+                        d="M 20 100 A 80 80 0 0 1 180 100"
+                        fill="none"
+                        stroke={getGaugeColor()}
+                        strokeWidth="12"
+                        strokeLinecap="round"
+                        strokeDasharray={`${(pct / 100) * 251.2} 251.2`}
+                        style={{ transition: 'stroke-dasharray 0.5s ease' }}
+                      />
+                      {/* Needle */}
+                      <line
+                        x1="100"
+                        y1="100"
+                        x2={100 + 60 * Math.cos((rotation - 90) * Math.PI / 180)}
+                        y2={100 + 60 * Math.sin((rotation - 90) * Math.PI / 180)}
+                        stroke="var(--color-text)"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                        style={{ transition: 'transform 0.5s ease' }}
+                      />
+                      {/* Center dot */}
+                      <circle cx="100" cy="100" r="6" fill="var(--color-text)" />
+                    </svg>
+                    <div className="gauge-center">
+                      <span className="gauge-pct" style={{ color: getGaugeColor() }}>{pct}%</span>
+                      <span className="gauge-label">Utilized</span>
+                    </div>
                   </div>
-                  <div className="capacity-stat-card">
-                    <span className="capacity-stat-value">{allocatedHours.toFixed(0)}</span>
-                    <span className="capacity-stat-label">Allocated Hours</span>
-                  </div>
-                  <div className="capacity-stat-card">
-                    <span className="capacity-stat-value">{pct}%</span>
-                    <span className="capacity-stat-label">Allocated Capacity (%)</span>
-                  </div>
-                  <div className="capacity-stat-card">
-                    <span className="capacity-stat-value">{unallocated}</span>
-                    <span className="capacity-stat-label">Unallocated Capacity (Quarter hrs)</span>
+                  <div className="capacity-gauge-stats">
+                    <div className="gauge-stat">
+                      <span className="gauge-stat-value">{Math.round(availableQuarter).toLocaleString()}</span>
+                      <span className="gauge-stat-label">Available hrs</span>
+                    </div>
+                    <div className="gauge-stat">
+                      <span className="gauge-stat-value">{Math.round(allocatedQuarter).toLocaleString()}</span>
+                      <span className="gauge-stat-label">Allocated hrs</span>
+                    </div>
+                    <div className="gauge-stat">
+                      <span className="gauge-stat-value" style={{ color: remaining < 0 ? 'var(--color-danger)' : 'var(--color-success)' }}>{remaining.toLocaleString()}</span>
+                      <span className="gauge-stat-label">Remaining hrs</span>
+                    </div>
                   </div>
                 </div>
               )
@@ -1880,7 +1926,7 @@ function App() {
                 }
 
                 return (
-                  <div key={member.id} className={`designer-expandable-card ${isOver ? 'over-capacity' : ''}`}>
+                  <div key={member.id} className={`designer-expandable-card ${isOver ? 'over-capacity' : ''} ${excludedDesigners.has(member.id) ? 'excluded' : ''}`}>
                     {/* Card Header - Always Visible */}
                     <div 
                       className="designer-card-header"
@@ -1903,22 +1949,6 @@ function App() {
                             )}
                           </span>
                           <span className="designer-hours">{available}h/week</span>
-                          <label className="exclude-toggle">
-                            <input
-                              type="checkbox"
-                              checked={excludedDesigners.has(member.id)}
-                              onChange={(e) => {
-                                const newExcluded = new Set(excludedDesigners)
-                                if (e.target.checked) {
-                                  newExcluded.add(member.id)
-                                } else {
-                                  newExcluded.delete(member.id)
-                                }
-                                setExcludedDesigners(newExcluded)
-                              }}
-                            />
-                            <span>Exclude</span>
-                          </label>
                         </div>
                         <div className="designer-col-bar">
                           <div 
@@ -1955,8 +1985,8 @@ function App() {
                                   <span 
                                     className="chip-project-link"
                                     onClick={() => {
-                                      setCalendarFilters({ ...calendarFilters, projects: [assignment.project_name || ''] })
-                                      setActiveTab('calendar')
+                                      setActiveTab('projects')
+                                      setProjectFilters({ ...projectFilters, project: assignment.project_name || '' })
                                     }}
                                   >
                                     {assignment.project_name || 'Project'}
@@ -2045,21 +2075,42 @@ function App() {
 
                         {/* Hours Edit */}
                         <div className="hours-edit">
-                          <label>Weekly hours:</label>
-                          <input
-                            type="number"
-                            className="hours-edit-input"
-                            min={0}
-                            max={80}
-                            value={hoursDraft[member.id] ?? available}
-                            onChange={e => setHoursDraft({ ...hoursDraft, [member.id]: Number(e.target.value) })}
-                            onBlur={(e) => {
-                              const newVal = Number(e.target.value)
-                              if (newVal !== available) {
-                                updateWeeklyHours(member.id, newVal)
-                              }
-                            }}
-                          />
+                          <div className="hours-edit-left">
+                            <label>Weekly hours:</label>
+                            <input
+                              type="number"
+                              className="hours-edit-input"
+                              min={0}
+                              max={80}
+                              value={hoursDraft[member.id] ?? available}
+                              onChange={e => setHoursDraft({ ...hoursDraft, [member.id]: Number(e.target.value) })}
+                              onBlur={(e) => {
+                                const newVal = Number(e.target.value)
+                                if (newVal !== available) {
+                                  updateWeeklyHours(member.id, newVal)
+                                }
+                              }}
+                            />
+                          </div>
+                          <div className="exclude-group">
+                            <span className="exclude-label">Exclude</span>
+                            <label className="switch">
+                              <input
+                                type="checkbox"
+                                checked={excludedDesigners.has(member.id)}
+                                onChange={(e) => {
+                                  const newExcluded = new Set(excludedDesigners)
+                                  if (e.target.checked) {
+                                    newExcluded.add(member.id)
+                                  } else {
+                                    newExcluded.delete(member.id)
+                                  }
+                                  setExcludedDesigners(newExcluded)
+                                }}
+                              />
+                              <span className="slider"></span>
+                            </label>
+                          </div>
                         </div>
                       </div>
                     )}
