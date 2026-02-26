@@ -178,6 +178,7 @@ interface CapacityMember {
   id: string
   name: string
   weekly_hours?: number
+  excluded?: boolean
 }
 
 interface CapacityAssignment {
@@ -277,6 +278,7 @@ function App() {
   const [hoursDraft, setHoursDraft] = useState<Record<string, number>>({})
   const [assignmentDraft, setAssignmentDraft] = useState<Record<string, number>>({})
   const [expandedDesigners, setExpandedDesigners] = useState<Set<string>>(new Set())
+  const [excludedDesigners, setExcludedDesigners] = useState<Set<string>>(new Set())
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; title: string; message: string; onConfirm: (() => Promise<void> | void) | null }>({
     open: false,
     title: '',
@@ -1791,59 +1793,39 @@ function App() {
         <div className="capacity-page">
           <div className="capacity-dashboard">
             {/* Summary Stats */}
-            <div className="capacity-stats">
-              <div className="capacity-stat-card">
-                <span className="capacity-stat-value">
-                  {Math.round(
-                    capacityData.team.reduce((sum: number, m: CapacityMember) => sum + (m.weekly_hours || 35), 0) * 13
-                  )}
-                </span>
-                <span className="capacity-stat-label">Total Team Capacity (Quarter hrs)</span>
-              </div>
-              <div className="capacity-stat-card">
-                <span className="capacity-stat-value">
-                  {capacityData.team.reduce((sum: number, m: CapacityMember) => {
-                    const assigned = capacityData.assignments
-                      .filter((a: CapacityAssignment) => a.designer_id === m.id)
-                      .reduce((s: number, a: CapacityAssignment) => s + (a.allocation_percent || 0), 0)
-                    return sum + ((m.weekly_hours || 35) * assigned / 100)
-                  }, 0).toFixed(0)}
-                </span>
-                <span className="capacity-stat-label">Allocated Hours</span>
-              </div>
-              <div className="capacity-stat-card">
-                <span className="capacity-stat-value">
-                  {(() => {
-                    const totalWeekly = capacityData.team.reduce((sum: number, m: CapacityMember) => sum + (m.weekly_hours || 35), 0)
-                    const allocatedWeekly = capacityData.team.reduce((sum: number, m: CapacityMember) => {
-                      const assigned = capacityData.assignments
-                        .filter((a: CapacityAssignment) => a.designer_id === m.id)
-                        .reduce((s: number, a: CapacityAssignment) => s + (a.allocation_percent || 0), 0)
-                      return sum + ((m.weekly_hours || 35) * assigned / 100)
-                    }, 0)
-                    if (totalWeekly === 0) return '0%'
-                    return `${Math.round((allocatedWeekly / totalWeekly) * 100)}%`
-                  })()}
-                </span>
-                <span className="capacity-stat-label">Allocated Capacity (%)</span>
-              </div>
-              <div className="capacity-stat-card">
-                <span className="capacity-stat-value">
-                  {Math.round(
-                    (
-                      capacityData.team.reduce((sum: number, m: CapacityMember) => sum + (m.weekly_hours || 35), 0) -
-                      capacityData.team.reduce((sum: number, m: CapacityMember) => {
-                        const assigned = capacityData.assignments
-                          .filter((a: CapacityAssignment) => a.designer_id === m.id)
-                          .reduce((s: number, a: CapacityAssignment) => s + (a.allocation_percent || 0), 0)
-                        return sum + ((m.weekly_hours || 35) * assigned / 100)
-                      }, 0)
-                    ) * 13
-                  )}
-                </span>
-                <span className="capacity-stat-label">Unallocated Capacity (Quarter hrs)</span>
-              </div>
-            </div>
+            {(() => {
+              const activeTeam = capacityData.team.filter((m: CapacityMember) => !excludedDesigners.has(m.id))
+              const totalQuarter = Math.round(activeTeam.reduce((sum: number, m: CapacityMember) => sum + (m.weekly_hours || 35), 0) * 13)
+              const allocatedHours = activeTeam.reduce((sum: number, m: CapacityMember) => {
+                const assigned = capacityData.assignments
+                  .filter((a: CapacityAssignment) => a.designer_id === m.id)
+                  .reduce((s: number, a: CapacityAssignment) => s + (a.allocation_percent || 0), 0)
+                return sum + ((m.weekly_hours || 35) * assigned / 100)
+              }, 0)
+              const totalWeekly = activeTeam.reduce((sum: number, m: CapacityMember) => sum + (m.weekly_hours || 35), 0)
+              const pct = totalWeekly > 0 ? Math.round((allocatedHours / totalWeekly) * 100) : 0
+              const unallocated = Math.round((totalWeekly - allocatedHours) * 13)
+              return (
+                <div className="capacity-stats">
+                  <div className="capacity-stat-card">
+                    <span className="capacity-stat-value">{totalQuarter}</span>
+                    <span className="capacity-stat-label">Total Team Capacity (Quarter hrs)</span>
+                  </div>
+                  <div className="capacity-stat-card">
+                    <span className="capacity-stat-value">{allocatedHours.toFixed(0)}</span>
+                    <span className="capacity-stat-label">Allocated Hours</span>
+                  </div>
+                  <div className="capacity-stat-card">
+                    <span className="capacity-stat-value">{pct}%</span>
+                    <span className="capacity-stat-label">Allocated Capacity (%)</span>
+                  </div>
+                  <div className="capacity-stat-card">
+                    <span className="capacity-stat-value">{unallocated}</span>
+                    <span className="capacity-stat-label">Unallocated Capacity (Quarter hrs)</span>
+                  </div>
+                </div>
+              )
+            })()}
 
             {/* Quick Add Assignment */}
             <div className="capacity-quick-add">
@@ -1921,6 +1903,22 @@ function App() {
                             )}
                           </span>
                           <span className="designer-hours">{available}h/week</span>
+                          <label className="exclude-toggle">
+                            <input
+                              type="checkbox"
+                              checked={excludedDesigners.has(member.id)}
+                              onChange={(e) => {
+                                const newExcluded = new Set(excludedDesigners)
+                                if (e.target.checked) {
+                                  newExcluded.add(member.id)
+                                } else {
+                                  newExcluded.delete(member.id)
+                                }
+                                setExcludedDesigners(newExcluded)
+                              }}
+                            />
+                            <span>Exclude</span>
+                          </label>
                         </div>
                         <div className="designer-col-bar">
                           <div 
@@ -1954,7 +1952,15 @@ function App() {
                             {memberAssignments.map((assignment: CapacityAssignment) => (
                               <div key={assignment.id} className="assignment-chip">
                                 <div className="chip-main">
-                                  <span className="chip-project">{assignment.project_name || 'Project'}</span>
+                                  <span 
+                                    className="chip-project-link"
+                                    onClick={() => {
+                                      setCalendarFilters({ ...calendarFilters, projects: [assignment.project_name || ''] })
+                                      setActiveTab('calendar')
+                                    }}
+                                  >
+                                    {assignment.project_name || 'Project'}
+                                  </span>
                                   <div className="chip-edit">
                                     <input
                                       type="number"
@@ -1983,7 +1989,7 @@ function App() {
                                         })
                                       }}
                                     >
-                                      ×
+                                      <Trash2 size={14} />
                                     </button>
                                   </div>
                                 </div>
