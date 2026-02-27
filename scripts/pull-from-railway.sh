@@ -27,6 +27,18 @@ PROJECT_COUNT=$(echo "$PROJECTS" | jq 'length')
 TEAM_COUNT=$(echo "$TEAM" | jq 'length')
 echo "Fetched $PROJECT_COUNT projects, $TEAM_COUNT team members from Railway."
 
+# Fetch capacity data (includes project_assignments)
+echo "Fetching capacity data (assignments)..."
+CAPACITY=$(curl -sf "$RAILWAY_URL/api/capacity")
+if [ $? -ne 0 ] || [ -z "$CAPACITY" ]; then
+    echo "WARNING: Failed to fetch capacity data from Railway."
+    ASSIGNMENTS="[]"
+else
+    ASSIGNMENTS=$(echo "$CAPACITY" | jq '.assignments // []')
+    ASSIGNMENT_COUNT=$(echo "$ASSIGNMENTS" | jq 'length')
+    echo "Fetched $ASSIGNMENT_COUNT project assignments from Railway."
+fi
+
 # Check if local server is running, start if not
 if ! curl -sf "$LOCAL_SERVER/api/health" &>/dev/null; then
     echo "Local server not running on port 3001. Starting it now..."
@@ -53,7 +65,7 @@ fi
 echo "Seeding local database via $LOCAL_SERVER/api/seed ..."
 RESULT=$(curl -sf -X POST "$LOCAL_SERVER/api/seed" \
   -H "Content-Type: application/json" \
-  -d "{\"projects\":$PROJECTS,\"team\":$TEAM}")
+  -d "{\"projects\":$PROJECTS,\"team\":$TEAM,\"assignments\":$ASSIGNMENTS}")
 
 if [ $? -ne 0 ]; then
     echo "ERROR: Failed to seed local DB."

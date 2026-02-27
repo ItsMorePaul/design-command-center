@@ -488,7 +488,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 // Seed endpoint - replaces all data
 app.post('/api/seed', async (req, res) => {
   try {
-    const { projects, team } = req.body
+    const { projects, team, assignments } = req.body
     
     // Clear and insert projects
     if (projects) {
@@ -508,10 +508,19 @@ app.post('/api/seed', async (req, res) => {
       }
     }
     
+    // Clear and insert project assignments (for capacity sync)
+    if (assignments && assignments.length > 0) {
+      await run('DELETE FROM project_assignments')
+      for (const a of assignments) {
+        await run(`INSERT INTO project_assignments (id, project_id, designer_id, allocation_percent, created_at) VALUES (?, ?, ?, ?, ?)`,
+          [a.id || `${a.project_id}_${a.designer_id}`, a.project_id, a.designer_id, a.allocation_percent ?? 0, a.created_at || new Date().toISOString()])
+      }
+    }
+    
     // Update DB version on seed
     await updateDbVersion()
     
-    res.json({ success: true })
+    res.json({ success: true, synced: { projects: projects?.length ?? 0, team: team?.length ?? 0, assignments: assignments?.length ?? 0 } })
   } catch (e) { res.status(500).json({error: e.message}); }
 })
 
@@ -532,8 +541,8 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 // Format: YYYY.MM.DD.hhmm (e.g., 2026.02.26.2059) → displays as "2026.02.26 2059"
 
-const SITE_VERSION = '2026.02.27.0752'
-const SITE_TIME = '0752'
+const SITE_VERSION = '2026.02.27.0755'
+const SITE_TIME = '0755'
 
 const VERSION_KEY = 'dcc_versions'
 
