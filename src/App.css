@@ -1995,18 +1995,19 @@
 }
 
 .priority-bl-select {
-  padding: 0.375rem 0.75rem;
-  border-radius: 6px;
+  padding: 6px 12px;
+  border-radius: 4px;
   border: 1px solid var(--color-border);
   background: var(--color-bg-secondary);
   color: var(--color-text);
-  font-size: 0.875rem;
+  font-size: 0.8rem;
   cursor: pointer;
   outline: none;
+  transition: border-color 0.15s ease;
 }
 
 .priority-bl-select:focus {
-  border-color: var(--color-accent);
+  border-color: var(--color-primary);
 }
 
 .priority-unranked {
