@@ -2574,15 +2574,7 @@ const [showFilters, setShowFilters] = useState(false)
                       onClick={() => setFormData({ ...formData, status: 'online' })}
                     >
                       <span className="status-dot bg-green-500"></span>
-                      Online
-                    </button>
-                    <button
-                      type="button"
-                      className={`status-option ${formData.status === 'away' ? 'active' : ''}`}
-                      onClick={() => setFormData({ ...formData, status: 'away' })}
-                    >
-                      <span className="status-dot bg-yellow-500"></span>
-                      Away
+                      Working
                     </button>
                     <button
                       type="button"
@@ -2590,7 +2582,7 @@ const [showFilters, setShowFilters] = useState(false)
                       onClick={() => setFormData({ ...formData, status: 'offline' })}
                     >
                       <span className="status-dot bg-gray-500"></span>
-                      Offline
+                      Away
                     </button>
                   </div>
                 </div>
