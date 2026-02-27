@@ -107,15 +107,20 @@ const getTodayFormatted = () => {
   return today.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
 }
 
-// Format version string: 'v260226|1739' → '2026.2.26 1739'
+// Format version string: '2026.02.26.2059' → '2026.02.26 2059'
 const formatVersionDisplay = (version: string): string => {
-  const match = version.match(/^v(\d{2})(\d{2})(\d{2})\|(\d{4})$/)
-  if (!match) return version
-  const [, yy, mm, dd, time] = match
-  const year = 2000 + parseInt(yy)
-  const month = parseInt(mm)
-  const day = parseInt(dd)
-  return `${year}.${month}.${day} ${time}`
+  // New format: YYYY.MM.DD.hhmm → YYYY.MM.DD hhmm
+  if (/^\d{4}\.\d{2}\.\d{2}\.\d{4}$/.test(version)) {
+    return version.replace(/\.(\d{4})$/, ' $1')
+  }
+  // Legacy format support: v260226|2059 → 2026.02.26 2059
+  const legacyMatch = version.match(/^v(\d{2})(\d{2})(\d{2})\|(\d{4})$/)
+  if (legacyMatch) {
+    const [, yy, mm, dd, time] = legacyMatch
+    const year = 2000 + parseInt(yy)
+    return `${year}.${mm}.${dd} ${time}`
+  }
+  return version
 }
 
 // Types

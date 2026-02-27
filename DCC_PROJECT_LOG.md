@@ -298,5 +298,27 @@ git checkout v260226-save-site
 
 ---
 
+### ✅ v260226-priority-hide-filters
+**Date:** 2026-02-26  
+**Time:** 8:53 PM PST  
+**Git tag:** `v260226-priority-hide-filters`  
+**Commit:** `e4f24a4`  
+**Site version:** `2026.2.26 2053`  
+**DB version at save:** `2026.2.26 1941`
+
+**To restore:**
+```bash
+git checkout v260226-priority-hide-filters
+```
+
+#### What was built in this checkpoint
+**Priority view UI cleanup**
+- When Priority tab is selected, the "Filter:" row is now completely hidden
+- The filter pills (Business Line, Designer, Status) no longer appear in priority mode
+- The sort row still shows the "Business Line:" dropdown (required for priority view functionality)
+- Changed condition from `{showProjectFilter() && (...)}` to `{projectViewMode === 'list' && showProjectFilter() && (...)}`
+
+---
+
 *Log started: 2026-02-26*  
 *Maintained by: Wilson 🦉*

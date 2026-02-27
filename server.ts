@@ -618,11 +618,12 @@ if (isProduction) {
 }
 
 // ============ VERSION TRACKING ============
-// Site version: manually updated in code when commits are made (vYYMMDD.hhmm)
+// Site version: manually updated in code when commits are made (YYYY.MM.DD.hhmm)
 // DB version: stored in DB, auto-updates on data changes
+// Format: YYYY.MM.DD.hhmm (e.g., 2026.02.26.2059) → displays as "2026.02.26 2059"
 
-const SITE_VERSION = 'v260226|2053'  // Manual update on code changes
-const SITE_TIME = '2053'
+const SITE_VERSION = '2026.02.26.2059'  // Manual update on code changes
+const SITE_TIME = '2059'
 
 const VERSION_KEY = 'dcc_versions'
 
@@ -632,7 +633,7 @@ const generateDbVersionParts = () => {
   const now = new Date()
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/Los_Angeles',
-    year: '2-digit',
+    year: 'numeric',
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
@@ -641,14 +642,14 @@ const generateDbVersionParts = () => {
   }).formatToParts(now)
 
   const get = (type: string) => parts.find(p => p.type === type)?.value || '00'
-  const yy = get('year')
+  const year = get('year')
   const mm = get('month')
   const dd = get('day')
   const hh = get('hour')
   const min = get('minute')
 
   return {
-    versionNumber: `v${yy}${mm}${dd}|${hh}${min}`,
+    versionNumber: `${year}.${mm}.${dd}.${hh}${min}`,
     versionTime: `${hh}${min}`,
   }
 }
