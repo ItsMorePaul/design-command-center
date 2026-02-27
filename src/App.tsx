@@ -317,38 +317,6 @@ function SortablePriorityItem({
   )
 }
 
-// Sortable done item component (for dragging out of done zone)
-function SortableDoneItem({
-  project,
-  onEdit,
-}: {
-  project: Project
-  onEdit: (p: Project) => void
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: `done-${project.id}` })
-  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }
-  const statusColors: Record<string, string> = { active: '#3b82f6', review: '#f59e0b', done: '#22c55e', blocked: '#ef4444' }
-  const statusLabel: Record<string, string> = { active: 'Active', review: 'In Review', done: 'Done', blocked: 'Blocked' }
-
-  return (
-    <div ref={setNodeRef} style={style} className="priority-item unranked done-item">
-      <button type="button" className="action-btn drag-handle" {...attributes} {...listeners} tabIndex={-1}>
-        <GripVertical size={14} />
-      </button>
-      <span className="priority-rank-empty">—</span>
-      <div className="priority-info">
-        <span className="priority-name">{project.name}</span>
-        <span className="priority-meta">{project.designers?.join(', ') || '—'}</span>
-      </div>
-      <span className="priority-status-label" style={{ color: statusColors[project.status] }}>
-        <span className="priority-status-dot" style={{ background: statusColors[project.status] }} />
-        {statusLabel[project.status]}
-      </span>
-      <button type="button" className="action-btn" onClick={() => onEdit(project)}><Pencil size={14} /></button>
-    </div>
-  )
-}
-
 // Sortable done item — draggable out of the Done zone
 function SortableDoneItem({
   project,
@@ -1029,8 +997,8 @@ const [showFilters, setShowFilters] = useState(false)
     })
   }
 
-  // Track active drag for done-drop highlight
-  const [activeDragId, setActiveDragId] = useState<UniqueIdentifier | null>(null)
+  // Track active drag for done-drop highlight (setter only, variable read via callback)
+  const [, setActiveDragId] = useState<UniqueIdentifier | null>(null)
 
   const markProjectDone = async (projectId: string, blId: string, currentRankedIds: string[]) => {
     // Optimistic: update local state
@@ -1040,16 +1008,6 @@ const [showFilters, setShowFilters] = useState(false)
     savePriorities(blId, newRankedIds)
     // Persist to backend
     await fetch(`/api/projects/${projectId}/done`, { method: 'PUT' })
-  }
-
-  const unmarkProjectDone = async (projectId: string, blId: string, currentRankedIds: string[]) => {
-    // Optimistic: update local state
-    setProjects(prev => prev.map(p => p.id === projectId ? { ...p, status: 'active' as const } : p))
-    // Add back to priority ranking at the end
-    const newRankedIds = [...currentRankedIds, projectId]
-    savePriorities(blId, newRankedIds)
-    // Persist to backend
-    await fetch(`/api/projects/${projectId}/undone`, { method: 'PUT' })
   }
 
   const markProjectUndone = async (projectId: string, blId: string, currentRankedIds: string[], insertIndex: number) => {
@@ -1824,8 +1782,6 @@ const [showFilters, setShowFilters] = useState(false)
               {projectViewMode === 'priority' && (() => {
                 const selectedBlId = priorityBusinessLine || 'all'
                 const isAllView = selectedBlId === 'all'
-                const statusColors: Record<string, string> = { active: '#3b82f6', review: '#f59e0b', done: '#22c55e', blocked: '#ef4444' }
-                const statusLabel: Record<string, string> = { active: 'Active', review: 'In Review', done: 'Done', blocked: 'Blocked' }
                 const liveStatuses = ['active', 'blocked', 'review']
 
                 // Helper: render a single business line's priority section
