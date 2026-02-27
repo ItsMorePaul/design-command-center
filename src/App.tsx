@@ -1864,14 +1864,14 @@ const [showFilters, setShowFilters] = useState(false)
                                 ))}
                               </div>
                             </div>
-                          </SortableContext>
 
-                          {/* Done drop zone — always visible, done items are draggable */}
-                          <DoneDropZone id={doneZoneId}>
-                            {doneSorted.map(p => (
-                              <SortableDoneItem key={p.id} project={p} onEdit={handleEditProject} />
-                            ))}
-                          </DoneDropZone>
+                            {/* Done drop zone — always visible, done items are draggable */}
+                            <DoneDropZone id={doneZoneId}>
+                              {doneSorted.map(p => (
+                                <SortableDoneItem key={p.id} project={p} onEdit={handleEditProject} />
+                              ))}
+                            </DoneDropZone>
+                          </SortableContext>
                         </DndContext>
                       )}
                     </div>
@@ -2023,7 +2023,7 @@ const [showFilters, setShowFilters] = useState(false)
                       {/* Legend - Left */}
                       <div className="calendar-legend">
                         <div className="legend-item">
-                          <span className="legend-dot" style={{ backgroundColor: '#6366f1' }}></span>
+                          <span className="legend-dot" style={{ backgroundColor: '#3b82f6' }}></span>
                           <span>Project</span>
                         </div>
                         <div className="legend-item">

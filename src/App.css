@@ -28,7 +28,7 @@
   margin-bottom: 2rem;
   border-radius: var(--radius-md);
   background: var(--color-accent-subtle);
-  border: 1px solid rgba(99, 102, 241, 0.2);
+  border: 1px solid rgba(59, 130, 246, 0.2);
 }
 
 .logo-icon {
@@ -72,7 +72,7 @@
 }
 
 .nav-item.active {
-  background: linear-gradient(135deg, var(--color-accent) 0%, #8b5cf6 100%);
+  background: linear-gradient(135deg, var(--color-accent) 0%, #2563eb 100%);
   color: white;
   box-shadow: var(--shadow-glow);
 }
@@ -361,7 +361,7 @@
 }
 
 .bg-blue-500 {
-  background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+  background: #3b82f6;
 }
 
 .bg-yellow-500 {
@@ -676,8 +676,8 @@
 }
 
 .day-modal-event.project {
-  border-color: #6366f1;
-  background: rgba(99, 102, 241, 0.1);
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.1);
 }
 
 .event-type-badge {
@@ -700,7 +700,7 @@
 }
 
 .day-modal-event.project .event-type-badge {
-  color: #6366f1;
+  color: #3b82f6;
 }
 
 .day-modal-event .event-name {
@@ -720,7 +720,7 @@
 }
 
 .day-modal-event.project .event-detail {
-  color: #6366f1;
+  color: #3b82f6;
 }
 
 .day-modal-event.clickable {
@@ -730,7 +730,7 @@
 
 .day-modal-event.clickable:hover {
   border-color: var(--color-accent);
-  background: rgba(99, 102, 241, 0.15);
+  background: rgba(59, 130, 246, 0.15);
 }
 
 .event-date-range {
@@ -1155,7 +1155,7 @@
   }
   
   .day-cell:active {
-    background: rgba(99, 102, 241, 0.15);
+    background: rgba(59, 130, 246, 0.15);
   }
   
   .day-number {
@@ -1907,6 +1907,7 @@
   display: flex;
   flex-direction: column;
   gap: 0;
+  padding-top: 1.5rem;
 }
 
 .priority-bl-tabs {
@@ -1928,7 +1929,7 @@
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--color-accent);
+  color: white;
   margin-bottom: 0.5rem;
 }
 
@@ -2617,12 +2618,12 @@ input:checked + .slider:before {
 }
 
 .day-cell.has-events {
-  background: rgba(99, 102, 241, 0.05);
+  background: rgba(59, 130, 246, 0.05);
   cursor: pointer;
 }
 
 .day-cell.has-events:hover {
-  background: rgba(99, 102, 241, 0.1);
+  background: rgba(59, 130, 246, 0.1);
   border-color: var(--color-accent);
 }
 
@@ -2686,7 +2687,7 @@ input:checked + .slider:before {
 }
 
 .event-tag.project {
-  background: #6366f1;
+  background: #3b82f6;
 }
 
 .more-events {
