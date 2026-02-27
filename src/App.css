@@ -1916,6 +1916,22 @@
   padding: 0.75rem 0 1rem;
 }
 
+.priority-in-progress-zone {
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  padding-top: 0.5rem;
+}
+
+.priority-zone-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  margin-bottom: 0.5rem;
+}
+
 .priority-list {
   display: flex;
   flex-direction: column;

@@ -1496,8 +1496,8 @@ const [showFilters, setShowFilters] = useState(false)
 
               <div className="projects-sort-row">
                 <div className="view-toggle">
-                  <button className={`sort-btn ${projectViewMode === 'list' ? 'active' : ''}`} onClick={() => setProjectViewMode('list')}>List</button>
                   <button className={`sort-btn ${projectViewMode === 'priority' ? 'active' : ''}`} onClick={() => setProjectViewMode('priority')}>Priority Ranking</button>
+                  <button className={`sort-btn ${projectViewMode === 'list' ? 'active' : ''}`} onClick={() => setProjectViewMode('list')}>List</button>
                 </div>
                 <div className="sort-divider" />
                 {projectViewMode === 'list' ? (
@@ -1856,10 +1856,13 @@ const [showFilters, setShowFilters] = useState(false)
                           }}
                         >
                           <SortableContext items={allSortableIds} strategy={verticalListSortingStrategy}>
-                            <div className="priority-list">
-                              {ranked.map((p, i) => (
-                                <SortablePriorityItem key={p.id} project={p} rank={i + 1} onEdit={handleEditProject} />
-                              ))}
+                            <div className="priority-in-progress-zone">
+                              <div className="priority-zone-label">In Progress</div>
+                              <div className="priority-list">
+                                {ranked.map((p, i) => (
+                                  <SortablePriorityItem key={p.id} project={p} rank={i + 1} onEdit={handleEditProject} />
+                                ))}
+                              </div>
                             </div>
                           </SortableContext>
 
