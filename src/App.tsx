@@ -251,6 +251,39 @@ const loadDataFromAPI = async () => {
   }
 }
 
+// Sortable priority item component
+function SortablePriorityItem({
+  project,
+  rank,
+  onEdit,
+}: {
+  project: Project
+  rank: number
+  onEdit: (p: Project) => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: project.id })
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }
+  const statusColors: Record<string, string> = { active: '#3b82f6', review: '#f59e0b', done: '#22c55e', blocked: '#ef4444' }
+
+  return (
+    <div ref={setNodeRef} style={style} className="priority-item">
+      <button type="button" className="action-btn drag-handle" {...attributes} {...listeners} tabIndex={-1}>
+        <GripVertical size={14} />
+      </button>
+      <span className="priority-rank">{rank}</span>
+      <div className="priority-info">
+        <span className="priority-name">{project.name}</span>
+        <span className="priority-meta">
+          {project.designers?.join(', ') || '—'}
+          {project.endDate ? ` · ${formatShortDate(project.endDate)}` : ''}
+        </span>
+      </div>
+      <span className="priority-status-dot" style={{ background: statusColors[project.status] || '#94a3b8' }} title={project.status} />
+      <button type="button" className="action-btn" onClick={() => onEdit(project)}><Pencil size={14} /></button>
+    </div>
+  )
+}
+
 // Sortable timeline item component
 function SortableTimelineItem({
   range,
@@ -298,8 +331,13 @@ function App() {
   
   // Project modal state
   const timelineSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+  const prioritySensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   const [showProjectModal, setShowProjectModal] = useState(false)
+  const [projectViewMode, setProjectViewMode] = useState<'list' | 'priority'>('list')
+  // priorities: { [business_line_id]: project_id[] } in rank order
+  const [priorities, setPriorities] = useState<Record<string, string[]>>({})
+  const [priorityBusinessLine, setPriorityBusinessLine] = useState<string>('')
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [projectFormData, setProjectFormData] = useState({
     name: '',
@@ -469,6 +507,15 @@ const [showFilters, setShowFilters] = useState(false)
         const blRes = await fetch('/api/business-lines')
         const blData = await blRes.json()
         setBusinessLines(blData)
+        // Load priorities
+        const prRes = await fetch('/api/priorities')
+        const prData: { business_line_id: string; project_id: string; rank: number }[] = await prRes.json()
+        const prMap: Record<string, string[]> = {}
+        for (const row of prData) {
+          if (!prMap[row.business_line_id]) prMap[row.business_line_id] = []
+          prMap[row.business_line_id].push(row.project_id)
+        }
+        setPriorities(prMap)
       } catch (err) {
         console.error('Error loading data:', err)
       } finally {
@@ -840,6 +887,26 @@ const [showFilters, setShowFilters] = useState(false)
       setFormData({ ...formData, timeOff: [...(formData.timeOff || []), { ...timeOffFormData, id: Date.now().toString() }] })
     }
     setShowTimeOffModal(false)
+  }
+
+  const savePriorities = async (blId: string, orderedIds: string[]) => {
+    setPriorities(prev => ({ ...prev, [blId]: orderedIds }))
+    await fetch('/api/priorities', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ business_line_id: blId, project_ids: orderedIds }),
+    })
+  }
+
+  const handlePriorityDragEnd = (event: DragEndEvent, blId: string) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const current = priorities[blId] || []
+    const oldIndex = current.indexOf(String(active.id))
+    const newIndex = current.indexOf(String(over.id))
+    if (oldIndex === -1 || newIndex === -1) return
+    const reordered = arrayMove(current, oldIndex, newIndex)
+    savePriorities(blId, reordered)
   }
 
   const handleSaveProject = async () => {
@@ -1315,6 +1382,11 @@ const [showFilters, setShowFilters] = useState(false)
               </div>
 
               <div className="projects-sort-row">
+                <div className="view-toggle">
+                  <button className={`sort-btn ${projectViewMode === 'list' ? 'active' : ''}`} onClick={() => setProjectViewMode('list')}>List</button>
+                  <button className={`sort-btn ${projectViewMode === 'priority' ? 'active' : ''}`} onClick={() => setProjectViewMode('priority')}>Priority</button>
+                </div>
+                <div className="sort-divider" />
                 <span className="sort-label">Sort by:</span>
                 <button 
                   className={`sort-btn ${projectSortBy === 'name' ? 'active' : ''}`}
@@ -1409,7 +1481,7 @@ const [showFilters, setShowFilters] = useState(false)
                 </div>
               )}
 
-              <div className="projects-list">
+              {projectViewMode === 'list' && <div className="projects-list">
                 <div className="list-header">
                   <span>Project Name</span>
                   <span>Designer(s)</span>
@@ -1592,7 +1664,75 @@ const [showFilters, setShowFilters] = useState(false)
                   </div>
                 );
                 })}
-              </div>
+              </div>}
+
+              {/* Priority View */}
+              {projectViewMode === 'priority' && (() => {
+                const blId = priorityBusinessLine || businessLines[0]?.id || ''
+                const bl = businessLines.find(b => b.id === blId)
+                const blProjects = projects.filter(p => {
+                  const lines = Array.isArray(p.businessLines) ? p.businessLines : (p.businessLines ? [p.businessLines] : [])
+                  return lines.some(l => l === bl?.name)
+                })
+                const rankedIds = priorities[blId] || []
+                const ranked = rankedIds.map(id => blProjects.find(p => p.id === id)).filter(Boolean) as Project[]
+                const unranked = blProjects.filter(p => !rankedIds.includes(p.id))
+
+                return (
+                  <div className="priority-view">
+                    {/* Business line tabs */}
+                    <div className="priority-bl-tabs">
+                      {businessLines.map(b => (
+                        <button
+                          key={b.id}
+                          className={`filter-pill ${(priorityBusinessLine || businessLines[0]?.id) === b.id ? 'active' : ''}`}
+                          onClick={() => setPriorityBusinessLine(b.id)}
+                        >{b.name}</button>
+                      ))}
+                    </div>
+
+                    {blProjects.length === 0 ? (
+                      <div className="priority-empty">No projects in {bl?.name || 'this business line'}</div>
+                    ) : (
+                      <>
+                        {/* Ranked list */}
+                        <DndContext sensors={prioritySensors} collisionDetection={closestCenter} onDragEnd={e => handlePriorityDragEnd(e, blId)}>
+                          <SortableContext items={rankedIds} strategy={verticalListSortingStrategy}>
+                            <div className="priority-list">
+                              {ranked.map((p, i) => (
+                                <SortablePriorityItem key={p.id} project={p} rank={i + 1} onEdit={handleEditProject} />
+                              ))}
+                            </div>
+                          </SortableContext>
+                        </DndContext>
+
+                        {/* Unranked projects */}
+                        {unranked.length > 0 && (
+                          <div className="priority-unranked">
+                            <div className="priority-unranked-label">Unranked</div>
+                            {unranked.map(p => (
+                              <div key={p.id} className="priority-item unranked">
+                                <span className="priority-rank-empty">—</span>
+                                <div className="priority-info">
+                                  <span className="priority-name">{p.name}</span>
+                                  <span className="priority-meta">{p.designers?.join(', ') || '—'}</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  className="add-link-btn"
+                                  style={{ padding: '0.25rem 0.75rem', fontSize: '0.75rem', width: 'auto' }}
+                                  onClick={() => savePriorities(blId, [...rankedIds, p.id])}
+                                >+ Rank</button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )
+              })()}
+
             </div>
           )}
 

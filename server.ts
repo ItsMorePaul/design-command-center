@@ -621,8 +621,8 @@ if (isProduction) {
 // Site version: manually updated in code when commits are made (vYYMMDD.hhmm)
 // DB version: stored in DB, auto-updates on data changes
 
-const SITE_VERSION = 'v260226|1914'  // Manual update on code changes
-const SITE_TIME = '1914'
+const SITE_VERSION = 'v260226|1940'  // Manual update on code changes
+const SITE_TIME = '1940'
 
 const VERSION_KEY = 'dcc_versions'
 
@@ -675,6 +675,7 @@ const initVersions = async () => {
 
 // Ensure table exists
 run("CREATE TABLE IF NOT EXISTS app_versions (key TEXT PRIMARY KEY, db_version TEXT, db_time TEXT, updated_at TEXT)").then(() => initVersions())
+run("CREATE TABLE IF NOT EXISTS project_priorities (business_line_id TEXT NOT NULL, project_id TEXT NOT NULL, rank INTEGER NOT NULL, PRIMARY KEY (business_line_id, project_id))")
 
 // Capacity schema safety
 run(`CREATE TABLE IF NOT EXISTS project_assignments (
@@ -737,6 +738,40 @@ app.get('/api/versions', async (req, res) => {
 // Update DB version (automatic on data changes - handled in individual endpoints)
 
 // ============ CAPACITY MANAGEMENT ============
+
+// --- Project Priorities ---
+
+// GET /api/priorities — returns all rows as { business_line_id, project_id, rank }
+app.get('/api/priorities', async (req, res) => {
+  try {
+    const rows = await all('SELECT business_line_id, project_id, rank FROM project_priorities ORDER BY business_line_id, rank ASC')
+    res.json(rows)
+  } catch (e) {
+    res.status(500).json({ error: String(e) })
+  }
+})
+
+// PUT /api/priorities — bulk upsert ranked list for one business line
+// Body: { business_line_id: string, project_ids: string[] } (ordered by priority)
+app.put('/api/priorities', async (req, res) => {
+  const { business_line_id, project_ids } = req.body
+  if (!business_line_id || !Array.isArray(project_ids)) {
+    return res.status(400).json({ error: 'business_line_id and project_ids required' })
+  }
+  try {
+    await run('DELETE FROM project_priorities WHERE business_line_id = ?', [business_line_id])
+    for (let i = 0; i < project_ids.length; i++) {
+      await run(
+        'INSERT INTO project_priorities (business_line_id, project_id, rank) VALUES (?, ?, ?)',
+        [business_line_id, project_ids[i], i + 1]
+      )
+    }
+    await updateDbVersion()
+    res.json({ ok: true })
+  } catch (e) {
+    res.status(500).json({ error: String(e) })
+  }
+})
 
 // Get all capacity data: team availability + project assignments
 app.get('/api/capacity', async (req, res) => {
