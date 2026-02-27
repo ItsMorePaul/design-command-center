@@ -2061,6 +2061,22 @@
   margin-bottom: 0.25rem;
 }
 
+.priority-bl-section {
+  margin-bottom: 2rem;
+}
+
+.priority-bl-section:last-child {
+  margin-bottom: 0;
+}
+
+.priority-bl-header {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 0.75rem;
+  letter-spacing: -0.01em;
+}
+
 .view-toggle {
   display: flex;
   gap: 4px;

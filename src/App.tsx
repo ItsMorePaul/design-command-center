@@ -351,8 +351,8 @@ function SortableTimelineItem({
 }
 
 // Droppable "Done" zone for priority view
-function DoneDropZone({ children }: { children?: React.ReactNode }) {
-  const { setNodeRef, isOver } = useDroppable({ id: 'done-drop-zone' })
+function DoneDropZone({ children, id = 'done-drop-zone' }: { children?: React.ReactNode; id?: string }) {
+  const { setNodeRef, isOver } = useDroppable({ id })
   return (
     <div
       ref={setNodeRef}
@@ -381,7 +381,7 @@ function App() {
   const prioritySensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   const [showProjectModal, setShowProjectModal] = useState(false)
-  const [projectViewMode, setProjectViewMode] = useState<'list' | 'priority'>('list')
+  const [projectViewMode, setProjectViewMode] = useState<'list' | 'priority'>('priority')
   // priorities: { [business_line_id]: project_id[] } in rank order
   const [priorities, setPriorities] = useState<Record<string, string[]>>({})
   const [priorityBusinessLine, setPriorityBusinessLine] = useState<string>('')
@@ -1470,9 +1470,10 @@ const [showFilters, setShowFilters] = useState(false)
                     <span className="sort-label">Business Line:</span>
                     <select
                       className="priority-bl-select"
-                      value={priorityBusinessLine || businessLines[0]?.id || ''}
+                      value={priorityBusinessLine || 'all'}
                       onChange={e => setPriorityBusinessLine(e.target.value)}
                     >
+                      <option value="all">All</option>
                       {businessLines.map(b => (
                         <option key={b.id} value={b.id}>{b.name}</option>
                       ))}
@@ -1591,7 +1592,7 @@ const [showFilters, setShowFilters] = useState(false)
                           )
                         })}
                       </div>
-                      <span className="status-badge">
+                      <span className="status-badge" style={{ color: { active: '#3b82f6', review: '#f59e0b', done: '#22c55e', blocked: '#ef4444' }[project.status] }}>
                         <span className={`status-badge-dot ${getStatusColor(project.status)}`}></span>
                         {getStatusLabel(project.status)}
                       </span>
@@ -1729,47 +1730,42 @@ const [showFilters, setShowFilters] = useState(false)
 
               {/* Priority View */}
               {projectViewMode === 'priority' && (() => {
-                const blId = priorityBusinessLine || businessLines[0]?.id || ''
-                const bl = businessLines.find(b => b.id === blId)
+                const selectedBlId = priorityBusinessLine || 'all'
+                const isAllView = selectedBlId === 'all'
                 const statusColors: Record<string, string> = { active: '#3b82f6', review: '#f59e0b', done: '#22c55e', blocked: '#ef4444' }
                 const statusLabel: Record<string, string> = { active: 'Active', review: 'In Review', done: 'Done', blocked: 'Blocked' }
-
-                // All projects for this business line
-                const blProjects = projects.filter(p => {
-                  const lines = Array.isArray(p.businessLines) ? p.businessLines : (p.businessLines ? [p.businessLines] : [])
-                  return lines.some(l => l === bl?.name)
-                })
-
-                // Live = active/blocked/review, auto-sorted alpha if no rank set
                 const liveStatuses = ['active', 'blocked', 'review']
-                const liveProjects = blProjects.filter(p => liveStatuses.includes(p.status))
-                const doneProjects = blProjects.filter(p => p.status === 'done')
 
-                // Ranked IDs (only live projects count)
-                const savedRankedIds = (priorities[blId] || []).filter(id => liveProjects.some(p => p.id === id))
-                // Auto-add unranked live projects alpha-sorted at the end
-                const unrankedLiveIds = liveProjects
-                  .filter(p => !savedRankedIds.includes(p.id))
-                  .sort((a, b) => a.name.localeCompare(b.name))
-                  .map(p => p.id)
-                const allRankedIds = [...savedRankedIds, ...unrankedLiveIds]
-                const ranked = allRankedIds.map(id => liveProjects.find(p => p.id === id)).filter(Boolean) as Project[]
+                // Helper: render a single business line's priority section
+                const renderBlSection = (blId: string, bl: BusinessLine, doneZoneId: string) => {
+                  const blProjects = projects.filter(p => {
+                    const lines = Array.isArray(p.businessLines) ? p.businessLines : (p.businessLines ? [p.businessLines] : [])
+                    return lines.some(l => l === bl.name)
+                  })
+                  const liveProjects = blProjects.filter(p => liveStatuses.includes(p.status))
+                  const doneProjects = blProjects.filter(p => p.status === 'done')
+                  const savedRankedIds = (priorities[blId] || []).filter(id => liveProjects.some(p => p.id === id))
+                  const unrankedLiveIds = liveProjects
+                    .filter(p => !savedRankedIds.includes(p.id))
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map(p => p.id)
+                  const allRankedIds = [...savedRankedIds, ...unrankedLiveIds]
+                  const ranked = allRankedIds.map(id => liveProjects.find(p => p.id === id)).filter(Boolean) as Project[]
 
-                return (
-                  <div className="priority-view">
-                    {blProjects.length === 0 ? (
-                      <div className="priority-empty">No projects in {bl?.name || 'this business line'}</div>
-                    ) : (
-                      <>
-                        {/* Ranked live list + Done drop zone */}
+                  if (blProjects.length === 0 && isAllView) return null
+
+                  return (
+                    <div key={blId} className={isAllView ? 'priority-bl-section' : undefined}>
+                      {isAllView && <div className="priority-bl-header">{bl.name}:</div>}
+                      {blProjects.length === 0 ? (
+                        <div className="priority-empty">No projects in {bl.name}</div>
+                      ) : (
                         <DndContext
                           sensors={prioritySensors}
                           collisionDetection={(args) => {
-                            // Check done drop zone first
                             const pointerCollisions = pointerWithin(args)
-                            const doneHit = pointerCollisions.find(c => c.id === 'done-drop-zone')
+                            const doneHit = pointerCollisions.find(c => c.id === doneZoneId)
                             if (doneHit) return [doneHit]
-                            // Fall back to closestCenter for sortable reordering
                             return closestCenter(args)
                           }}
                           onDragStart={(e: DragStartEvent) => setActiveDragId(e.active.id)}
@@ -1778,12 +1774,10 @@ const [showFilters, setShowFilters] = useState(false)
                             setActiveDragId(null)
                             const { active, over } = e
                             if (!over) return
-                            // Dropped into done zone
-                            if (over.id === 'done-drop-zone') {
+                            if (over.id === doneZoneId) {
                               markProjectDone(String(active.id), blId, allRankedIds)
                               return
                             }
-                            // Normal reorder
                             if (active.id === over.id) return
                             const oldIndex = allRankedIds.indexOf(String(active.id))
                             const newIndex = allRankedIds.indexOf(String(over.id))
@@ -1799,29 +1793,54 @@ const [showFilters, setShowFilters] = useState(false)
                             </div>
                           </SortableContext>
 
-                          {/* Done drop zone — always visible when dragging, or when done projects exist */}
-                          {(activeDragId || doneProjects.length > 0) && (
-                            <DoneDropZone>
-                              {doneProjects.sort((a, b) => a.name.localeCompare(b.name)).map(p => (
-                                <div key={p.id} className="priority-item unranked">
-                                  <span className="priority-rank-empty">—</span>
-                                  <div className="priority-info">
-                                    <span className="priority-name">{p.name}</span>
-                                    <span className="priority-meta">{p.designers?.join(', ') || '—'}</span>
-                                  </div>
-                                  <span className="priority-status-label" style={{ color: statusColors[p.status] }}>
-                                    <span className="priority-status-dot" style={{ background: statusColors[p.status] }} />
-                                    {statusLabel[p.status]}
-                                  </span>
+                          {/* Done drop zone — always visible */}
+                          <DoneDropZone id={doneZoneId}>
+                            {doneProjects.sort((a, b) => a.name.localeCompare(b.name)).map(p => (
+                              <div key={p.id} className="priority-item unranked">
+                                <span className="priority-rank-empty">—</span>
+                                <div className="priority-info">
+                                  <span className="priority-name">{p.name}</span>
+                                  <span className="priority-meta">{p.designers?.join(', ') || '—'}</span>
                                 </div>
-                              ))}
-                            </DoneDropZone>
-                          )}
+                                <span className="priority-status-label" style={{ color: statusColors[p.status] }}>
+                                  <span className="priority-status-dot" style={{ background: statusColors[p.status] }} />
+                                  {statusLabel[p.status]}
+                                </span>
+                              </div>
+                            ))}
+                          </DoneDropZone>
                         </DndContext>
-                      </>
-                    )}
-                  </div>
-                )
+                      )}
+                    </div>
+                  )
+                }
+
+                if (isAllView) {
+                  // Filter to business lines that have projects
+                  const blsWithProjects = businessLines.filter(bl =>
+                    projects.some(p => {
+                      const lines = Array.isArray(p.businessLines) ? p.businessLines : (p.businessLines ? [p.businessLines] : [])
+                      return lines.some(l => l === bl.name)
+                    })
+                  )
+                  return (
+                    <div className="priority-view">
+                      {blsWithProjects.length === 0 ? (
+                        <div className="priority-empty">No projects found</div>
+                      ) : (
+                        blsWithProjects.map(bl => renderBlSection(bl.id, bl, `done-drop-zone-${bl.id}`))
+                      )}
+                    </div>
+                  )
+                } else {
+                  const bl = businessLines.find(b => b.id === selectedBlId)
+                  if (!bl) return <div className="priority-view"><div className="priority-empty">Business line not found</div></div>
+                  return (
+                    <div className="priority-view">
+                      {renderBlSection(selectedBlId, bl, 'done-drop-zone')}
+                    </div>
+                  )
+                }
               })()}
 
             </div>
