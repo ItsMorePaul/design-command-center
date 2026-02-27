@@ -4,9 +4,10 @@ import { useFloating, offset, flip, shift, arrow } from '@floating-ui/react';
 interface TooltipProps {
   content: string;
   children: React.ReactNode;
+  variant?: 'default' | 'yellow';
 }
 
-export function Tooltip({ content, children }: TooltipProps) {
+export function Tooltip({ content, children, variant = 'default' }: TooltipProps) {
   const [isMounted, setIsMounted] = useState(false);
   const arrowRef = useRef<HTMLDivElement>(null);
   const showTimeoutRef = useRef<number | undefined>(undefined);
@@ -60,7 +61,7 @@ export function Tooltip({ content, children }: TooltipProps) {
         <div
           ref={refs.setFloating}
           style={floatingStyles}
-          className="tooltip-floating"
+          className={`tooltip-floating ${variant === 'yellow' ? 'tooltip-yellow' : ''}`}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         >

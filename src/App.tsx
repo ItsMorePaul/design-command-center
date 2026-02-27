@@ -80,6 +80,28 @@ const formatShortDate = (dateStr: string): string => {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+// Find the closest time off date to today
+const getClosestTimeOff = (timeOff: { name: string; startDate: string; endDate: string; id: string }[]): { name: string; date: string; isStart: boolean } | null => {
+  if (!timeOff || timeOff.length === 0) return null
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  let closest: { name: string; date: string; isStart: boolean; diff: number } | null = null
+  for (const off of timeOff) {
+    const startDate = parseLocalDate(off.startDate)
+    const endDate = parseLocalDate(off.endDate)
+    if (!startDate || !endDate) continue
+    const startDiff = Math.abs(startDate.getTime() - today.getTime())
+    const endDiff = Math.abs(endDate.getTime() - today.getTime())
+    if (!closest || startDiff < closest.diff) {
+      closest = { name: off.name, date: off.startDate, isStart: true, diff: startDiff }
+    }
+    if (endDiff < closest.diff) {
+      closest = { name: off.name, date: off.endDate, isStart: false, diff: endDiff }
+    }
+  }
+  return closest ? { name: closest.name, date: closest.date, isStart: closest.isStart } : null
+}
+
 // Format date range like "Feb 2 - Mar 12"
 const formatDateRange = (startDate: string, endDate: string) => {
   const start = parseLocalDate(startDate)
@@ -1782,7 +1804,15 @@ const [showFilters, setShowFilters] = useState(false)
                         })()}
                       </div>
                       {member.status === 'offline' && (
-                        <span className="status-emoji" data-tooltip="Offline">🌴</span>
+                        <Tooltip variant="yellow" content={(() => {
+                          const closest = getClosestTimeOff(member.timeOff || [])
+                          if (closest) {
+                            return `${closest.name}: ${closest.isStart ? 'Starts' : 'Ends'} ${formatShortDate(closest.date)}`
+                          }
+                          return 'Away'
+                        })()}>
+                          <span className="status-emoji status-emoji-away">🌴</span>
+                        </Tooltip>
                       )}
                     </div>
                     <div className="team-card-footer">
