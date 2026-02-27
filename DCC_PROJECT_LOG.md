@@ -251,5 +251,33 @@ git checkout v260226-calendar-filter-default
 
 ---
 
+### ✅ v260226-version-format-docs
+**Date:** 2026-02-26  
+**Time:** 8:44 PM PST  
+**Git tag:** `v260226-version-format-docs`  
+**Commit:** `7329564`  
+**Site version:** `2026.2.26 2044`  
+**DB version at save:** `2026.2.26 1941`
+
+**To restore:**
+```bash
+git checkout v260226-version-format-docs
+```
+
+#### What was built in this checkpoint
+**Documentation clarity — version formats**
+- Updated `DCC_PROJECT_LOG.md` versioning rules section:
+  - Added "INTERNAL CODE FORMAT — used in server.ts only, never shown to users" comment
+  - Added explicit warning: "⚠️ CRITICAL: The `vYYMMDD|HHMM` format is INTERNAL CODE ONLY"
+  - Clarified that checkpoints must always use DISPLAY format (`2026.2.26 2039`)
+- Updated `MEMORY.md` with same clarifications:
+  - Added "INTERNAL CODE FORMAT (server.ts only)" labels
+  - Added "Display format" vs "Internal format" distinctions
+  - Updated all examples to use consistent time (2039)
+- Removed all `v260226|2039` → `2026.2.26 2039` conversion arrows from checkpoint entries
+- Site version updated to `v260226|2044`
+
+---
+
 *Log started: 2026-02-26*  
 *Maintained by: Wilson 🦉*
