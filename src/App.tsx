@@ -1474,6 +1474,7 @@ const [showFilters, setShowFilters] = useState(false)
                       onChange={e => setPriorityBusinessLine(e.target.value)}
                     >
                       <option value="all">All</option>
+                      <option disabled>──────────</option>
                       {businessLines.map(b => (
                         <option key={b.id} value={b.id}>{b.name}</option>
                       ))}
@@ -1761,7 +1762,7 @@ const [showFilters, setShowFilters] = useState(false)
 
                   return (
                     <div key={blId} className={isAllView ? 'priority-bl-section' : undefined}>
-                      {isAllView && <div className="priority-bl-header">{bl.name}:</div>}
+                      {isAllView && <div className="priority-bl-header">{bl.name}</div>}
                       {blProjects.length === 0 ? (
                         <div className="priority-empty">No projects in {bl.name}</div>
                       ) : (
