@@ -23,28 +23,30 @@ npm run dev &>> /tmp/dcc-vite.log &
 
 ## Versioning Rules (CRITICAL — read before touching versions)
 
-**UI display format:** `Site: 2026.2.26 1739` / `DB: 2026.2.26 1739`
+**UI display format:** `Site: 2026.02.26 2059` / `DB: 2026.02.26 2059`
 
 ### Site Version — MANUAL, set on every commit
 - Two constants in `server.ts` — **update BOTH, every single time, no exceptions:**
   ```ts
-  // INTERNAL CODE FORMAT — used in server.ts only, never shown to users
-  const SITE_VERSION = 'vYYMMDD|HHMM'  // e.g., 'v260226|1739' (Feb 26 2026, 8:39 PM)
-  const SITE_TIME = 'HHMM'              // e.g., '2039' (just the time portion)
+  // Format: YYYY.MM.DD.hhmm (periods, no pipe, full year)
+  const SITE_VERSION = '2026.02.26.2059'  // Internal code format
+  const SITE_TIME = '2059'                 // Just the time portion
   ```
 - Use Pacific Time (PST/PDT).
-- ⚠️ **CRITICAL:** The `vYYMMDD|HHMM` format is INTERNAL CODE ONLY. Never document this format in checkpoints — always use the DISPLAY format: `2026.2.26 2039`
+- The internal format is nearly identical to display — just replace last `.` with ` `
 
 ### DB Version — FULLY AUTOMATIC. NEVER SET MANUALLY.
 - Updates itself on every DB write via `updateDbVersion()` → `generateDbVersionParts()` in `server.ts`
-- **Internal format (code only):** `vYYMMDD|HHMM` for `db_version`, `HHMM` for `db_time`
+- **Internal format:** `YYYY.MM.DD.hhmm` (e.g., `2026.02.26.2059`)
+- **DB storage:** Same format as site version
 - ❌ **NEVER** run `sqlite3 ... UPDATE app_versions SET db_version` manually
 - ❌ **NEVER** hardcode DB version anywhere outside `generateDbVersionParts()`
 - ✅ To READ current DB version for documentation: `sqlite3 data/shared.db "SELECT db_version, db_time FROM app_versions WHERE key='dcc_versions';"`
 
 ### UI Display (what users actually see)
-- Sidebar footer shows: `Site: 2026.2.26 2039` / `DB: 2026.2.26 2039`
-- Formatted by `formatVersionDisplay()` in `src/App.tsx` — converts internal `v260226|2039` → display `2026.2.26 2039`
+- Sidebar footer shows: `Site: 2026.02.26 2059` / `DB: 2026.02.26 2059`
+- Formatted by `formatVersionDisplay()` in `src/App.tsx` — simply replaces last `.` with space
+- Legacy format `v260226|2059` still supported for backwards compatibility
 
 ### On every "save site" checkpoint
 1. Update `SITE_VERSION` and `SITE_TIME` in `server.ts` to current PST time
@@ -317,6 +319,30 @@ git checkout v260226-priority-hide-filters
 - The filter pills (Business Line, Designer, Status) no longer appear in priority mode
 - The sort row still shows the "Business Line:" dropdown (required for priority view functionality)
 - Changed condition from `{showProjectFilter() && (...)}` to `{projectViewMode === 'list' && showProjectFilter() && (...)}`
+
+---
+
+### ✅ v260226-period-version-format
+**Date:** 2026-02-26  
+**Time:** 8:59 PM PST  
+**Git tag:** `v260226-period-version-format`  
+**Commit:** `4c693b6`  
+**Site version:** `2026.02.26 2059`  
+**DB version at save:** `2026.02.26 2055`
+
+**To restore:**
+```bash
+git checkout v260226-period-version-format
+```
+
+#### What was built in this checkpoint
+**Period-based version format**
+- Changed internal version format from `v260226|2059` to `2026.02.26.2059`
+- Display conversion is now trivial: replace last `.` with space
+- `generateDbVersionParts()` now uses full year (2026) instead of 2-digit year (26)
+- `formatVersionDisplay()` supports both new and legacy formats for backwards compatibility
+- Updated all documentation to reflect new format
+- Site version updated to `2026.02.26.2059`
 
 ---
 
