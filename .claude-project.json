@@ -1,0 +1,57 @@
+{
+  "project": {
+    "name": "Design Command Center",
+    "shortName": "DCC",
+    "type": "web-app",
+    "stack": ["React", "TypeScript", "Express", "SQLite"]
+  },
+  "structure": {
+    "frontend": {
+      "root": "src/",
+      "main": "src/App.tsx",
+      "styles": "src/App.css",
+      "components": "src/components/"
+    },
+    "backend": {
+      "root": "./",
+      "main": "server.ts",
+      "apiPrefix": "/api"
+    },
+    "database": {
+      "file": "data/shared.db",
+      "type": "SQLite",
+      "tables": ["projects", "team", "project_assignments", "project_priorities", "business_lines", "brand_options", "app_versions"]
+    }
+  },
+  "workflows": {
+    "devServer": "npm run dev",
+    "build": "npm run build",
+    "start": "NODE_ENV=production npm start"
+  },
+  "versioning": {
+    "format": "YYYY.MM.DD.hhmm",
+    "location": "server.ts",
+    "variables": ["SITE_VERSION", "SITE_TIME"]
+  },
+  "apiEndpoints": {
+    "projects": "/api/projects",
+    "team": "/api/team",
+    "capacity": "/api/capacity",
+    "priorities": "/api/priorities",
+    "businessLines": "/api/business-lines",
+    "brandOptions": "/api/brandOptions",
+    "seed": "/api/seed",
+    "health": "/api/health"
+  },
+  "deployment": {
+    "platform": "Railway",
+    "url": "https://design-command-center-production.up.railway.app",
+    "requiresPermission": true
+  },
+  "notes": [
+    "Site version MUST be updated on every commit",
+    "Database version auto-updates on writes",
+    "Never deploy to Railway without explicit permission",
+    "Sync Railway to local with: ./scripts/pull-from-railway.sh"
+  ]
+}
