@@ -23,30 +23,33 @@ npm run dev &>> /tmp/dcc-vite.log &
 
 ## Versioning Rules (CRITICAL — read before touching versions)
 
-### Site Version
-- Stored in `server.ts` as two constants:
+**UI display format:** `Site: 2026.2.26 1739` / `DB: 2026.2.26 1739`
+
+### Site Version — MANUAL, set on every commit
+- Two constants in `server.ts` — **update BOTH, every single time, no exceptions:**
   ```ts
-  const SITE_VERSION = 'vYYMMDD|HHMM'  // e.g., 'v260226|1905'
-  const SITE_TIME = 'HHMM'              // e.g., '1905'
+  const SITE_VERSION = 'vYYMMDD|HHMM'  // e.g., 'v260226|1739'
+  const SITE_TIME = 'HHMM'              // e.g., '1739'
   ```
-- **Update BOTH on every commit.** Never update one without the other.
 - Use Pacific Time (PST/PDT).
 
-### DB Version
-- Auto-updates on every write operation via `updateDbVersion()` in `server.ts`.
-- Timestamps itself in Pacific Time from the actual moment of the DB write.
-- **Do not manually set DB version** unless doing a checkpoint — the server manages it.
+### DB Version — FULLY AUTOMATIC. NEVER SET MANUALLY.
+- Updates itself on every DB write via `updateDbVersion()` → `generateDbVersionParts()` in `server.ts`
+- Format produced: `vYYMMDD|HHMM` for `db_version`, `HHMM` for `db_time`
+- ❌ **NEVER** run `sqlite3 ... UPDATE app_versions SET db_version` manually
+- ❌ **NEVER** hardcode DB version anywhere outside `generateDbVersionParts()`
+- ✅ To READ current DB version for documentation: `sqlite3 data/shared.db "SELECT db_version, db_time FROM app_versions WHERE key='dcc_versions';"`
 
-### UI Display Format
-- Displayed in sidebar footer as: `Site: 2026.2.26 1905` / `DB: 2026.2.26 1905`
-- Formatting done by `formatVersionDisplay()` in `src/App.tsx` — converts `vYYMMDD|HHMM` to human-readable.
+### UI Display
+- Sidebar footer shows: `Site: 2026.2.26 1739` / `DB: 2026.2.26 1739`
+- Formatted by `formatVersionDisplay()` in `src/App.tsx` — converts `vYYMMDD|HHMM` → `YYYY.M.D HHMM`
 
 ### On every "save site" checkpoint
-1. Update `SITE_VERSION` and `SITE_TIME` in `server.ts`
-2. DB version updates itself automatically — read current value from DB for documentation
-3. Commit locally: `git add -A && git commit -m "..."`
-4. Tag the commit (see checkpoint format below)
-5. Document in this file under **Checkpoints**
+1. Update `SITE_VERSION` and `SITE_TIME` in `server.ts` to current PST time
+2. Commit: `git add -A && git commit -m "..."`
+3. Tag the commit (see format below)
+4. READ (never set) DB version: `sqlite3 data/shared.db "SELECT db_version, db_time FROM app_versions WHERE key='dcc_versions';"`
+5. Document checkpoint in this file
 
 ---
 
@@ -54,11 +57,14 @@ npm run dev &>> /tmp/dcc-vite.log &
 
 When Paul says **"save site"**, Wilson will:
 
-1. Update `SITE_VERSION` + `SITE_TIME` in `server.ts` to current date/time
-2. Run: `git add -A && git commit -m "<description of session work>"`
-3. Create a git tag: `git tag -a <tag-name> -m "<description>"`
-4. Read current DB version from DB: `sqlite3 data/shared.db "SELECT db_version, db_time FROM app_versions WHERE key='dcc_versions';"`
+1. Update `SITE_VERSION` + `SITE_TIME` in `server.ts` to current PST time
+2. `git add -A && git commit -m "<description of session work>"`
+3. `git tag -a <tag-name> -m "<description>"`
+4. READ (never set) current DB version: `sqlite3 data/shared.db "SELECT db_version, db_time FROM app_versions WHERE key='dcc_versions';"`
 5. Document the checkpoint in this file with full rollback instructions
+
+> ⚠️ DB version is AUTOMATIC. Wilson must NEVER manually update the DB version table.  
+> Only READ it for documentation. The server sets it on every write.
 
 ### Tag naming format
 ```
