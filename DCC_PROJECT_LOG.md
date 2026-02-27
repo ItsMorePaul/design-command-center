@@ -164,5 +164,30 @@ git checkout v260226-modal-polish
 
 ---
 
+### ✅ v260226-operating-rules
+**Date:** 2026-02-26  
+**Time:** ~6:48 PM PST  
+**Git tag:** `v260226-operating-rules`  
+**Commit:** `618a902`  
+**Site version:** `v260226|1848` → displays as `2026.2.26 1848`  
+**DB version at save:** `v260226|1905` → displays as `2026.2.26 1905`
+
+**To restore:**
+```bash
+git checkout v260226-operating-rules
+```
+
+#### What was built in this checkpoint
+- `DCC_PROJECT_LOG.md` created — full operating manual for this project
+- `MEMORY.md` updated with complete DCC operating rules:
+  - Versioning rules (SITE_VERSION + SITE_TIME both required)
+  - "Save site" protocol (6-step process)
+  - Local dev startup commands
+  - No-deploy-without-permission rule
+  - Railway vs local DB independence note
+- VS Code open command documented: `open -a "Visual Studio Code" <path>`
+
+---
+
 *Log started: 2026-02-26*  
 *Maintained by: Wilson 🦉*
