@@ -2244,16 +2244,27 @@ const [showFilters, setShowFilters] = useState(false)
                       <div className="designer-card-body">
                         {memberAssignments.length === 0 ? (
                           <div className="no-assignments">No projects assigned</div>
-                        ) : (
-                          <div className="assignment-chips">
-                            {memberAssignments.map((assignment: CapacityAssignment) => (
-                              <div key={assignment.id} className="assignment-chip">
+                        ) : (() => {
+                          const activeAssignments = memberAssignments.filter((a: CapacityAssignment) => {
+                            const proj = projects.find(p => p.name === a.project_name)
+                            return !proj || proj.status !== 'done'
+                          })
+                          const doneAssignments = memberAssignments.filter((a: CapacityAssignment) => {
+                            const proj = projects.find(p => p.name === a.project_name)
+                            return proj?.status === 'done'
+                          })
+
+                          const renderChip = (assignment: CapacityAssignment, isDone: boolean) => {
+                            const effectiveAlloc = isDone ? 0 : (assignmentDraft[assignment.id] ?? (assignment.allocation_percent || 0))
+                            return (
+                              <div key={assignment.id} className={`assignment-chip${isDone ? ' chip-done' : ''}`}>
                                 <div className="chip-main">
-                                  <span 
+                                  <span
                                     className="chip-project-link"
                                     onClick={() => {
                                       setActiveTab('projects')
-                                      setProjectFilters({ businessLines: [], designers: [], statuses: [], project: assignment.project_name || null }); setProjectSortBy('name')
+                                      setProjectFilters({ businessLines: [], designers: [], statuses: [], project: assignment.project_name || null })
+                                      setProjectSortBy('name')
                                     }}
                                   >
                                     {assignment.project_name || 'Project'}
@@ -2264,14 +2275,14 @@ const [showFilters, setShowFilters] = useState(false)
                                       className="chip-input"
                                       min={0}
                                       max={100}
-                                      value={assignmentDraft[assignment.id] ?? (assignment.allocation_percent || 0)}
-                                      onChange={e => setAssignmentDraft({ ...assignmentDraft, [assignment.id]: Number(e.target.value) })}
+                                      value={effectiveAlloc}
+                                      disabled={isDone}
+                                      onChange={e => !isDone && setAssignmentDraft({ ...assignmentDraft, [assignment.id]: Number(e.target.value) })}
                                       onBlur={(e) => {
+                                        if (isDone) return
                                         const newVal = Number(e.target.value)
                                         const oldVal = assignment.allocation_percent || 0
-                                        if (newVal !== oldVal) {
-                                          saveAssignmentAllocation(assignment, newVal)
-                                        }
+                                        if (newVal !== oldVal) saveAssignmentAllocation(assignment, newVal)
                                       }}
                                       onClick={e => e.stopPropagation()}
                                     />
@@ -2290,17 +2301,33 @@ const [showFilters, setShowFilters] = useState(false)
                                     </button>
                                   </div>
                                 </div>
-                                <div 
+                                <div
                                   className="chip-bar"
-                                  style={{ 
-                                    width: `${Math.min(assignment.allocation_percent || 0, 100)}%`,
+                                  style={{
+                                    width: `${Math.min(effectiveAlloc, 100)}%`,
                                     backgroundColor: getUtilColor()
                                   }}
                                 />
                               </div>
-                            ))}
-                          </div>
-                        )}
+                            )
+                          }
+
+                          return (
+                            <>
+                              {activeAssignments.length > 0 && (
+                                <div className="assignment-chips">
+                                  {activeAssignments.map((a: CapacityAssignment) => renderChip(a, false))}
+                                </div>
+                              )}
+                              {doneAssignments.length > 0 && (
+                                <div className="assignment-chips-done">
+                                  <div className="chips-done-label">Done</div>
+                                  {doneAssignments.map((a: CapacityAssignment) => renderChip(a, true))}
+                                </div>
+                              )}
+                            </>
+                          )
+                        })()}
 
                         {/* Inline Add Project */}
                         <div className="inline-add">

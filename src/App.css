@@ -3150,6 +3150,33 @@ input:checked + .slider:before {
   padding-top: 1rem;
 }
 
+.assignment-chips-done {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-top: 1rem;
+  margin-top: 0.25rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.chips-done-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  opacity: 0.6;
+}
+
+.assignment-chip.chip-done {
+  opacity: 0.45;
+}
+
+.assignment-chip.chip-done .chip-input {
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
 .assignment-chip {
   display: flex;
   flex-direction: column;
