@@ -529,6 +529,13 @@ const [showFilters, setShowFilters] = useState(false)
     init()
   }, [])
 
+  // Initialize calendar filters with all designers selected once team data is loaded
+  useEffect(() => {
+    if (team.length > 0 && calendarFilters.designers.length === 0) {
+      setCalendarFilters(prev => ({...prev, designers: team.map(m => m.name)}))
+    }
+  }, [team])
+
   // Load calendar data when switching to calendar tab
   useEffect(() => {
     if (activeTab === 'calendar' && !calendarData) {
