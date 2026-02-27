@@ -1453,7 +1453,7 @@ const [showFilters, setShowFilters] = useState(false)
               <div className="projects-sort-row">
                 <div className="view-toggle">
                   <button className={`sort-btn ${projectViewMode === 'list' ? 'active' : ''}`} onClick={() => setProjectViewMode('list')}>List</button>
-                  <button className={`sort-btn ${projectViewMode === 'priority' ? 'active' : ''}`} onClick={() => setProjectViewMode('priority')}>Priority</button>
+                  <button className={`sort-btn ${projectViewMode === 'priority' ? 'active' : ''}`} onClick={() => setProjectViewMode('priority')}>Priority Ranking</button>
                 </div>
                 <div className="sort-divider" />
                 {projectViewMode === 'list' ? (
@@ -1481,6 +1481,11 @@ const [showFilters, setShowFilters] = useState(false)
                   </>
                 )}
               </div>
+
+              {/* Divider line under business line picker in priority All view */}
+              {projectViewMode === 'priority' && priorityBusinessLine === 'all' && (
+                <div className="priority-all-divider" />
+              )}
 
               {/* Project Filters - hidden in priority mode */}
               {projectViewMode === 'list' && showProjectFilter() && (

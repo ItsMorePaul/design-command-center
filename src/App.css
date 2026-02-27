@@ -2063,6 +2063,11 @@
 
 .priority-bl-section {
   margin-bottom: 2rem;
+  margin-top: 2.5rem;
+}
+
+.priority-bl-section:first-child {
+  margin-top: 0;
 }
 
 .priority-bl-section:last-child {
@@ -2070,11 +2075,19 @@
 }
 
 .priority-bl-header {
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: 1.1rem;
+  font-weight: 700;
   color: var(--color-text);
-  margin-bottom: 0.75rem;
+  margin-bottom: 1rem;
   letter-spacing: -0.01em;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.priority-all-divider {
+  height: 1px;
+  background: var(--color-border);
+  margin: 1rem 0 1.5rem;
 }
 
 .view-toggle {
