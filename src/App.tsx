@@ -2234,53 +2234,53 @@ const [showFilters, setShowFilters] = useState(false)
             <div className="modal-body">
               <div className="form-section">
                 <div className="form-section-title">Identity</div>
-
-                <div className="form-group">
-                  <label htmlFor="name">Name</label>
-                  <input
-                    id="name"
-                    type="text"
-                    value={formData.name}
-                    onChange={e => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Enter name"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="role">Role</label>
-                  <input
-                    id="role"
-                    type="text"
-                    value={formData.role}
-                    onChange={e => setFormData({ ...formData, role: e.target.value })}
-                    placeholder="Enter role"
-                  />
+                <div className="form-row">
+                  <div className={`float-field${formData.name ? ' has-value' : ''}`}>
+                    <input
+                      id="name"
+                      type="text"
+                      value={formData.name}
+                      onChange={e => setFormData({ ...formData, name: e.target.value })}
+                      placeholder=" "
+                    />
+                    <label htmlFor="name">Name</label>
+                  </div>
+                  <div className={`float-field${formData.role ? ' has-value' : ''}`}>
+                    <input
+                      id="role"
+                      type="text"
+                      value={formData.role}
+                      onChange={e => setFormData({ ...formData, role: e.target.value })}
+                      placeholder=" "
+                    />
+                    <label htmlFor="role">Role</label>
+                  </div>
                 </div>
               </div>
 
               <div className="form-section">
                 <div className="form-section-title">Contact</div>
-
-                <div className="form-group">
-                  <label htmlFor="slack">Slack Link</label>
-                  <input
-                    id="slack"
-                    type="url"
-                    value={formData.slack}
-                    onChange={e => setFormData({ ...formData, slack: e.target.value })}
-                    placeholder="https://..."
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="email">Email Link</label>
-                  <input
-                    id="email"
-                    type="url"
-                    value={formData.email}
-                    onChange={e => setFormData({ ...formData, email: e.target.value })}
-                    placeholder="mailto:..."
-                  />
+                <div className="form-row">
+                  <div className={`float-field${formData.slack ? ' has-value' : ''}`}>
+                    <input
+                      id="slack"
+                      type="url"
+                      value={formData.slack}
+                      onChange={e => setFormData({ ...formData, slack: e.target.value })}
+                      placeholder=" "
+                    />
+                    <label htmlFor="slack">Slack Link</label>
+                  </div>
+                  <div className={`float-field${formData.email ? ' has-value' : ''}`}>
+                    <input
+                      id="email"
+                      type="url"
+                      value={formData.email}
+                      onChange={e => setFormData({ ...formData, email: e.target.value })}
+                      placeholder=" "
+                    />
+                    <label htmlFor="email">Email Link</label>
+                  </div>
                 </div>
               </div>
 
@@ -2421,33 +2421,34 @@ const [showFilters, setShowFilters] = useState(false)
             </div>
             
             <div className="modal-body">
+
+              {/* Basic Info */}
               <div className="form-section">
                 <div className="form-section-title">Basic Info</div>
-                
-                <div className="form-group">
-                  <label>Project Name</label>
-                  <input
-                    id="project-name"
-                    type="text"
-                    value={projectFormData.name}
-                    onChange={e => setProjectFormData({ ...projectFormData, name: e.target.value })}
-                    placeholder="Enter project name"
-                  />
+                <div className="form-row">
+                  <div className={`float-field${projectFormData.name ? ' has-value' : ''}`}>
+                    <input
+                      id="project-name"
+                      type="text"
+                      value={projectFormData.name}
+                      onChange={e => setProjectFormData({ ...projectFormData, name: e.target.value })}
+                      placeholder=" "
+                    />
+                    <label htmlFor="project-name">Project Name</label>
+                  </div>
+                  <div className={`float-field${projectFormData.url ? ' has-value' : ''}`}>
+                    <input
+                      id="project-url"
+                      type="url"
+                      value={projectFormData.url}
+                      onChange={e => setProjectFormData({ ...projectFormData, url: e.target.value })}
+                      placeholder=" "
+                    />
+                    <label htmlFor="project-url">Project Link</label>
+                  </div>
                 </div>
-
-                <div className="form-group">
-                  <label>Project Link</label>
-                  <input
-                    id="project-url"
-                    type="url"
-                    value={projectFormData.url}
-                    onChange={e => setProjectFormData({ ...projectFormData, url: e.target.value })}
-                    placeholder="https://..."
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Business Line</label>
+                <div className="form-group" style={{ marginTop: '1rem', marginBottom: 0 }}>
+                  <div className="form-section-title" style={{ marginBottom: '0.5rem' }}>Business Lines</div>
                   <div className="brand-checkboxes">
                     {brandOptions.map(brand => (
                       <label key={brand} className={`brand-checkbox ${projectFormData.businessLines.includes(brand) ? 'selected' : ''}`}>
@@ -2469,94 +2470,93 @@ const [showFilters, setShowFilters] = useState(false)
                 </div>
               </div>
 
+              {/* Design Artifacts */}
               <div className="form-section">
                 <div className="form-section-title">Design Artifacts</div>
-
-                <div className="form-group">
-                  <label>Design Deck Name</label>
-                  <input
-                    id="deck-name"
-                    type="text"
-                    value={projectFormData.deckName}
-                    onChange={e => setProjectFormData({ ...projectFormData, deckName: e.target.value })}
-                    placeholder="Enter deck name"
-                  />
+                <div className="form-row" style={{ marginBottom: '0.75rem' }}>
+                  <div className={`float-field${projectFormData.deckName ? ' has-value' : ''}`}>
+                    <input
+                      id="deck-name"
+                      type="text"
+                      value={projectFormData.deckName}
+                      onChange={e => setProjectFormData({ ...projectFormData, deckName: e.target.value })}
+                      placeholder=" "
+                    />
+                    <label htmlFor="deck-name">Design Deck Name</label>
+                  </div>
+                  <div className={`float-field${projectFormData.deckLink ? ' has-value' : ''}`}>
+                    <input
+                      id="deck-link"
+                      type="url"
+                      value={projectFormData.deckLink}
+                      onChange={e => setProjectFormData({ ...projectFormData, deckLink: e.target.value })}
+                      placeholder=" "
+                    />
+                    <label htmlFor="deck-link">Design Deck Link</label>
+                  </div>
                 </div>
-
-                <div className="form-group">
-                  <label>Design Deck Link</label>
-                  <input
-                    id="deck-link"
-                    type="url"
-                    value={projectFormData.deckLink}
-                    onChange={e => setProjectFormData({ ...projectFormData, deckLink: e.target.value })}
-                    placeholder="https://..."
-                  />
+                <div className="form-row" style={{ marginBottom: '0.75rem' }}>
+                  <div className={`float-field${projectFormData.prdName ? ' has-value' : ''}`}>
+                    <input
+                      id="prd-name"
+                      type="text"
+                      value={projectFormData.prdName}
+                      onChange={e => setProjectFormData({ ...projectFormData, prdName: e.target.value })}
+                      placeholder=" "
+                    />
+                    <label htmlFor="prd-name">PRD Name</label>
+                  </div>
+                  <div className={`float-field${projectFormData.prdLink ? ' has-value' : ''}`}>
+                    <input
+                      id="prd-link"
+                      type="url"
+                      value={projectFormData.prdLink}
+                      onChange={e => setProjectFormData({ ...projectFormData, prdLink: e.target.value })}
+                      placeholder=" "
+                    />
+                    <label htmlFor="prd-link">PRD Link</label>
+                  </div>
                 </div>
-
-                <div className="form-group">
-                  <label>PRD Name</label>
-                  <input
-                    id="prd-name"
-                    type="text"
-                    value={projectFormData.prdName}
-                    onChange={e => setProjectFormData({ ...projectFormData, prdName: e.target.value })}
-                    placeholder="Enter PRD name"
-                  />
+                <div className="form-row" style={{ marginBottom: '0.75rem' }}>
+                  <div className={`float-field${projectFormData.briefName ? ' has-value' : ''}`}>
+                    <input
+                      id="brief-name"
+                      type="text"
+                      value={projectFormData.briefName}
+                      onChange={e => setProjectFormData({ ...projectFormData, briefName: e.target.value })}
+                      placeholder=" "
+                    />
+                    <label htmlFor="brief-name">Design Brief Name</label>
+                  </div>
+                  <div className={`float-field${projectFormData.briefLink ? ' has-value' : ''}`}>
+                    <input
+                      id="brief-link"
+                      type="url"
+                      value={projectFormData.briefLink}
+                      onChange={e => setProjectFormData({ ...projectFormData, briefLink: e.target.value })}
+                      placeholder=" "
+                    />
+                    <label htmlFor="brief-link">Design Brief Link</label>
+                  </div>
                 </div>
-
-                <div className="form-group">
-                  <label>PRD Link</label>
-                  <input
-                    id="prd-link"
-                    type="url"
-                    value={projectFormData.prdLink}
-                    onChange={e => setProjectFormData({ ...projectFormData, prdLink: e.target.value })}
-                    placeholder="https://..."
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Design Brief Name</label>
-                  <input
-                    id="brief-name"
-                    type="text"
-                    value={projectFormData.briefName}
-                    onChange={e => setProjectFormData({ ...projectFormData, briefName: e.target.value })}
-                    placeholder="Enter brief name"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Design Brief Link</label>
-                  <input
-                    id="brief-link"
-                    type="url"
-                    value={projectFormData.briefLink}
-                    onChange={e => setProjectFormData({ ...projectFormData, briefLink: e.target.value })}
-                    placeholder="https://..."
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Figma Link</label>
+                <div className={`float-field${projectFormData.figmaLink ? ' has-value' : ''}`}>
                   <input
                     id="figma-link"
                     type="url"
                     value={projectFormData.figmaLink}
                     onChange={e => setProjectFormData({ ...projectFormData, figmaLink: e.target.value })}
-                    placeholder="https://figma.com/..."
+                    placeholder=" "
                   />
+                  <label htmlFor="figma-link">Figma Link</label>
                 </div>
               </div>
 
+              {/* Custom Links */}
               <div className="form-section">
                 <div className="form-section-title">Custom Links</div>
-
-                <div className="form-group">
-                  <label>Custom Links (max 3)</label>
-                  {projectFormData.customLinks?.map((link, idx) => (
-                    <div key={idx} className="custom-link-row">
+                {projectFormData.customLinks?.map((link, idx) => (
+                  <div key={idx} className="custom-link-row" style={{ marginBottom: '0.75rem' }}>
+                    <div className={`float-field${link.name ? ' has-value' : ''}`}>
                       <input
                         type="text"
                         value={link.name}
@@ -2565,8 +2565,11 @@ const [showFilters, setShowFilters] = useState(false)
                           newLinks[idx].name = e.target.value;
                           setProjectFormData({ ...projectFormData, customLinks: newLinks });
                         }}
-                        placeholder="Link name"
+                        placeholder=" "
                       />
+                      <label>Link Name</label>
+                    </div>
+                    <div className={`float-field${link.url ? ' has-value' : ''}`}>
                       <input
                         type="url"
                         value={link.url}
@@ -2575,148 +2578,121 @@ const [showFilters, setShowFilters] = useState(false)
                           newLinks[idx].url = e.target.value;
                           setProjectFormData({ ...projectFormData, customLinks: newLinks });
                         }}
-                        placeholder="https://..."
+                        placeholder=" "
                       />
-                      <button
-                        type="button"
-                        className="remove-link-btn"
-                        onClick={() => openConfirmModal('Remove custom link?', 'This link will be removed from the project.', () => {
-                          const newLinks = projectFormData.customLinks.filter((_, i) => i !== idx)
-                          setProjectFormData({ ...projectFormData, customLinks: newLinks })
-                          closeConfirmModal()
-                        })}
-                      >
-                        ×
-                      </button>
+                      <label>URL</label>
                     </div>
+                    <button
+                      type="button"
+                      className="remove-link-btn"
+                      onClick={() => openConfirmModal('Remove custom link?', 'This link will be removed from the project.', () => {
+                        const newLinks = projectFormData.customLinks.filter((_, i) => i !== idx)
+                        setProjectFormData({ ...projectFormData, customLinks: newLinks })
+                        closeConfirmModal()
+                      })}
+                    >×</button>
+                  </div>
+                ))}
+                {(!projectFormData.customLinks || projectFormData.customLinks.length < 3) && (
+                  <button
+                    type="button"
+                    className="add-link-btn"
+                    onClick={() => {
+                      const newLinks = [...(projectFormData.customLinks || []), { name: '', url: '' }];
+                      setProjectFormData({ ...projectFormData, customLinks: newLinks });
+                    }}
+                  >+ Add Custom Link</button>
+                )}
+              </div>
+
+              {/* Status & Schedule */}
+              <div className="form-section">
+                <div className="form-section-title">Status</div>
+                <div className="status-options" style={{ marginBottom: '1rem' }}>
+                  {(['active', 'review', 'done', 'blocked'] as const).map(s => (
+                    <button
+                      key={s}
+                      type="button"
+                      className={`status-option ${projectFormData.status === s ? 'active' : ''}`}
+                      onClick={() => setProjectFormData({ ...projectFormData, status: s })}
+                    >
+                      <span className={`status-dot ${s === 'active' ? 'bg-blue-500' : s === 'review' ? 'bg-yellow-500' : s === 'done' ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                      {s.charAt(0).toUpperCase() + s.slice(1)}
+                    </button>
                   ))}
-                  {(!projectFormData.customLinks || projectFormData.customLinks.length < 3) && (
-                    <button
-                      type="button"
-                      className="add-link-btn"
-                      onClick={() => {
-                        const newLinks = [...(projectFormData.customLinks || []), { name: '', url: '' }];
-                        setProjectFormData({ ...projectFormData, customLinks: newLinks });
-                      }}
-                    >
-                      + Add Custom Link
-                    </button>
-                  )}
                 </div>
-              </div>
 
-              <div className="form-section">
-                <div className="form-section-title">Status & Schedule</div>
-
-                <div className="form-group">
-                  <label>Status</label>
-                  <div className="status-options">
-                    <button
-                      type="button"
-                      className={`status-option ${projectFormData.status === 'active' ? 'active' : ''}`}
-                      onClick={() => setProjectFormData({ ...projectFormData, status: 'active' })}
-                    >
-                      <span className="status-dot bg-blue-500"></span>
-                      Active
-                    </button>
-                    <button
-                      type="button"
-                      className={`status-option ${projectFormData.status === 'review' ? 'active' : ''}`}
-                      onClick={() => setProjectFormData({ ...projectFormData, status: 'review' })}
-                    >
-                      <span className="status-dot bg-yellow-500"></span>
-                      Review
-                    </button>
-                    <button
-                      type="button"
-                      className={`status-option ${projectFormData.status === 'done' ? 'active' : ''}`}
-                      onClick={() => setProjectFormData({ ...projectFormData, status: 'done' })}
-                    >
-                      <span className="status-dot bg-green-500"></span>
-                      Done
-                    </button>
-                    <button
-                      type="button"
-                      className={`status-option ${projectFormData.status === 'blocked' ? 'active' : ''}`}
-                      onClick={() => setProjectFormData({ ...projectFormData, status: 'blocked' })}
-                    >
-                      <span className="status-dot bg-red-500"></span>
-                      Blocked
-                    </button>
+                <div className="form-section-title" style={{ marginBottom: '0.5rem' }}>Schedule</div>
+                <div className="form-row" style={{ marginBottom: '1rem' }}>
+                  <div className={`float-field${projectFormData.startDate ? ' has-value' : ''}`}>
+                    <input
+                      id="start-date"
+                      type="date"
+                      value={projectFormData.startDate}
+                      onChange={e => setProjectFormData({ ...projectFormData, startDate: e.target.value })}
+                      onClick={e => (e.target as HTMLInputElement).showPicker?.()}
+                      placeholder=" "
+                    />
+                    <label htmlFor="start-date">Start Date</label>
+                  </div>
+                  <div className={`float-field${projectFormData.endDate ? ' has-value' : ''}`}>
+                    <input
+                      id="end-date"
+                      type="date"
+                      value={projectFormData.endDate}
+                      onChange={e => setProjectFormData({ ...projectFormData, endDate: e.target.value })}
+                      onClick={e => (e.target as HTMLInputElement).showPicker?.()}
+                      placeholder=" "
+                    />
+                    <label htmlFor="end-date">End Date</label>
                   </div>
                 </div>
 
-                <div className="form-group">
-                  <label>Start Date</label>
-                  <input
-                    id="start-date"
-                    type="date"
-                    value={projectFormData.startDate}
-                    onChange={e => setProjectFormData({ ...projectFormData, startDate: e.target.value })}
-                    onClick={e => (e.target as HTMLInputElement).showPicker?.()}
-                  />
+                <div className="timeline-header">
+                  <span className="form-section-title" style={{ marginBottom: 0 }}>Timeline Ranges</span>
+                  <button type="button" className="add-timeline-btn" onClick={handleAddTimeline}>+ Add Range</button>
                 </div>
-
-                <div className="form-group">
-                  <label>End Date</label>
-                  <input
-                    id="end-date"
-                    type="date"
-                    value={projectFormData.endDate}
-                    onChange={e => setProjectFormData({ ...projectFormData, endDate: e.target.value })}
-                    onClick={e => (e.target as HTMLInputElement).showPicker?.()}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <div className="timeline-header">
-                    <label>Project Timeline</label>
-                    <button type="button" className="add-timeline-btn" onClick={handleAddTimeline}>+ Add Range</button>
-                  </div>
-                  {projectFormData.timeline.length > 0 && (
-                    <div className="timeline-list">
-                      {projectFormData.timeline.map(range => (
-                        <div key={range.id} className="timeline-item">
-                          <div className="timeline-info">
-                            <span className="timeline-name">{range.name}</span>
-                            <span className="timeline-dates">{range.startDate} → {range.endDate}</span>
-                          </div>
-                          <div className="timeline-actions">
-                            <button type="button" className="action-btn" onClick={() => handleEditTimeline(range)}><Pencil size={14} /></button>
-                            <button type="button" className="action-btn delete" onClick={() => handleDeleteTimeline(range.id)}><Trash2 size={14} /></button>
-                          </div>
+                {projectFormData.timeline.length > 0 && (
+                  <div className="timeline-list" style={{ marginTop: '0.5rem' }}>
+                    {projectFormData.timeline.map(range => (
+                      <div key={range.id} className="timeline-item">
+                        <div className="timeline-info">
+                          <span className="timeline-name">{range.name}</span>
+                          <span className="timeline-dates">{range.startDate} → {range.endDate}</span>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="form-section">
-                <div className="form-section-title">Team</div>
-
-                <div className="form-group">
-                  <label>Designers</label>
-                  <div className="designer-checkboxes">
-                    {[...team].sort((a, b) => a.name.localeCompare(b.name)).map(member => (
-                      <label key={member.id} className={`designer-checkbox ${projectFormData.designers.includes(member.name) ? 'selected' : ''}`}>
-                        <input
-                          type="checkbox"
-                          checked={projectFormData.designers.includes(member.name)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setProjectFormData({ ...projectFormData, designers: [...projectFormData.designers, member.name] })
-                            } else {
-                              setProjectFormData({ ...projectFormData, designers: projectFormData.designers.filter(d => d !== member.name) })
-                            }
-                          }}
-                        />
-                        {member.name}
-                      </label>
+                        <div className="timeline-actions">
+                          <button type="button" className="action-btn" onClick={() => handleEditTimeline(range)}><Pencil size={14} /></button>
+                          <button type="button" className="action-btn delete" onClick={() => handleDeleteTimeline(range.id)}><Trash2 size={14} /></button>
+                        </div>
+                      </div>
                     ))}
                   </div>
+                )}
+              </div>
+
+              {/* Team */}
+              <div className="form-section">
+                <div className="form-section-title">Designers</div>
+                <div className="designer-checkboxes">
+                  {[...team].sort((a, b) => a.name.localeCompare(b.name)).map(member => (
+                    <label key={member.id} className={`designer-checkbox ${projectFormData.designers.includes(member.name) ? 'selected' : ''}`}>
+                      <input
+                        type="checkbox"
+                        checked={projectFormData.designers.includes(member.name)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setProjectFormData({ ...projectFormData, designers: [...projectFormData.designers, member.name] })
+                          } else {
+                            setProjectFormData({ ...projectFormData, designers: projectFormData.designers.filter(d => d !== member.name) })
+                          }
+                        }}
+                      />
+                      {member.name}
+                    </label>
+                  ))}
                 </div>
               </div>
+
             </div>
 
             <div className="modal-footer">
