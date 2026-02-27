@@ -195,5 +195,38 @@ git checkout v260226-operating-rules
 
 ---
 
+### ✅ v260226-dnd-timeline
+**Date:** 2026-02-26  
+**Time:** 7:14 PM PST  
+**Git tag:** `v260226-dnd-timeline`  
+**Commit:** `578cf2c`  
+**Site version:** `v260226|1914` → displays as `2026.2.26 1914`  
+**DB version at save:** `v260226|1912` → displays as `2026.2.26 1912`
+
+**To restore:**
+```bash
+git checkout v260226-dnd-timeline
+```
+
+#### What was built in this checkpoint
+
+**Drag-and-drop timeline reordering**
+- Library: `@dnd-kit/core` + `@dnd-kit/sortable` + `@dnd-kit/utilities` — React 19 compatible, clean build confirmed before implementing
+- New component: `SortableTimelineItem` — wraps each timeline range with drag handle (grip icon), edit, and delete buttons
+- `DragEndEvent` imported as type-only (required by `verbatimModuleSyntax`)
+- Drag updates `projectFormData.timeline` state via `arrayMove` — persists to DB on Save Changes
+- Activation constraint: 5px distance prevents accidental drags on click
+- Drag handle: `GripVertical` icon, 40% opacity, full opacity on hover, `cursor: grab`
+- `.drag-handle` CSS added to `App.css`
+
+**DB version format bug fixed**
+- `generateDbVersionParts()` was returning `vYYMMDD` without the time — now returns `vYYMMDD|HHMM`
+- DB version is AUTOMATIC — server sets it on every write, never touch manually
+
+**Docs updated**
+- `MEMORY.md` and `DCC_PROJECT_LOG.md` both updated with unambiguous rule: DB version = automatic, never set manually
+
+---
+
 *Log started: 2026-02-26*  
 *Maintained by: Wilson 🦉*
