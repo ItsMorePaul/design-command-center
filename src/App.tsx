@@ -2227,162 +2227,183 @@ const [showFilters, setShowFilters] = useState(false)
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <h2>{editingMember ? 'Edit Team Member' : 'Add Team Member'}</h2>
-            
-            <div className="form-group">
-              <label htmlFor="name">Name</label>
-              <input
-                id="name"
-                type="text"
-                value={formData.name}
-                onChange={e => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Enter name"
-              />
+            <div className="modal-header">
+              <h2>{editingMember ? 'Edit Team Member' : 'Add Team Member'}</h2>
             </div>
 
-            <div className="form-group">
-              <label htmlFor="role">Role</label>
-              <input
-                id="role"
-                type="text"
-                value={formData.role}
-                onChange={e => setFormData({ ...formData, role: e.target.value })}
-                placeholder="Enter role"
-              />
-            </div>
+            <div className="modal-body">
+              <div className="form-section">
+                <div className="form-section-title">Identity</div>
 
-            <div className="form-group">
-              <label htmlFor="slack">Slack Link</label>
-              <input
-                id="slack"
-                type="url"
-                value={formData.slack}
-                onChange={e => setFormData({ ...formData, slack: e.target.value })}
-                placeholder="https://..."
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="email">Email Link</label>
-              <input
-                id="email"
-                type="url"
-                value={formData.email}
-                onChange={e => setFormData({ ...formData, email: e.target.value })}
-                placeholder="mailto:..."
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Status</label>
-              <div className="status-options">
-                <button
-                  type="button"
-                  className={`status-option ${formData.status === 'online' ? 'active' : ''}`}
-                  onClick={() => setFormData({ ...formData, status: 'online' })}
-                >
-                  <span className="status-dot bg-green-500"></span>
-                  Online
-                </button>
-                <button
-                  type="button"
-                  className={`status-option ${formData.status === 'away' ? 'active' : ''}`}
-                  onClick={() => setFormData({ ...formData, status: 'away' })}
-                >
-                  <span className="status-dot bg-yellow-500"></span>
-                  Away
-                </button>
-                <button
-                  type="button"
-                  className={`status-option ${formData.status === 'offline' ? 'active' : ''}`}
-                  onClick={() => setFormData({ ...formData, status: 'offline' })}
-                >
-                  <span className="status-dot bg-gray-500"></span>
-                  Offline
-                </button>
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label>Business Line</label>
-              <div className="brand-checkboxes">
-                {brandOptions.map(brand => (
-                  <label key={brand} className={`brand-checkbox ${formData.brands.includes(brand) ? 'selected' : ''}`}>
-                    <input
-                      type="checkbox"
-                      checked={formData.brands.includes(brand)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setFormData({ ...formData, brands: [...formData.brands, brand] })
-                        } else {
-                          setFormData({ ...formData, brands: formData.brands.filter(b => b !== brand) })
-                        }
-                      }}
-                    />
-                    {brand}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label>Time Off (Auto-sets status to offline)</label>
-              {formData.timeOff?.map((off, idx) => (
-                <div key={off.id || idx} className="timeline-row">
+                <div className="form-group">
+                  <label htmlFor="name">Name</label>
                   <input
+                    id="name"
                     type="text"
-                    value={off.name}
-                    onChange={e => {
-                      const newTimeOff = [...formData.timeOff];
-                      newTimeOff[idx].name = e.target.value;
-                      setFormData({ ...formData, timeOff: newTimeOff });
-                    }}
-                    placeholder="Time off name (e.g., Vacation)"
+                    value={formData.name}
+                    onChange={e => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="Enter name"
                   />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="role">Role</label>
                   <input
-                    type="date"
-                    value={off.startDate}
-                    onChange={e => {
-                      const newTimeOff = [...formData.timeOff];
-                      newTimeOff[idx].startDate = e.target.value;
-                      setFormData({ ...formData, timeOff: newTimeOff });
-                    }}
+                    id="role"
+                    type="text"
+                    value={formData.role}
+                    onChange={e => setFormData({ ...formData, role: e.target.value })}
+                    placeholder="Enter role"
                   />
-                  <span>to</span>
+                </div>
+              </div>
+
+              <div className="form-section">
+                <div className="form-section-title">Contact</div>
+
+                <div className="form-group">
+                  <label htmlFor="slack">Slack Link</label>
                   <input
-                    type="date"
-                    value={off.endDate}
-                    onChange={e => {
-                      const newTimeOff = [...formData.timeOff];
-                      newTimeOff[idx].endDate = e.target.value;
-                      setFormData({ ...formData, timeOff: newTimeOff });
-                    }}
+                    id="slack"
+                    type="url"
+                    value={formData.slack}
+                    onChange={e => setFormData({ ...formData, slack: e.target.value })}
+                    placeholder="https://..."
                   />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="email">Email Link</label>
+                  <input
+                    id="email"
+                    type="url"
+                    value={formData.email}
+                    onChange={e => setFormData({ ...formData, email: e.target.value })}
+                    placeholder="mailto:..."
+                  />
+                </div>
+              </div>
+
+              <div className="form-section">
+                <div className="form-section-title">Status</div>
+
+                <div className="form-group">
+                  <div className="status-options">
+                    <button
+                      type="button"
+                      className={`status-option ${formData.status === 'online' ? 'active' : ''}`}
+                      onClick={() => setFormData({ ...formData, status: 'online' })}
+                    >
+                      <span className="status-dot bg-green-500"></span>
+                      Online
+                    </button>
+                    <button
+                      type="button"
+                      className={`status-option ${formData.status === 'away' ? 'active' : ''}`}
+                      onClick={() => setFormData({ ...formData, status: 'away' })}
+                    >
+                      <span className="status-dot bg-yellow-500"></span>
+                      Away
+                    </button>
+                    <button
+                      type="button"
+                      className={`status-option ${formData.status === 'offline' ? 'active' : ''}`}
+                      onClick={() => setFormData({ ...formData, status: 'offline' })}
+                    >
+                      <span className="status-dot bg-gray-500"></span>
+                      Offline
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="form-section">
+                <div className="form-section-title">Business Lines</div>
+
+                <div className="form-group">
+                  <div className="brand-checkboxes">
+                    {brandOptions.map(brand => (
+                      <label key={brand} className={`brand-checkbox ${formData.brands.includes(brand) ? 'selected' : ''}`}>
+                        <input
+                          type="checkbox"
+                          checked={formData.brands.includes(brand)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setFormData({ ...formData, brands: [...formData.brands, brand] })
+                            } else {
+                              setFormData({ ...formData, brands: formData.brands.filter(b => b !== brand) })
+                            }
+                          }}
+                        />
+                        {brand}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="form-section">
+                <div className="form-section-title">Time Off</div>
+
+                <div className="form-group">
+                  {formData.timeOff?.map((off, idx) => (
+                    <div key={off.id || idx} className="timeline-row">
+                      <input
+                        type="text"
+                        value={off.name}
+                        onChange={e => {
+                          const newTimeOff = [...formData.timeOff];
+                          newTimeOff[idx].name = e.target.value;
+                          setFormData({ ...formData, timeOff: newTimeOff });
+                        }}
+                        placeholder="Label (e.g., Vacation)"
+                      />
+                      <input
+                        type="date"
+                        value={off.startDate}
+                        onChange={e => {
+                          const newTimeOff = [...formData.timeOff];
+                          newTimeOff[idx].startDate = e.target.value;
+                          setFormData({ ...formData, timeOff: newTimeOff });
+                        }}
+                      />
+                      <span>to</span>
+                      <input
+                        type="date"
+                        value={off.endDate}
+                        onChange={e => {
+                          const newTimeOff = [...formData.timeOff];
+                          newTimeOff[idx].endDate = e.target.value;
+                          setFormData({ ...formData, timeOff: newTimeOff });
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="remove-btn"
+                        onClick={() => {
+                          const newTimeOff = formData.timeOff.filter((_, i) => i !== idx);
+                          setFormData({ ...formData, timeOff: newTimeOff });
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
                   <button
                     type="button"
-                    className="remove-btn"
+                    className="add-link-btn"
                     onClick={() => {
-                      const newTimeOff = formData.timeOff.filter((_, i) => i !== idx);
+                      const newTimeOff = [...(formData.timeOff || []), { name: '', startDate: '', endDate: '', id: Date.now().toString() }];
                       setFormData({ ...formData, timeOff: newTimeOff });
                     }}
                   >
-                    ×
+                    + Add Time Off
                   </button>
                 </div>
-              ))}
-              <button
-                type="button"
-                className="add-link-btn"
-                onClick={() => {
-                  const newTimeOff = [...(formData.timeOff || []), { name: '', startDate: '', endDate: '', id: Date.now().toString() }];
-                  setFormData({ ...formData, timeOff: newTimeOff });
-                }}
-              >
-                + Add Time Off
-              </button>
+              </div>
             </div>
 
-            <div className="modal-actions">
+            <div className="modal-footer">
               <button className="secondary-btn" onClick={() => setShowModal(false)}>Cancel</button>
               <button className="primary-btn" onClick={handleSave}>
                 {editingMember ? 'Save Changes' : 'Add Member'}
