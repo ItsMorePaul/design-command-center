@@ -2299,6 +2299,21 @@ const [showFilters, setShowFilters] = useState(false)
                             const proj = projects.find(p => p.name === a.project_name)
                             return !proj || proj.status !== 'done'
                           })
+                          // Sort active assignments by force ranking (best rank across all business lines), then alphabetical
+                          activeAssignments.sort((a, b) => {
+                            const getBestRank = (assignment: CapacityAssignment) => {
+                              let best = Infinity
+                              for (const blId in priorities) {
+                                const idx = priorities[blId].indexOf(assignment.project_id)
+                                if (idx !== -1 && idx + 1 < best) best = idx + 1
+                              }
+                              return best
+                            }
+                            const rankA = getBestRank(a)
+                            const rankB = getBestRank(b)
+                            if (rankA !== rankB) return rankA - rankB
+                            return (a.project_name || '').localeCompare(b.project_name || '')
+                          })
                           const doneAssignments = memberAssignments.filter((a: CapacityAssignment) => {
                             const proj = projects.find(p => p.name === a.project_name)
                             return proj?.status === 'done'

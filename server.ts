@@ -127,6 +127,11 @@ const reconcileProjectDesignerAssignments = async () => {
   }
 }
 
+// ============ HEALTH ============
+app.get('/api/health', async (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() })
+})
+
 // ============ PROJECTS ============
 app.get('/api/projects', async (req, res) => {
   try {
@@ -527,8 +532,8 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 // Format: YYYY.MM.DD.hhmm (e.g., 2026.02.26.2059) → displays as "2026.02.26 2059"
 
-const SITE_VERSION = '2026.02.27.0635'
-const SITE_TIME = '0635'
+const SITE_VERSION = '2026.02.27.0752'
+const SITE_TIME = '0752'
 
 const VERSION_KEY = 'dcc_versions'
 
