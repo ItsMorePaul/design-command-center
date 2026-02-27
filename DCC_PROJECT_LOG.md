@@ -28,21 +28,23 @@ npm run dev &>> /tmp/dcc-vite.log &
 ### Site Version — MANUAL, set on every commit
 - Two constants in `server.ts` — **update BOTH, every single time, no exceptions:**
   ```ts
-  const SITE_VERSION = 'vYYMMDD|HHMM'  // e.g., 'v260226|1739'
-  const SITE_TIME = 'HHMM'              // e.g., '1739'
+  // INTERNAL CODE FORMAT — used in server.ts only, never shown to users
+  const SITE_VERSION = 'vYYMMDD|HHMM'  // e.g., 'v260226|1739' (Feb 26 2026, 8:39 PM)
+  const SITE_TIME = 'HHMM'              // e.g., '2039' (just the time portion)
   ```
 - Use Pacific Time (PST/PDT).
+- ⚠️ **CRITICAL:** The `vYYMMDD|HHMM` format is INTERNAL CODE ONLY. Never document this format in checkpoints — always use the DISPLAY format: `2026.2.26 2039`
 
 ### DB Version — FULLY AUTOMATIC. NEVER SET MANUALLY.
 - Updates itself on every DB write via `updateDbVersion()` → `generateDbVersionParts()` in `server.ts`
-- Format produced: `vYYMMDD|HHMM` for `db_version`, `HHMM` for `db_time`
+- **Internal format (code only):** `vYYMMDD|HHMM` for `db_version`, `HHMM` for `db_time`
 - ❌ **NEVER** run `sqlite3 ... UPDATE app_versions SET db_version` manually
 - ❌ **NEVER** hardcode DB version anywhere outside `generateDbVersionParts()`
 - ✅ To READ current DB version for documentation: `sqlite3 data/shared.db "SELECT db_version, db_time FROM app_versions WHERE key='dcc_versions';"`
 
-### UI Display
-- Sidebar footer shows: `Site: 2026.2.26 1739` / `DB: 2026.2.26 1739`
-- Formatted by `formatVersionDisplay()` in `src/App.tsx` — converts `vYYMMDD|HHMM` → `YYYY.M.D HHMM`
+### UI Display (what users actually see)
+- Sidebar footer shows: `Site: 2026.2.26 2039` / `DB: 2026.2.26 2039`
+- Formatted by `formatVersionDisplay()` in `src/App.tsx` — converts internal `v260226|2039` → display `2026.2.26 2039`
 
 ### On every "save site" checkpoint
 1. Update `SITE_VERSION` and `SITE_TIME` in `server.ts` to current PST time
@@ -102,8 +104,8 @@ git push origin <commit-hash>:main --force
 **Time:** ~6:05 PM PST  
 **Git tag:** `v260226-modal-polish`  
 **Commit:** `e655a9c`  
-**Site version:** `v260226|1905` → displays as `2026.2.26 1905`  
-**DB version at save:** `v260226|1905` → displays as `2026.2.26 1905`
+**Site version:** `2026.2.26 1905`  
+**DB version at save:** `2026.2.26 1905`
 
 **To restore:**
 ```bash
@@ -175,8 +177,8 @@ git checkout v260226-modal-polish
 **Time:** ~6:48 PM PST  
 **Git tag:** `v260226-operating-rules`  
 **Commit:** `618a902`  
-**Site version:** `v260226|1848` → displays as `2026.2.26 1848`  
-**DB version at save:** `v260226|1905` → displays as `2026.2.26 1905`
+**Site version:** `2026.2.26 1848`  
+**DB version at save:** `2026.2.26 1905`
 
 **To restore:**
 ```bash
@@ -200,8 +202,8 @@ git checkout v260226-operating-rules
 **Time:** 7:14 PM PST  
 **Git tag:** `v260226-dnd-timeline`  
 **Commit:** `578cf2c`  
-**Site version:** `v260226|1914` → displays as `2026.2.26 1914`  
-**DB version at save:** `v260226|1912` → displays as `2026.2.26 1912`
+**Site version:** `2026.2.26 1914`  
+**DB version at save:** `2026.2.26 1912`
 
 **To restore:**
 ```bash
@@ -225,6 +227,27 @@ git checkout v260226-dnd-timeline
 
 **Docs updated**
 - `MEMORY.md` and `DCC_PROJECT_LOG.md` both updated with unambiguous rule: DB version = automatic, never set manually
+
+---
+
+### ✅ v260226-calendar-filter-default
+**Date:** 2026-02-26  
+**Time:** 8:39 PM PST  
+**Git tag:** `v260226-calendar-filter-default`  
+**Commit:** `f367382`  
+**Site version:** `2026.2.26 2039`  
+**DB version at save:** `2026.2.26 1941`
+
+**To restore:**
+```bash
+git checkout v260226-calendar-filter-default
+```
+
+#### What was built in this checkpoint
+- Calendar filter default now selects all designers on initial load
+- Added useEffect in `App.tsx` that initializes `calendarFilters.designers` with all team member names once team data is loaded
+- Only initializes if designers array is empty (preserves user selections after first load)
+- Site version updated to `2026.2.26 2039`
 
 ---
 
