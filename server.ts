@@ -178,6 +178,16 @@ app.delete('/api/projects/:id', async (req, res) => {
   } catch (e) { res.status(500).json({error: e.message}); }
 });
 
+// Mark project as done: set status='done' and zero all allocations
+app.put('/api/projects/:id/done', async (req, res) => {
+  try {
+    await run("UPDATE projects SET status = 'done', updatedAt = datetime('now') WHERE id = ?", [req.params.id])
+    await run('UPDATE project_assignments SET allocation_percent = 0 WHERE project_id = ?', [req.params.id])
+    await updateDbVersion()
+    res.json({ success: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
 // ============ BUSINESS LINES ============
 app.get('/api/business-lines', async (req, res) => {
   try {
@@ -578,8 +588,8 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 // Format: YYYY.MM.DD.hhmm (e.g., 2026.02.26.2059) → displays as "2026.02.26 2059"
 
-const SITE_VERSION = '2026.02.27.0805'
-const SITE_TIME = '0805'
+const SITE_VERSION = '2026.02.27.0813'
+const SITE_TIME = '0813'
 
 const VERSION_KEY = 'dcc_versions'
 

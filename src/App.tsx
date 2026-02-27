@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react'
 import {
   DndContext,
   closestCenter,
+  pointerWithin,
   PointerSensor,
   useSensor,
   useSensors,
+  useDroppable,
 } from '@dnd-kit/core'
-import type { DragEndEvent } from '@dnd-kit/core'
+import type { DragEndEvent, DragStartEvent, UniqueIdentifier } from '@dnd-kit/core'
 import {
   SortableContext,
   useSortable,
@@ -344,6 +346,20 @@ function SortableTimelineItem({
         <button type="button" className="action-btn" onClick={() => onEdit(range)}><Pencil size={14} /></button>
         <button type="button" className="action-btn delete" onClick={() => onDelete(range.id)}><Trash2 size={14} /></button>
       </div>
+    </div>
+  )
+}
+
+// Droppable "Done" zone for priority view
+function DoneDropZone({ children }: { children?: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id: 'done-drop-zone' })
+  return (
+    <div
+      ref={setNodeRef}
+      className={`priority-done-drop${isOver ? ' drop-active' : ''}`}
+    >
+      <span className="priority-done-drop-label">{isOver ? 'Drop to mark done' : 'Done'}</span>
+      {children}
     </div>
   )
 }
@@ -946,6 +962,19 @@ const [showFilters, setShowFilters] = useState(false)
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ business_line_id: blId, project_ids: orderedIds }),
     })
+  }
+
+  // Track active drag for done-drop highlight
+  const [activeDragId, setActiveDragId] = useState<UniqueIdentifier | null>(null)
+
+  const markProjectDone = async (projectId: string, blId: string, currentRankedIds: string[]) => {
+    // Optimistic: update local state
+    setProjects(prev => prev.map(p => p.id === projectId ? { ...p, status: 'done' as const } : p))
+    // Remove from priority ranking
+    const newRankedIds = currentRankedIds.filter(id => id !== projectId)
+    savePriorities(blId, newRankedIds)
+    // Persist to backend
+    await fetch(`/api/projects/${projectId}/done`, { method: 'PUT' })
   }
 
   const handleSaveProject = async () => {
@@ -1732,15 +1761,36 @@ const [showFilters, setShowFilters] = useState(false)
                       <div className="priority-empty">No projects in {bl?.name || 'this business line'}</div>
                     ) : (
                       <>
-                        {/* Ranked live list */}
-                        <DndContext sensors={prioritySensors} collisionDetection={closestCenter} onDragEnd={e => {
-                          const { active, over } = e
-                          if (!over || active.id === over.id) return
-                          const oldIndex = allRankedIds.indexOf(String(active.id))
-                          const newIndex = allRankedIds.indexOf(String(over.id))
-                          if (oldIndex === -1 || newIndex === -1) return
-                          savePriorities(blId, arrayMove(allRankedIds, oldIndex, newIndex))
-                        }}>
+                        {/* Ranked live list + Done drop zone */}
+                        <DndContext
+                          sensors={prioritySensors}
+                          collisionDetection={(args) => {
+                            // Check done drop zone first
+                            const pointerCollisions = pointerWithin(args)
+                            const doneHit = pointerCollisions.find(c => c.id === 'done-drop-zone')
+                            if (doneHit) return [doneHit]
+                            // Fall back to closestCenter for sortable reordering
+                            return closestCenter(args)
+                          }}
+                          onDragStart={(e: DragStartEvent) => setActiveDragId(e.active.id)}
+                          onDragCancel={() => setActiveDragId(null)}
+                          onDragEnd={(e: DragEndEvent) => {
+                            setActiveDragId(null)
+                            const { active, over } = e
+                            if (!over) return
+                            // Dropped into done zone
+                            if (over.id === 'done-drop-zone') {
+                              markProjectDone(String(active.id), blId, allRankedIds)
+                              return
+                            }
+                            // Normal reorder
+                            if (active.id === over.id) return
+                            const oldIndex = allRankedIds.indexOf(String(active.id))
+                            const newIndex = allRankedIds.indexOf(String(over.id))
+                            if (oldIndex === -1 || newIndex === -1) return
+                            savePriorities(blId, arrayMove(allRankedIds, oldIndex, newIndex))
+                          }}
+                        >
                           <SortableContext items={allRankedIds} strategy={verticalListSortingStrategy}>
                             <div className="priority-list">
                               {ranked.map((p, i) => (
@@ -1748,27 +1798,26 @@ const [showFilters, setShowFilters] = useState(false)
                               ))}
                             </div>
                           </SortableContext>
-                        </DndContext>
 
-                        {/* Done projects — unranked */}
-                        {doneProjects.length > 0 && (
-                          <div className="priority-unranked">
-                            <div className="priority-unranked-label">Done</div>
-                            {doneProjects.sort((a, b) => a.name.localeCompare(b.name)).map(p => (
-                              <div key={p.id} className="priority-item unranked">
-                                <span className="priority-rank-empty">—</span>
-                                <div className="priority-info">
-                                  <span className="priority-name">{p.name}</span>
-                                  <span className="priority-meta">{p.designers?.join(', ') || '—'}</span>
+                          {/* Done drop zone — always visible when dragging, or when done projects exist */}
+                          {(activeDragId || doneProjects.length > 0) && (
+                            <DoneDropZone>
+                              {doneProjects.sort((a, b) => a.name.localeCompare(b.name)).map(p => (
+                                <div key={p.id} className="priority-item unranked">
+                                  <span className="priority-rank-empty">—</span>
+                                  <div className="priority-info">
+                                    <span className="priority-name">{p.name}</span>
+                                    <span className="priority-meta">{p.designers?.join(', ') || '—'}</span>
+                                  </div>
+                                  <span className="priority-status-label" style={{ color: statusColors[p.status] }}>
+                                    <span className="priority-status-dot" style={{ background: statusColors[p.status] }} />
+                                    {statusLabel[p.status]}
+                                  </span>
                                 </div>
-                                <span className="priority-status-label" style={{ color: statusColors[p.status] }}>
-                                  <span className="priority-status-dot" style={{ background: statusColors[p.status] }} />
-                                  {statusLabel[p.status]}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                              ))}
+                            </DoneDropZone>
+                          )}
+                        </DndContext>
                       </>
                     )}
                   </div>
