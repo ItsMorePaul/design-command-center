@@ -1940,10 +1940,10 @@
 }
 
 .priority-rank {
-  font-size: 0.75rem;
+  font-size: 1rem;
   font-weight: 700;
-  color: var(--color-text-muted);
-  width: 1.5rem;
+  color: rgb(59, 130, 246);
+  width: 1.75rem;
   text-align: center;
   flex-shrink: 0;
 }
@@ -1977,10 +1977,36 @@
 }
 
 .priority-status-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   flex-shrink: 0;
+  display: inline-block;
+}
+
+.priority-status-label {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.priority-bl-select {
+  padding: 0.375rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
+  font-size: 0.875rem;
+  cursor: pointer;
+  outline: none;
+}
+
+.priority-bl-select:focus {
+  border-color: var(--color-accent);
 }
 
 .priority-unranked {
