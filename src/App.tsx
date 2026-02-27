@@ -1296,7 +1296,7 @@ const [showFilters, setShowFilters] = useState(false)
         </div>
         
         <nav className="nav">
-          <button 
+          <button
             className={`nav-item ${activeTab === 'projects' ? 'active' : ''}`}
             onClick={() => setActiveTab('projects')}
             aria-label="Projects"
@@ -1304,7 +1304,7 @@ const [showFilters, setShowFilters] = useState(false)
             <span className="nav-icon"><FileText size={18} /></span>
             <span>Projects</span>
           </button>
-          <button 
+          <button
             className={`nav-item ${activeTab === 'team' ? 'active' : ''}`}
             onClick={() => setActiveTab('team')}
             aria-label="Team"
@@ -1312,21 +1312,21 @@ const [showFilters, setShowFilters] = useState(false)
             <span className="nav-icon"><Users size={18} /></span>
             <span>Team</span>
           </button>
-          <button 
-            className={`nav-item ${activeTab === 'calendar' ? 'active' : ''}`}
-            onClick={() => setActiveTab('calendar')}
-            aria-label="Calendar"
-          >
-            <span className="nav-icon"><Calendar size={18} /></span>
-            <span>Calendar</span>
-          </button>
-          <button 
+          <button
             className={`nav-item ${activeTab === 'capacity' ? 'active' : ''}`}
             onClick={() => setActiveTab('capacity')}
             aria-label="Capacity"
           >
             <span className="nav-icon"><Gauge size={18} /></span>
             <span>Capacity</span>
+          </button>
+          <button
+            className={`nav-item ${activeTab === 'calendar' ? 'active' : ''}`}
+            onClick={() => setActiveTab('calendar')}
+            aria-label="Calendar"
+          >
+            <span className="nav-icon"><Calendar size={18} /></span>
+            <span>Calendar</span>
           </button>
         </nav>
 
