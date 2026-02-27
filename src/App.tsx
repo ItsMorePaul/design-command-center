@@ -1804,14 +1804,14 @@ const [showFilters, setShowFilters] = useState(false)
                         })()}
                       </div>
                       {member.status === 'offline' && (
-                        <Tooltip variant="yellow" content={(() => {
+                        <Tooltip content={(() => {
                           const closest = getClosestTimeOff(member.timeOff || [])
                           if (closest) {
                             return `${closest.name}: ${closest.isStart ? 'Starts' : 'Ends'} ${formatShortDate(closest.date)}`
                           }
                           return 'Away'
                         })()}>
-                          <span className="status-emoji status-emoji-away">🌴</span>
+                          <span className="status-emoji">🌴</span>
                         </Tooltip>
                       )}
                     </div>

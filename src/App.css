@@ -2131,28 +2131,6 @@
   line-height: 1;
 }
 
-/* Status Emoji - Away (yellow treatment) */
-.status-emoji-away {
-  cursor: help;
-  filter: drop-shadow(0 0 4px rgba(245, 158, 11, 0.4));
-}
-
-/* Yellow tooltip for away status */
-.tooltip-floating.tooltip-yellow {
-  background: #f59e0b;
-  border: 1px solid #f59e0b;
-  color: #000;
-}
-
-.tooltip-floating.tooltip-yellow .tooltip-content {
-  color: #000;
-  font-weight: 500;
-}
-
-.tooltip-floating.tooltip-yellow .tooltip-arrow {
-  background: #f59e0b;
-}
-
 /* Time Off Rows in Team Modal */
 .timeline-row {
   display: flex;
