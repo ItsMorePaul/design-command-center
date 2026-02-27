@@ -58,6 +58,13 @@ const parseLocalDate = (dateStr: string): Date | null => {
   return parsed
 }
 
+// Format a YYYY-MM-DD date as "Feb 2, 2026"
+const formatShortDate = (dateStr: string): string => {
+  const d = parseLocalDate(dateStr)
+  if (!d) return dateStr
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
 // Format date range like "Feb 2 - Mar 12"
 const formatDateRange = (startDate: string, endDate: string) => {
   const start = parseLocalDate(startDate)
@@ -2386,7 +2393,7 @@ const [showFilters, setShowFilters] = useState(false)
                       <div key={off.id} className="timeline-item">
                         <div className="timeline-info">
                           <span className="timeline-name">{off.name}</span>
-                          <span className="timeline-dates">{off.startDate} → {off.endDate}</span>
+                          <span className="timeline-dates">{formatShortDate(off.startDate)} → {formatShortDate(off.endDate)}</span>
                         </div>
                         <div className="timeline-actions">
                           <button type="button" className="action-btn" onClick={() => handleEditTimeOff(off)}><Pencil size={14} /></button>
@@ -2654,7 +2661,7 @@ const [showFilters, setShowFilters] = useState(false)
                       <div key={range.id} className="timeline-item">
                         <div className="timeline-info">
                           <span className="timeline-name">{range.name}</span>
-                          <span className="timeline-dates">{range.startDate} → {range.endDate}</span>
+                          <span className="timeline-dates">{formatShortDate(range.startDate)} → {formatShortDate(range.endDate)}</span>
                         </div>
                         <div className="timeline-actions">
                           <button type="button" className="action-btn" onClick={() => handleEditTimeline(range)}><Pencil size={14} /></button>
