@@ -2386,286 +2386,310 @@ const [showFilters, setShowFilters] = useState(false)
       {showProjectModal && (
         <div className="modal-overlay" onClick={() => setShowProjectModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <h2>{editingProject ? 'Edit Project' : 'New Project'}</h2>
+            <div className="modal-header">
+              <h2>{editingProject ? 'Edit Project' : 'New Project'}</h2>
+            </div>
             
-            <div className="form-group">
-              <label>Project Name</label>
-              <input
-                id="project-name"
-                type="text"
-                value={projectFormData.name}
-                onChange={e => setProjectFormData({ ...projectFormData, name: e.target.value })}
-                placeholder="Enter project name"
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Project Link</label>
-              <input
-                id="project-url"
-                type="url"
-                value={projectFormData.url}
-                onChange={e => setProjectFormData({ ...projectFormData, url: e.target.value })}
-                placeholder="https://..."
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Business Line</label>
-              <div className="brand-checkboxes">
-                {brandOptions.map(brand => (
-                  <label key={brand} className={`brand-checkbox ${projectFormData.businessLines.includes(brand) ? 'selected' : ''}`}>
-                    <input
-                      type="checkbox"
-                      checked={projectFormData.businessLines.includes(brand)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setProjectFormData({ ...projectFormData, businessLines: [...projectFormData.businessLines, brand] })
-                        } else {
-                          setProjectFormData({ ...projectFormData, businessLines: projectFormData.businessLines.filter(b => b !== brand) })
-                        }
-                      }}
-                    />
-                    {brand}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label>Design Deck Name</label>
-              <input
-                id="deck-name"
-                type="text"
-                value={projectFormData.deckName}
-                onChange={e => setProjectFormData({ ...projectFormData, deckName: e.target.value })}
-                placeholder="Enter deck name"
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Design Deck Link</label>
-              <input
-                id="deck-link"
-                type="url"
-                value={projectFormData.deckLink}
-                onChange={e => setProjectFormData({ ...projectFormData, deckLink: e.target.value })}
-                placeholder="https://..."
-              />
-            </div>
-
-            <div className="form-group">
-              <label>PRD Name</label>
-              <input
-                id="prd-name"
-                type="text"
-                value={projectFormData.prdName}
-                onChange={e => setProjectFormData({ ...projectFormData, prdName: e.target.value })}
-                placeholder="Enter PRD name"
-              />
-            </div>
-
-            <div className="form-group">
-              <label>PRD Link</label>
-              <input
-                id="prd-link"
-                type="url"
-                value={projectFormData.prdLink}
-                onChange={e => setProjectFormData({ ...projectFormData, prdLink: e.target.value })}
-                placeholder="https://..."
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Design Brief Name</label>
-              <input
-                id="brief-name"
-                type="text"
-                value={projectFormData.briefName}
-                onChange={e => setProjectFormData({ ...projectFormData, briefName: e.target.value })}
-                placeholder="Enter brief name"
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Design Brief Link</label>
-              <input
-                id="brief-link"
-                type="url"
-                value={projectFormData.briefLink}
-                onChange={e => setProjectFormData({ ...projectFormData, briefLink: e.target.value })}
-                placeholder="https://..."
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Figma Link</label>
-              <input
-                id="figma-link"
-                type="url"
-                value={projectFormData.figmaLink}
-                onChange={e => setProjectFormData({ ...projectFormData, figmaLink: e.target.value })}
-                placeholder="https://figma.com/..."
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Custom Links (max 3)</label>
-              {projectFormData.customLinks?.map((link, idx) => (
-                <div key={idx} className="custom-link-row">
+            <div className="modal-body">
+              <div className="form-section">
+                <div className="form-section-title">Basic Info</div>
+                
+                <div className="form-group">
+                  <label>Project Name</label>
                   <input
+                    id="project-name"
                     type="text"
-                    value={link.name}
-                    onChange={e => {
-                      const newLinks = [...projectFormData.customLinks];
-                      newLinks[idx].name = e.target.value;
-                      setProjectFormData({ ...projectFormData, customLinks: newLinks });
-                    }}
-                    placeholder="Link name"
+                    value={projectFormData.name}
+                    onChange={e => setProjectFormData({ ...projectFormData, name: e.target.value })}
+                    placeholder="Enter project name"
                   />
+                </div>
+
+                <div className="form-group">
+                  <label>Project Link</label>
                   <input
+                    id="project-url"
                     type="url"
-                    value={link.url}
-                    onChange={e => {
-                      const newLinks = [...projectFormData.customLinks];
-                      newLinks[idx].url = e.target.value;
-                      setProjectFormData({ ...projectFormData, customLinks: newLinks });
-                    }}
+                    value={projectFormData.url}
+                    onChange={e => setProjectFormData({ ...projectFormData, url: e.target.value })}
                     placeholder="https://..."
                   />
-                  <button
-                    type="button"
-                    className="remove-link-btn"
-                    onClick={() => openConfirmModal('Remove custom link?', 'This link will be removed from the project.', () => {
-                      const newLinks = projectFormData.customLinks.filter((_, i) => i !== idx)
-                      setProjectFormData({ ...projectFormData, customLinks: newLinks })
-                      closeConfirmModal()
-                    })}
-                  >
-                    ×
-                  </button>
                 </div>
-              ))}
-              {(!projectFormData.customLinks || projectFormData.customLinks.length < 3) && (
-                <button
-                  type="button"
-                  className="add-link-btn"
-                  onClick={() => {
-                    const newLinks = [...(projectFormData.customLinks || []), { name: '', url: '' }];
-                    setProjectFormData({ ...projectFormData, customLinks: newLinks });
-                  }}
-                >
-                  + Add Custom Link
-                </button>
-              )}
-            </div>
 
-            <div className="form-group">
-              <label>Status</label>
-              <div className="status-options">
-                <button
-                  type="button"
-                  className={`status-option ${projectFormData.status === 'active' ? 'active' : ''}`}
-                  onClick={() => setProjectFormData({ ...projectFormData, status: 'active' })}
-                >
-                  <span className="status-dot bg-blue-500"></span>
-                  Active
-                </button>
-                <button
-                  type="button"
-                  className={`status-option ${projectFormData.status === 'review' ? 'active' : ''}`}
-                  onClick={() => setProjectFormData({ ...projectFormData, status: 'review' })}
-                >
-                  <span className="status-dot bg-yellow-500"></span>
-                  Review
-                </button>
-                <button
-                  type="button"
-                  className={`status-option ${projectFormData.status === 'done' ? 'active' : ''}`}
-                  onClick={() => setProjectFormData({ ...projectFormData, status: 'done' })}
-                >
-                  <span className="status-dot bg-green-500"></span>
-                  Done
-                </button>
-                <button
-                  type="button"
-                  className={`status-option ${projectFormData.status === 'blocked' ? 'active' : ''}`}
-                  onClick={() => setProjectFormData({ ...projectFormData, status: 'blocked' })}
-                >
-                  <span className="status-dot bg-red-500"></span>
-                  Blocked
-                </button>
+                <div className="form-group">
+                  <label>Business Line</label>
+                  <div className="brand-checkboxes">
+                    {brandOptions.map(brand => (
+                      <label key={brand} className={`brand-checkbox ${projectFormData.businessLines.includes(brand) ? 'selected' : ''}`}>
+                        <input
+                          type="checkbox"
+                          checked={projectFormData.businessLines.includes(brand)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setProjectFormData({ ...projectFormData, businessLines: [...projectFormData.businessLines, brand] })
+                            } else {
+                              setProjectFormData({ ...projectFormData, businessLines: projectFormData.businessLines.filter(b => b !== brand) })
+                            }
+                          }}
+                        />
+                        {brand}
+                      </label>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
 
-            <div className="form-group">
-              <label>Start Date</label>
-              <input
-                id="start-date"
-                type="date"
-                value={projectFormData.startDate}
-                onChange={e => setProjectFormData({ ...projectFormData, startDate: e.target.value })}
-                onClick={e => (e.target as HTMLInputElement).showPicker?.()}
-              />
-            </div>
+              <div className="form-section">
+                <div className="form-section-title">Design Artifacts</div>
 
-            <div className="form-group">
-              <label>End Date</label>
-              <input
-                id="end-date"
-                type="date"
-                value={projectFormData.endDate}
-                onChange={e => setProjectFormData({ ...projectFormData, endDate: e.target.value })}
-                onClick={e => (e.target as HTMLInputElement).showPicker?.()}
-              />
-            </div>
+                <div className="form-group">
+                  <label>Design Deck Name</label>
+                  <input
+                    id="deck-name"
+                    type="text"
+                    value={projectFormData.deckName}
+                    onChange={e => setProjectFormData({ ...projectFormData, deckName: e.target.value })}
+                    placeholder="Enter deck name"
+                  />
+                </div>
 
-            <div className="form-group">
-              <div className="timeline-header">
-                <label>Project Timeline</label>
-                <button type="button" className="add-timeline-btn" onClick={handleAddTimeline}>+ Add Range</button>
+                <div className="form-group">
+                  <label>Design Deck Link</label>
+                  <input
+                    id="deck-link"
+                    type="url"
+                    value={projectFormData.deckLink}
+                    onChange={e => setProjectFormData({ ...projectFormData, deckLink: e.target.value })}
+                    placeholder="https://..."
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>PRD Name</label>
+                  <input
+                    id="prd-name"
+                    type="text"
+                    value={projectFormData.prdName}
+                    onChange={e => setProjectFormData({ ...projectFormData, prdName: e.target.value })}
+                    placeholder="Enter PRD name"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>PRD Link</label>
+                  <input
+                    id="prd-link"
+                    type="url"
+                    value={projectFormData.prdLink}
+                    onChange={e => setProjectFormData({ ...projectFormData, prdLink: e.target.value })}
+                    placeholder="https://..."
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Design Brief Name</label>
+                  <input
+                    id="brief-name"
+                    type="text"
+                    value={projectFormData.briefName}
+                    onChange={e => setProjectFormData({ ...projectFormData, briefName: e.target.value })}
+                    placeholder="Enter brief name"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Design Brief Link</label>
+                  <input
+                    id="brief-link"
+                    type="url"
+                    value={projectFormData.briefLink}
+                    onChange={e => setProjectFormData({ ...projectFormData, briefLink: e.target.value })}
+                    placeholder="https://..."
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Figma Link</label>
+                  <input
+                    id="figma-link"
+                    type="url"
+                    value={projectFormData.figmaLink}
+                    onChange={e => setProjectFormData({ ...projectFormData, figmaLink: e.target.value })}
+                    placeholder="https://figma.com/..."
+                  />
+                </div>
               </div>
-              {projectFormData.timeline.length > 0 && (
-                <div className="timeline-list">
-                  {projectFormData.timeline.map(range => (
-                    <div key={range.id} className="timeline-item">
-                      <div className="timeline-info">
-                        <span className="timeline-name">{range.name}</span>
-                        <span className="timeline-dates">{range.startDate} → {range.endDate}</span>
-                      </div>
-                      <div className="timeline-actions">
-                        <button type="button" className="action-btn" onClick={() => handleEditTimeline(range)}><Pencil size={14} /></button>
-                        <button type="button" className="action-btn delete" onClick={() => handleDeleteTimeline(range.id)}><Trash2 size={14} /></button>
-                      </div>
+
+              <div className="form-section">
+                <div className="form-section-title">Custom Links</div>
+
+                <div className="form-group">
+                  <label>Custom Links (max 3)</label>
+                  {projectFormData.customLinks?.map((link, idx) => (
+                    <div key={idx} className="custom-link-row">
+                      <input
+                        type="text"
+                        value={link.name}
+                        onChange={e => {
+                          const newLinks = [...projectFormData.customLinks];
+                          newLinks[idx].name = e.target.value;
+                          setProjectFormData({ ...projectFormData, customLinks: newLinks });
+                        }}
+                        placeholder="Link name"
+                      />
+                      <input
+                        type="url"
+                        value={link.url}
+                        onChange={e => {
+                          const newLinks = [...projectFormData.customLinks];
+                          newLinks[idx].url = e.target.value;
+                          setProjectFormData({ ...projectFormData, customLinks: newLinks });
+                        }}
+                        placeholder="https://..."
+                      />
+                      <button
+                        type="button"
+                        className="remove-link-btn"
+                        onClick={() => openConfirmModal('Remove custom link?', 'This link will be removed from the project.', () => {
+                          const newLinks = projectFormData.customLinks.filter((_, i) => i !== idx)
+                          setProjectFormData({ ...projectFormData, customLinks: newLinks })
+                          closeConfirmModal()
+                        })}
+                      >
+                        ×
+                      </button>
                     </div>
                   ))}
-                </div>
-              )}
-            </div>
-
-            <div className="form-group">
-              <label>Designers</label>
-              <div className="designer-checkboxes">
-                {[...team].sort((a, b) => a.name.localeCompare(b.name)).map(member => (
-                  <label key={member.id} className={`designer-checkbox ${projectFormData.designers.includes(member.name) ? 'selected' : ''}`}>
-                    <input
-                      type="checkbox"
-                      checked={projectFormData.designers.includes(member.name)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setProjectFormData({ ...projectFormData, designers: [...projectFormData.designers, member.name] })
-                        } else {
-                          setProjectFormData({ ...projectFormData, designers: projectFormData.designers.filter(d => d !== member.name) })
-                        }
+                  {(!projectFormData.customLinks || projectFormData.customLinks.length < 3) && (
+                    <button
+                      type="button"
+                      className="add-link-btn"
+                      onClick={() => {
+                        const newLinks = [...(projectFormData.customLinks || []), { name: '', url: '' }];
+                        setProjectFormData({ ...projectFormData, customLinks: newLinks });
                       }}
-                    />
-                    {member.name}
-                  </label>
-                ))}
+                    >
+                      + Add Custom Link
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="form-section">
+                <div className="form-section-title">Status & Schedule</div>
+
+                <div className="form-group">
+                  <label>Status</label>
+                  <div className="status-options">
+                    <button
+                      type="button"
+                      className={`status-option ${projectFormData.status === 'active' ? 'active' : ''}`}
+                      onClick={() => setProjectFormData({ ...projectFormData, status: 'active' })}
+                    >
+                      <span className="status-dot bg-blue-500"></span>
+                      Active
+                    </button>
+                    <button
+                      type="button"
+                      className={`status-option ${projectFormData.status === 'review' ? 'active' : ''}`}
+                      onClick={() => setProjectFormData({ ...projectFormData, status: 'review' })}
+                    >
+                      <span className="status-dot bg-yellow-500"></span>
+                      Review
+                    </button>
+                    <button
+                      type="button"
+                      className={`status-option ${projectFormData.status === 'done' ? 'active' : ''}`}
+                      onClick={() => setProjectFormData({ ...projectFormData, status: 'done' })}
+                    >
+                      <span className="status-dot bg-green-500"></span>
+                      Done
+                    </button>
+                    <button
+                      type="button"
+                      className={`status-option ${projectFormData.status === 'blocked' ? 'active' : ''}`}
+                      onClick={() => setProjectFormData({ ...projectFormData, status: 'blocked' })}
+                    >
+                      <span className="status-dot bg-red-500"></span>
+                      Blocked
+                    </button>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Start Date</label>
+                  <input
+                    id="start-date"
+                    type="date"
+                    value={projectFormData.startDate}
+                    onChange={e => setProjectFormData({ ...projectFormData, startDate: e.target.value })}
+                    onClick={e => (e.target as HTMLInputElement).showPicker?.()}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>End Date</label>
+                  <input
+                    id="end-date"
+                    type="date"
+                    value={projectFormData.endDate}
+                    onChange={e => setProjectFormData({ ...projectFormData, endDate: e.target.value })}
+                    onClick={e => (e.target as HTMLInputElement).showPicker?.()}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <div className="timeline-header">
+                    <label>Project Timeline</label>
+                    <button type="button" className="add-timeline-btn" onClick={handleAddTimeline}>+ Add Range</button>
+                  </div>
+                  {projectFormData.timeline.length > 0 && (
+                    <div className="timeline-list">
+                      {projectFormData.timeline.map(range => (
+                        <div key={range.id} className="timeline-item">
+                          <div className="timeline-info">
+                            <span className="timeline-name">{range.name}</span>
+                            <span className="timeline-dates">{range.startDate} → {range.endDate}</span>
+                          </div>
+                          <div className="timeline-actions">
+                            <button type="button" className="action-btn" onClick={() => handleEditTimeline(range)}><Pencil size={14} /></button>
+                            <button type="button" className="action-btn delete" onClick={() => handleDeleteTimeline(range.id)}><Trash2 size={14} /></button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="form-section">
+                <div className="form-section-title">Team</div>
+
+                <div className="form-group">
+                  <label>Designers</label>
+                  <div className="designer-checkboxes">
+                    {[...team].sort((a, b) => a.name.localeCompare(b.name)).map(member => (
+                      <label key={member.id} className={`designer-checkbox ${projectFormData.designers.includes(member.name) ? 'selected' : ''}`}>
+                        <input
+                          type="checkbox"
+                          checked={projectFormData.designers.includes(member.name)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setProjectFormData({ ...projectFormData, designers: [...projectFormData.designers, member.name] })
+                            } else {
+                              setProjectFormData({ ...projectFormData, designers: projectFormData.designers.filter(d => d !== member.name) })
+                            }
+                          }}
+                        />
+                        {member.name}
+                      </label>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="modal-actions">
+            <div className="modal-footer">
               <button className="secondary-btn" onClick={() => setShowProjectModal(false)}>Cancel</button>
               <button className="primary-btn" onClick={handleSaveProject}>
                 {editingProject ? 'Save Changes' : 'Add Project'}
