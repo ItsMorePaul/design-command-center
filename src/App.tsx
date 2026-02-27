@@ -1412,8 +1412,8 @@ const [showFilters, setShowFilters] = useState(false)
                 )}
               </div>
 
-              {/* Project Filters */}
-              {showProjectFilter() && (
+              {/* Project Filters - hidden in priority mode */}
+              {projectViewMode === 'list' && showProjectFilter() && (
                 <div className="projects-filter-row">
                   {projectSortBy === 'businessLine' && (
                     <>

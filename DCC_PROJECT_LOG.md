@@ -279,5 +279,24 @@ git checkout v260226-version-format-docs
 
 ---
 
+### ✅ v260226-save-site
+**Date:** 2026-02-26  
+**Time:** 8:46 PM PST  
+**Git tag:** `v260226-save-site`  
+**Commit:** `11763a2`  
+**Site version:** `2026.2.26 2046`  
+**DB version at save:** `2026.2.26 1941`
+
+**To restore:**
+```bash
+git checkout v260226-save-site
+```
+
+#### What was built in this checkpoint
+- "Save site" protocol checkpoint — no new features, just capturing current state
+- Site version updated to `v260226|2046`
+
+---
+
 *Log started: 2026-02-26*  
 *Maintained by: Wilson 🦉*
