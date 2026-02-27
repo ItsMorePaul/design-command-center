@@ -85,6 +85,17 @@ const getTodayFormatted = () => {
   return today.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
 }
 
+// Format version string: 'v260226|1739' → '2026.2.26 1739'
+const formatVersionDisplay = (version: string): string => {
+  const match = version.match(/^v(\d{2})(\d{2})(\d{2})\|(\d{4})$/)
+  if (!match) return version
+  const [, yy, mm, dd, time] = match
+  const year = 2000 + parseInt(yy)
+  const month = parseInt(mm)
+  const day = parseInt(dd)
+  return `${year}.${month}.${day} ${time}`
+}
+
 // Types
 interface TimelineRange {
   id: string
@@ -1141,13 +1152,11 @@ const [showFilters, setShowFilters] = useState(false)
           <div className="version-info">
             <div className="version-row">
               <span className="version-label">Site</span>
-              <span className="version-num">{siteVersion.version || '-'}</span>
-              <span className="version-time">{siteVersion.time || '-'}</span>
+              <span className="version-num">{formatVersionDisplay(siteVersion.version) || '-'}</span>
             </div>
             <div className="version-row">
               <span className="version-label">DB</span>
-              <span className="version-num">{dbVersion.version || '-'}</span>
-              <span className="version-time">{dbVersion.time || '-'}</span>
+              <span className="version-num">{formatVersionDisplay(dbVersion.version) || '-'}</span>
             </div>
           </div>
         </div>
