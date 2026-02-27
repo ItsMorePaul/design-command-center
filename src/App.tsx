@@ -266,10 +266,14 @@ function App() {
   // Timeline editing state
   const [showTimelineModal, setShowTimelineModal] = useState(false)
   const [editingTimeline, setEditingTimeline] = useState<TimelineRange | null>(null)
-  
+  const [timelineFormData, setTimelineFormData] = useState({ name: '', startDate: '', endDate: '' })
+
+  const [showTimeOffModal, setShowTimeOffModal] = useState(false)
+  const [editingTimeOff, setEditingTimeOff] = useState<{ name: string; startDate: string; endDate: string; id: string } | null>(null)
+  const [timeOffFormData, setTimeOffFormData] = useState({ name: '', startDate: '', endDate: '' })
+
   // Calendar day modal state
   const [selectedDay, setSelectedDay] = useState<{ date: string; events: CalendarEvent[]; dayName: string } | null>(null)
-  const [timelineFormData, setTimelineFormData] = useState({ name: '', startDate: '', endDate: '' })
   
   const [isLoaded, setIsLoaded] = useState(false)
   const [projectSortBy, setProjectSortBy] = useState<'name' | 'businessLine' | 'designer' | 'dueDate' | 'status'>(() => { try { return (localStorage.getItem('dcc_projectSortBy') as any) || 'name' } catch { return 'name' } })
@@ -742,6 +746,35 @@ const [showFilters, setShowFilters] = useState(false)
       })
     }
     setShowTimelineModal(false)
+  }
+
+  const handleAddTimeOff = () => {
+    setEditingTimeOff(null)
+    setTimeOffFormData({ name: '', startDate: '', endDate: '' })
+    setShowTimeOffModal(true)
+  }
+
+  const handleEditTimeOff = (off: { name: string; startDate: string; endDate: string; id: string }) => {
+    setEditingTimeOff(off)
+    setTimeOffFormData({ name: off.name, startDate: off.startDate, endDate: off.endDate })
+    setShowTimeOffModal(true)
+  }
+
+  const handleDeleteTimeOff = (id: string) => {
+    setFormData({ ...formData, timeOff: formData.timeOff.filter(o => o.id !== id) })
+  }
+
+  const handleSaveTimeOff = () => {
+    if (!timeOffFormData.name.trim()) { alert('Please enter a label'); return }
+    if (!timeOffFormData.startDate || !timeOffFormData.endDate) { alert('Please select start and end dates'); return }
+    if (new Date(timeOffFormData.endDate) < new Date(timeOffFormData.startDate)) { alert('End date must be after start date'); return }
+
+    if (editingTimeOff) {
+      setFormData({ ...formData, timeOff: formData.timeOff.map(o => o.id === editingTimeOff.id ? { ...o, ...timeOffFormData } : o) })
+    } else {
+      setFormData({ ...formData, timeOff: [...(formData.timeOff || []), { ...timeOffFormData, id: Date.now().toString() }] })
+    }
+    setShowTimeOffModal(false)
   }
 
   const handleSaveProject = async () => {
@@ -2343,63 +2376,26 @@ const [showFilters, setShowFilters] = useState(false)
               </div>
 
               <div className="form-section">
-                <div className="form-section-title">Time Off</div>
-
-                <div className="form-group">
-                  {formData.timeOff?.map((off, idx) => (
-                    <div key={off.id || idx} className="timeline-row">
-                      <input
-                        type="text"
-                        value={off.name}
-                        onChange={e => {
-                          const newTimeOff = [...formData.timeOff];
-                          newTimeOff[idx].name = e.target.value;
-                          setFormData({ ...formData, timeOff: newTimeOff });
-                        }}
-                        placeholder="Label (e.g., Vacation)"
-                      />
-                      <input
-                        type="date"
-                        value={off.startDate}
-                        onChange={e => {
-                          const newTimeOff = [...formData.timeOff];
-                          newTimeOff[idx].startDate = e.target.value;
-                          setFormData({ ...formData, timeOff: newTimeOff });
-                        }}
-                      />
-                      <span>to</span>
-                      <input
-                        type="date"
-                        value={off.endDate}
-                        onChange={e => {
-                          const newTimeOff = [...formData.timeOff];
-                          newTimeOff[idx].endDate = e.target.value;
-                          setFormData({ ...formData, timeOff: newTimeOff });
-                        }}
-                      />
-                      <button
-                        type="button"
-                        className="remove-btn"
-                        onClick={() => {
-                          const newTimeOff = formData.timeOff.filter((_, i) => i !== idx);
-                          setFormData({ ...formData, timeOff: newTimeOff });
-                        }}
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    className="add-link-btn"
-                    onClick={() => {
-                      const newTimeOff = [...(formData.timeOff || []), { name: '', startDate: '', endDate: '', id: Date.now().toString() }];
-                      setFormData({ ...formData, timeOff: newTimeOff });
-                    }}
-                  >
-                    + Add Time Off
-                  </button>
+                <div className="timeline-header">
+                  <span className="form-section-title" style={{ marginBottom: 0 }}>Time Off</span>
+                  <button type="button" className="add-timeline-btn" onClick={handleAddTimeOff}>+ Add</button>
                 </div>
+                {(formData.timeOff?.length ?? 0) > 0 && (
+                  <div className="timeline-list" style={{ marginTop: '0.5rem' }}>
+                    {formData.timeOff.map(off => (
+                      <div key={off.id} className="timeline-item">
+                        <div className="timeline-info">
+                          <span className="timeline-name">{off.name}</span>
+                          <span className="timeline-dates">{off.startDate} → {off.endDate}</span>
+                        </div>
+                        <div className="timeline-actions">
+                          <button type="button" className="action-btn" onClick={() => handleEditTimeOff(off)}><Pencil size={14} /></button>
+                          <button type="button" className="action-btn delete" onClick={() => handleDeleteTimeOff(off.id)}><Trash2 size={14} /></button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -2707,47 +2703,99 @@ const [showFilters, setShowFilters] = useState(false)
 
       {showTimelineModal && (
         <div className="modal-overlay">
-          <div className="modal">
-            <h2>{editingTimeline ? 'Edit Timeline Range' : 'Add Timeline Range'}</h2>
-            
-            <div className="form-group">
-              <label>Range Name</label>
-              <input
-                id="timeline-name"
-                type="text"
-                value={timelineFormData.name}
-                onChange={e => setTimelineFormData({ ...timelineFormData, name: e.target.value })}
-                placeholder="e.g., Research Phase"
-              />
+          <div className="modal" style={{ maxWidth: 360 }}>
+            <div className="modal-header">
+              <h2>{editingTimeline ? 'Edit Timeline Range' : 'Add Timeline Range'}</h2>
             </div>
-
-            <div className="form-group">
-              <label>Start Date</label>
-              <input
-                id="timeline-start"
-                type="date"
-                value={timelineFormData.startDate}
-                onChange={e => setTimelineFormData({ ...timelineFormData, startDate: e.target.value })}
-                onClick={e => (e.target as HTMLInputElement).showPicker?.()}
-              />
+            <div className="modal-body">
+              <div className={`float-field${timelineFormData.name ? ' has-value' : ''}`} style={{ marginBottom: '0.75rem' }}>
+                <input
+                  id="timeline-name"
+                  type="text"
+                  value={timelineFormData.name}
+                  onChange={e => setTimelineFormData({ ...timelineFormData, name: e.target.value })}
+                  placeholder=" "
+                />
+                <label htmlFor="timeline-name">Range Name</label>
+              </div>
+              <div className="form-row">
+                <div className={`float-field${timelineFormData.startDate ? ' has-value' : ''}`}>
+                  <input
+                    id="timeline-start"
+                    type="date"
+                    value={timelineFormData.startDate}
+                    onChange={e => setTimelineFormData({ ...timelineFormData, startDate: e.target.value })}
+                    onClick={e => (e.target as HTMLInputElement).showPicker?.()}
+                    placeholder=" "
+                  />
+                  <label htmlFor="timeline-start">Start Date</label>
+                </div>
+                <div className={`float-field${timelineFormData.endDate ? ' has-value' : ''}`}>
+                  <input
+                    id="timeline-end"
+                    type="date"
+                    value={timelineFormData.endDate}
+                    onChange={e => setTimelineFormData({ ...timelineFormData, endDate: e.target.value })}
+                    onClick={e => (e.target as HTMLInputElement).showPicker?.()}
+                    placeholder=" "
+                  />
+                  <label htmlFor="timeline-end">End Date</label>
+                </div>
+              </div>
             </div>
-
-            <div className="form-group">
-              <label>End Date</label>
-              <input
-                id="timeline-end"
-                type="date"
-                value={timelineFormData.endDate}
-                onChange={e => setTimelineFormData({ ...timelineFormData, endDate: e.target.value })}
-                onClick={e => (e.target as HTMLInputElement).showPicker?.()}
-              />
-            </div>
-
-            <div className="modal-actions">
+            <div className="modal-footer">
               <button className="secondary-btn" onClick={() => setShowTimelineModal(false)}>Cancel</button>
-              <button className="primary-btn" onClick={handleSaveTimeline}>
-                {editingTimeline ? 'Save Changes' : 'Add Range'}
-              </button>
+              <button className="primary-btn" onClick={handleSaveTimeline}>{editingTimeline ? 'Save Changes' : 'Add Range'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showTimeOffModal && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: 360 }}>
+            <div className="modal-header">
+              <h2>{editingTimeOff ? 'Edit Time Off' : 'Add Time Off'}</h2>
+            </div>
+            <div className="modal-body">
+              <div className={`float-field${timeOffFormData.name ? ' has-value' : ''}`} style={{ marginBottom: '0.75rem' }}>
+                <input
+                  id="timeoff-name"
+                  type="text"
+                  value={timeOffFormData.name}
+                  onChange={e => setTimeOffFormData({ ...timeOffFormData, name: e.target.value })}
+                  placeholder=" "
+                />
+                <label htmlFor="timeoff-name">Label (e.g., Vacation)</label>
+              </div>
+              <div className="form-row">
+                <div className={`float-field${timeOffFormData.startDate ? ' has-value' : ''}`}>
+                  <input
+                    id="timeoff-start"
+                    type="date"
+                    value={timeOffFormData.startDate}
+                    onChange={e => setTimeOffFormData({ ...timeOffFormData, startDate: e.target.value })}
+                    onClick={e => (e.target as HTMLInputElement).showPicker?.()}
+                    placeholder=" "
+                  />
+                  <label htmlFor="timeoff-start">Start Date</label>
+                </div>
+                <div className={`float-field${timeOffFormData.endDate ? ' has-value' : ''}`}>
+                  <input
+                    id="timeoff-end"
+                    type="date"
+                    value={timeOffFormData.endDate}
+                    onChange={e => setTimeOffFormData({ ...timeOffFormData, endDate: e.target.value })}
+                    onClick={e => (e.target as HTMLInputElement).showPicker?.()}
+                    placeholder=" "
+                  />
+                  <label htmlFor="timeoff-end">End Date</label>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="secondary-btn" onClick={() => setShowTimeOffModal(false)}>Cancel</button>
+              <button className="primary-btn" onClick={handleSaveTimeOff}>{editingTimeOff ? 'Save Changes' : 'Add Time Off'}</button>
             </div>
           </div>
         </div>
