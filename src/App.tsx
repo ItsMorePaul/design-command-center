@@ -1,5 +1,20 @@
 import { useState, useEffect } from 'react'
-import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Bell, Gauge, ChevronDown, Settings } from 'lucide-react'
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import type { DragEndEvent } from '@dnd-kit/core'
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Bell, Gauge, ChevronDown, Settings, GripVertical } from 'lucide-react'
 import { Tooltip } from './Tooltip'
 import './App.css'
 import initialData from './data.json'
@@ -236,6 +251,39 @@ const loadDataFromAPI = async () => {
   }
 }
 
+// Sortable timeline item component
+function SortableTimelineItem({
+  range,
+  onEdit,
+  onDelete,
+}: {
+  range: TimelineRange
+  onEdit: (r: TimelineRange) => void
+  onDelete: (id: string) => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: range.id })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+  return (
+    <div ref={setNodeRef} style={style} className="timeline-item">
+      <button type="button" className="action-btn drag-handle" {...attributes} {...listeners} tabIndex={-1}>
+        <GripVertical size={14} />
+      </button>
+      <div className="timeline-info">
+        <span className="timeline-name">{range.name}</span>
+        <span className="timeline-dates">{formatShortDate(range.startDate)} → {formatShortDate(range.endDate)}</span>
+      </div>
+      <div className="timeline-actions">
+        <button type="button" className="action-btn" onClick={() => onEdit(range)}><Pencil size={14} /></button>
+        <button type="button" className="action-btn delete" onClick={() => onDelete(range.id)}><Trash2 size={14} /></button>
+      </div>
+    </div>
+  )
+}
+
 function App() {
   const [activeTab, setActiveTab] = useState<'projects' | 'team' | 'calendar' | 'capacity' | 'settings'>('projects')
   const [notifications] = useState(mockNotifications)
@@ -249,6 +297,8 @@ function App() {
   const [formData, setFormData] = useState({ name: '', role: '', brands: ["Barron's"] as string[], status: 'offline' as TeamMember['status'], slack: '', email: '', timeOff: [] as { name: string; startDate: string; endDate: string; id: string }[] })
   
   // Project modal state
+  const timelineSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+
   const [showProjectModal, setShowProjectModal] = useState(false)
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [projectFormData, setProjectFormData] = useState({
@@ -721,6 +771,14 @@ const [showFilters, setShowFilters] = useState(false)
       })
       closeConfirmModal()
     })
+  }
+
+  const handleTimelineDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIndex = projectFormData.timeline.findIndex(t => t.id === active.id)
+    const newIndex = projectFormData.timeline.findIndex(t => t.id === over.id)
+    setProjectFormData({ ...projectFormData, timeline: arrayMove(projectFormData.timeline, oldIndex, newIndex) })
   }
 
   const handleSaveTimeline = () => {
@@ -2656,20 +2714,20 @@ const [showFilters, setShowFilters] = useState(false)
                   <button type="button" className="add-timeline-btn" onClick={handleAddTimeline}>+ Add Range</button>
                 </div>
                 {projectFormData.timeline.length > 0 && (
-                  <div className="timeline-list" style={{ marginTop: '0.5rem' }}>
-                    {projectFormData.timeline.map(range => (
-                      <div key={range.id} className="timeline-item">
-                        <div className="timeline-info">
-                          <span className="timeline-name">{range.name}</span>
-                          <span className="timeline-dates">{formatShortDate(range.startDate)} → {formatShortDate(range.endDate)}</span>
-                        </div>
-                        <div className="timeline-actions">
-                          <button type="button" className="action-btn" onClick={() => handleEditTimeline(range)}><Pencil size={14} /></button>
-                          <button type="button" className="action-btn delete" onClick={() => handleDeleteTimeline(range.id)}><Trash2 size={14} /></button>
-                        </div>
+                  <DndContext sensors={timelineSensors} collisionDetection={closestCenter} onDragEnd={handleTimelineDragEnd}>
+                    <SortableContext items={projectFormData.timeline.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                      <div className="timeline-list" style={{ marginTop: '0.5rem' }}>
+                        {projectFormData.timeline.map(range => (
+                          <SortableTimelineItem
+                            key={range.id}
+                            range={range}
+                            onEdit={handleEditTimeline}
+                            onDelete={handleDeleteTimeline}
+                          />
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </SortableContext>
+                  </DndContext>
                 )}
               </div>
 
