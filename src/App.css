@@ -842,7 +842,7 @@
   font-size: 0.7rem;
   font-weight: 600;
   letter-spacing: 0.04em;
-  color: var(--color-accent);
+  color: var(--color-text-muted);
 }
 
 .float-field input[type="date"] {
