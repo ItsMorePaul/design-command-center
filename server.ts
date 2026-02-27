@@ -488,7 +488,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 // Seed endpoint - replaces all data
 app.post('/api/seed', async (req, res) => {
   try {
-    const { projects, team, assignments } = req.body
+    const { projects, team, assignments, priorities, businessLines, brandOptions } = req.body
     
     // Clear and insert projects
     if (projects) {
@@ -517,10 +517,47 @@ app.post('/api/seed', async (req, res) => {
       }
     }
     
+    // Clear and insert project priorities (force rankings)
+    if (priorities && priorities.length > 0) {
+      await run('DELETE FROM project_priorities')
+      for (const p of priorities) {
+        await run(`INSERT INTO project_priorities (business_line_id, project_id, rank) VALUES (?, ?, ?)`,
+          [p.business_line_id, p.project_id, p.rank])
+      }
+    }
+    
+    // Clear and insert business lines
+    if (businessLines && businessLines.length > 0) {
+      await run('DELETE FROM business_lines')
+      for (const bl of businessLines) {
+        await run(`INSERT INTO business_lines (id, name, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinks) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [bl.id, bl.name, bl.deckName || '', bl.deckLink || '', bl.prdName || '', bl.prdLink || '', bl.briefName || '', bl.briefLink || '', bl.figmaLink || '', JSON.stringify(bl.customLinks || [])])
+      }
+    }
+    
+    // Clear and insert brand options
+    if (brandOptions && brandOptions.length > 0) {
+      await run('DELETE FROM brand_options')
+      for (const bo of brandOptions) {
+        if (typeof bo === 'string') {
+          await run(`INSERT INTO brand_options (name) VALUES (?)`, [bo])
+        } else {
+          await run(`INSERT INTO brand_options (id, name) VALUES (?, ?)`, [bo.id, bo.name])
+        }
+      }
+    }
+    
     // Update DB version on seed
     await updateDbVersion()
     
-    res.json({ success: true, synced: { projects: projects?.length ?? 0, team: team?.length ?? 0, assignments: assignments?.length ?? 0 } })
+    res.json({ success: true, synced: { 
+      projects: projects?.length ?? 0, 
+      team: team?.length ?? 0, 
+      assignments: assignments?.length ?? 0,
+      priorities: priorities?.length ?? 0,
+      businessLines: businessLines?.length ?? 0,
+      brandOptions: brandOptions?.length ?? 0
+    }})
   } catch (e) { res.status(500).json({error: e.message}); }
 })
 
@@ -541,8 +578,8 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 // Format: YYYY.MM.DD.hhmm (e.g., 2026.02.26.2059) → displays as "2026.02.26 2059"
 
-const SITE_VERSION = '2026.02.27.0755'
-const SITE_TIME = '0755'
+const SITE_VERSION = '2026.02.27.0758'
+const SITE_TIME = '0758'
 
 const VERSION_KEY = 'dcc_versions'
 
