@@ -2594,31 +2594,6 @@ const [showFilters, setShowFilters] = useState(false)
               </div>
 
               <div className="form-section">
-                <div className="form-section-title">Status</div>
-
-                <div className="form-group">
-                  <div className="status-options">
-                    <button
-                      type="button"
-                      className={`status-option ${formData.status === 'online' ? 'active' : ''}`}
-                      onClick={() => setFormData({ ...formData, status: 'online' })}
-                    >
-                      <span className="status-dot bg-green-500"></span>
-                      Working
-                    </button>
-                    <button
-                      type="button"
-                      className={`status-option ${formData.status === 'offline' ? 'active' : ''}`}
-                      onClick={() => setFormData({ ...formData, status: 'offline' })}
-                    >
-                      <span className="status-dot bg-gray-500"></span>
-                      Away
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="form-section">
                 <div className="form-section-title">Business Lines</div>
 
                 <div className="form-group">
@@ -3139,59 +3114,24 @@ const [showFilters, setShowFilters] = useState(false)
       {showSearch && (
         <div className="modal-overlay" onClick={() => { setShowSearch(false); setSearchQuery(''); setSearchResults({ projects: [], team: [], businessLines: [] }); }}>
           <div className="modal search-modal search-modal-v2" onClick={e => e.stopPropagation()}>
-            {/* Search Input */}
-            <div className="search-input-container">
-              <Search size={20} className="search-input-icon" />
-              <input
-                type="text"
-                className="search-input-v2"
-                placeholder="Search anything..."
-                value={searchQuery}
-                onChange={e => handleSearch(e.target.value)}
-                autoFocus
-              />
-              {searchQuery && (
-                <button 
-                  className="search-clear-btn"
-                  onClick={() => { setSearchQuery(''); setSearchResults({ projects: [], team: [], businessLines: [] }); }}
-                >
-                  ×
-                </button>
-              )}
-              <kbd className="search-kbd">ESC</kbd>
-            </div>
-
-            {/* Scope Filters */}
-            <div className="search-scope-bar">
-              <button 
-                className={`search-scope-btn ${searchFilters.projects ? 'active' : ''}`}
-                onClick={() => setSearchFilters({ ...searchFilters, projects: !searchFilters.projects })}
+            {/* Search Header with Close */}
+            <div className="search-modal-header">
+              <div className="search-input-container">
+                <Search size={20} className="search-input-icon" />
+                <input
+                  type="text"
+                  className="search-input-v2"
+                  placeholder="Search anything..."
+                  value={searchQuery}
+                  onChange={e => handleSearch(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              <button
+                className="search-close-btn"
+                onClick={() => { setShowSearch(false); setSearchQuery(''); setSearchResults({ projects: [], team: [], businessLines: [] }); }}
               >
-                <LayoutGrid size={14} />
-                Projects
-                {searchResults.projects.length > 0 && (
-                  <span className="search-scope-count">{searchResults.projects.length}</span>
-                )}
-              </button>
-              <button 
-                className={`search-scope-btn ${searchFilters.team ? 'active' : ''}`}
-                onClick={() => setSearchFilters({ ...searchFilters, team: !searchFilters.team })}
-              >
-                <Users size={14} />
-                Team
-                {searchResults.team.length > 0 && (
-                  <span className="search-scope-count">{searchResults.team.length}</span>
-                )}
-              </button>
-              <button 
-                className={`search-scope-btn ${searchFilters.businessLines ? 'active' : ''}`}
-                onClick={() => setSearchFilters({ ...searchFilters, businessLines: !searchFilters.businessLines })}
-              >
-                <Folder size={14} />
-                Business Lines
-                {searchResults.businessLines.length > 0 && (
-                  <span className="search-scope-count">{searchResults.businessLines.length}</span>
-                )}
+                ×
               </button>
             </div>
 
@@ -3336,12 +3276,6 @@ const [showFilters, setShowFilters] = useState(false)
               )}
             </div>
 
-            {/* Footer */}
-            <div className="search-footer">
-              <span className="search-footer-hint">
-                <kbd>↑</kbd> <kbd>↓</kbd> to navigate • <kbd>↵</kbd> to select
-              </span>
-            </div>
           </div>
         </div>
       )}
