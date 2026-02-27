@@ -14,7 +14,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Bell, Gauge, ChevronDown, Settings, GripVertical } from 'lucide-react'
+import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Bell, Gauge, ChevronDown, Settings, GripVertical, Folder } from 'lucide-react'
 import { Tooltip } from './Tooltip'
 import './App.css'
 import initialData from './data.json'
@@ -702,7 +702,12 @@ const [showFilters, setShowFilters] = useState(false)
       return
     }
     try {
-      const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`)
+      const params = new URLSearchParams()
+      params.set('q', query)
+      if (!searchFilters.projects) params.set('projects', 'false')
+      if (!searchFilters.team) params.set('team', 'false')
+      if (!searchFilters.businessLines) params.set('businessLines', 'false')
+      const res = await fetch(`/api/search?${params.toString()}`)
       const data = await res.json()
       setSearchResults(data)
     } catch (e) {
@@ -711,10 +716,17 @@ const [showFilters, setShowFilters] = useState(false)
   }
 
   const filteredResults = {
-    projects: searchFilters.projects ? searchResults.projects : [],
-    team: searchFilters.team ? searchResults.team : [],
-    businessLines: searchFilters.businessLines ? searchResults.businessLines : []
+    projects: searchResults.projects,
+    team: searchResults.team,
+    businessLines: searchResults.businessLines
   }
+
+  // Re-search when filters change (to update backend query)
+  useEffect(() => {
+    if (searchQuery.length >= 2) {
+      handleSearch(searchQuery)
+    }
+  }, [searchFilters.projects, searchFilters.team, searchFilters.businessLines])
 
   // Business Line CRUD
   const saveBusinessLine = async (line: BusinessLine, originalName?: string) => {
@@ -1757,14 +1769,11 @@ const [showFilters, setShowFilters] = useState(false)
                           if (businessLines.length === 0) return null
                           return (
                             <span className="member-business-line">
-                              {businessLines.map(({ brand, count, isManual }) => (
+                              {businessLines.map(({ brand, isManual }) => (
                                 <span 
                                   key={brand} 
                                   className={`business-line-item ${isManual ? 'glow' : 'muted'}`}
                                 >
-                                  {count > 0 && Array(count).fill(0).map((_, i) => (
-                                    <span key={i} className="project-dot"></span>
-                                  ))}
                                   {brand}
                                 </span>
                               ))}
@@ -1772,10 +1781,8 @@ const [showFilters, setShowFilters] = useState(false)
                           )
                         })()}
                       </div>
-                      {member.status === 'offline' ? (
+                      {member.status === 'offline' && (
                         <span className="status-emoji" data-tooltip="Offline">🌴</span>
-                      ) : (
-                        <span className={`status-dot ${getMemberStatusColor(member.status)}`}></span>
                       )}
                     </div>
                     <div className="team-card-footer">
@@ -3109,134 +3116,209 @@ const [showFilters, setShowFilters] = useState(false)
       {/* Search Modal */}
       {showSearch && (
         <div className="modal-overlay" onClick={() => { setShowSearch(false); setSearchQuery(''); setSearchResults({ projects: [], team: [], businessLines: [] }); }}>
-          <div className="modal search-modal" onClick={e => e.stopPropagation()}>
-            <div className="search-header">
-              <h2>Search</h2>
-              <button className="close-btn" onClick={() => { setShowSearch(false); setSearchQuery(''); setSearchResults({ projects: [], team: [], businessLines: [] }); }}>×</button>
-            </div>
-            
-            <div className="search-input-wrapper">
-              <Search size={18} className="search-icon" />
+          <div className="modal search-modal search-modal-v2" onClick={e => e.stopPropagation()}>
+            {/* Search Input */}
+            <div className="search-input-container">
+              <Search size={20} className="search-input-icon" />
               <input
                 type="text"
-                className="search-input"
-                placeholder="Search projects, team, business lines..."
+                className="search-input-v2"
+                placeholder="Search anything..."
                 value={searchQuery}
                 onChange={e => handleSearch(e.target.value)}
                 autoFocus
               />
+              {searchQuery && (
+                <button 
+                  className="search-clear-btn"
+                  onClick={() => { setSearchQuery(''); setSearchResults({ projects: [], team: [], businessLines: [] }); }}
+                >
+                  ×
+                </button>
+              )}
+              <kbd className="search-kbd">ESC</kbd>
             </div>
 
-            <div className="search-filters">
-              <label className={`search-filter-chip ${searchFilters.projects ? 'active' : ''}`}>
-                <input
-                  type="checkbox"
-                  checked={searchFilters.projects}
-                  onChange={() => setSearchFilters({ ...searchFilters, projects: !searchFilters.projects })}
-                />
-                Projects ({searchResults.projects.length})
-              </label>
-              <label className={`search-filter-chip ${searchFilters.team ? 'active' : ''}`}>
-                <input
-                  type="checkbox"
-                  checked={searchFilters.team}
-                  onChange={() => setSearchFilters({ ...searchFilters, team: !searchFilters.team })}
-                />
-                Team ({searchResults.team.length})
-              </label>
-              <label className={`search-filter-chip ${searchFilters.businessLines ? 'active' : ''}`}>
-                <input
-                  type="checkbox"
-                  checked={searchFilters.businessLines}
-                  onChange={() => setSearchFilters({ ...searchFilters, businessLines: !searchFilters.businessLines })}
-                />
-                Business Lines ({searchResults.businessLines.length})
-              </label>
+            {/* Scope Filters */}
+            <div className="search-scope-bar">
+              <button 
+                className={`search-scope-btn ${searchFilters.projects ? 'active' : ''}`}
+                onClick={() => setSearchFilters({ ...searchFilters, projects: !searchFilters.projects })}
+              >
+                <LayoutGrid size={14} />
+                Projects
+                {searchResults.projects.length > 0 && (
+                  <span className="search-scope-count">{searchResults.projects.length}</span>
+                )}
+              </button>
+              <button 
+                className={`search-scope-btn ${searchFilters.team ? 'active' : ''}`}
+                onClick={() => setSearchFilters({ ...searchFilters, team: !searchFilters.team })}
+              >
+                <Users size={14} />
+                Team
+                {searchResults.team.length > 0 && (
+                  <span className="search-scope-count">{searchResults.team.length}</span>
+                )}
+              </button>
+              <button 
+                className={`search-scope-btn ${searchFilters.businessLines ? 'active' : ''}`}
+                onClick={() => setSearchFilters({ ...searchFilters, businessLines: !searchFilters.businessLines })}
+              >
+                <Folder size={14} />
+                Business Lines
+                {searchResults.businessLines.length > 0 && (
+                  <span className="search-scope-count">{searchResults.businessLines.length}</span>
+                )}
+              </button>
             </div>
 
-            <div className="search-results">
-              {filteredResults.projects.length === 0 && filteredResults.team.length === 0 && filteredResults.businessLines.length === 0 && searchQuery.length >= 2 && (
-                <p className="search-empty">No results found</p>
-              )}
-              {searchQuery.length < 2 && (
-                <p className="search-hint">Type at least 2 characters to search</p>
-              )}
-
-              {filteredResults.businessLines.length > 0 && (
-                <div className="search-section">
-                  <h3>Business Lines</h3>
-                  {filteredResults.businessLines.map(bl => (
-                    <div key={bl.id}>
-                      <div className="search-result-item" onClick={() => { setActiveTab('settings'); setShowSearch(false); setSearchQuery(''); }}>
-                        <span className="search-result-icon">📁</span>
-                        <span className="search-result-name">{bl.name}</span>
+            {/* Results */}
+            <div className="search-results-v2">
+              {searchQuery.length < 2 ? (
+                <div className="search-empty-state">
+                  <Search size={48} className="search-empty-icon" />
+                  <p>Start typing to search across projects, team, and business lines</p>
+                  <span className="search-empty-hint">Try "Barron's", "Jason", or "IBD"</span>
+                </div>
+              ) : filteredResults.projects.length === 0 && filteredResults.team.length === 0 && filteredResults.businessLines.length === 0 ? (
+                <div className="search-empty-state">
+                  <p className="search-no-results">No results found for "{searchQuery}"</p>
+                  <span className="search-empty-hint">Try a different search term</span>
+                </div>
+              ) : (
+                <>
+                  {filteredResults.projects.length > 0 && (
+                    <div className="search-result-group">
+                      <div className="search-group-header">
+                        <LayoutGrid size={14} />
+                        <span>Projects</span>
                       </div>
-                      {bl.matchedLinks && bl.matchedLinks.length > 0 && (
-                        <div className="search-matched-links">
-                          {bl.matchedLinks.map((link, idx) => (
-                            <a 
-                              key={idx} 
-                              href={link.url} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="search-matched-link"
-                              onClick={e => e.stopPropagation()}
-                            >
-                              {link.type && <span className="search-link-type">{link.type}</span>}
-                              {link.name}
-                            </a>
-                          ))}
+                      {filteredResults.projects.map(project => (
+                        <div key={project.id} className="search-result-card">
+                          <div 
+                            className="search-result-main"
+                            onClick={() => { 
+                              setActiveTab('projects'); 
+                              setProjectFilters({ businessLines: [], designers: [], statuses: [], project: project.name || null }); 
+                              setProjectSortBy('name'); 
+                              setShowSearch(false); 
+                              setSearchQuery(''); 
+                            }}
+                          >
+                            <div className="search-result-title">{project.name}</div>
+                            <div className="search-result-subtitle">
+                              {project.designers?.join(', ')} • {project.businessLines?.join(', ')}
+                            </div>
+                          </div>
+                          {project.matchedLinks && project.matchedLinks.length > 0 && (
+                            <div className="search-result-links">
+                              {project.matchedLinks.map((link, idx) => (
+                                <a 
+                                  key={idx} 
+                                  href={link.url} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="search-result-link"
+                                  onClick={e => e.stopPropagation()}
+                                >
+                                  {link.type === 'Deck' && <Presentation size={12} />}
+                                  {link.type === 'PRD' && <FileText size={12} />}
+                                  {link.type === 'Figma' && <Figma size={12} />}
+                                  {link.type === 'Brief' && <FileEdit size={12} />}
+                                  {link.type === 'Link' && <LinkIcon size={12} />}
+                                  <span>{link.type}</span>
+                                </a>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      )}
+                      ))}
                     </div>
-                  ))}
-                </div>
-              )}
+                  )}
 
-              {filteredResults.team.length > 0 && (
-                <div className="search-section">
-                  <h3>Team</h3>
-                  {filteredResults.team.map(member => (
-                    <div key={member.id} className="search-result-item" onClick={() => { setActiveTab('team'); setShowSearch(false); setSearchQuery(''); }}>
-                      <span className="search-result-icon">👤</span>
-                      <span className="search-result-name">{member.name}</span>
-                      <span className="search-result-meta">{member.role}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {filteredResults.projects.length > 0 && (
-                <div className="search-section">
-                  <h3>Projects</h3>
-                  {filteredResults.projects.map(project => (
-                    <div key={project.id}>
-                      <div className="search-result-item" onClick={() => { setActiveTab('projects'); setProjectFilters({ businessLines: [], designers: [], statuses: [], project: project.name || null }); setProjectSortBy('name'); setShowSearch(false); setSearchQuery(''); }}>
-                        <span className="search-result-icon">📋</span>
-                        <span className="search-result-name">{project.name}</span>
-                        <span className="search-result-meta">{project.businessLines?.join(', ')}</span>
+                  {filteredResults.team.length > 0 && (
+                    <div className="search-result-group">
+                      <div className="search-group-header">
+                        <Users size={14} />
+                        <span>Team</span>
                       </div>
-                      {project.matchedLinks && project.matchedLinks.length > 0 && (
-                        <div className="search-matched-links">
-                          {project.matchedLinks.map((link, idx) => (
-                            <a 
-                              key={idx} 
-                              href={link.url} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="search-matched-link"
-                              onClick={e => e.stopPropagation()}
-                            >
-                              {link.type && <span className="search-link-type">{link.type}</span>}
-                              {link.name}
-                            </a>
-                          ))}
+                      {filteredResults.team.map(member => (
+                        <div 
+                          key={member.id} 
+                          className="search-result-card search-result-card-team"
+                          onClick={() => { 
+                            setActiveTab('team'); 
+                            setShowSearch(false); 
+                            setSearchQuery(''); 
+                          }}
+                        >
+                          <div className="search-result-avatar">
+                            {member.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                          </div>
+                          <div className="search-result-info">
+                            <div className="search-result-title">{member.name}</div>
+                            <div className="search-result-subtitle">
+                              {member.role} • {member.brands?.slice(0, 3).join(', ')}
+                              {member.brands?.length > 3 && ` +${member.brands.length - 3}`}
+                            </div>
+                          </div>
+                          <div className={`search-result-status ${member.status}`} />
                         </div>
-                      )}
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  )}
+
+                  {filteredResults.businessLines.length > 0 && (
+                    <div className="search-result-group">
+                      <div className="search-group-header">
+                        <Folder size={14} />
+                        <span>Business Lines</span>
+                      </div>
+                      {filteredResults.businessLines.map(bl => (
+                        <div key={bl.id} className="search-result-card">
+                          <div 
+                            className="search-result-main"
+                            onClick={() => { 
+                              setActiveTab('settings'); 
+                              setShowSearch(false); 
+                              setSearchQuery(''); 
+                            }}
+                          >
+                            <div className="search-result-title">{bl.name}</div>
+                          </div>
+                          {bl.matchedLinks && bl.matchedLinks.length > 0 && (
+                            <div className="search-result-links">
+                              {bl.matchedLinks.map((link, idx) => (
+                                <a 
+                                  key={idx} 
+                                  href={link.url} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="search-result-link"
+                                  onClick={e => e.stopPropagation()}
+                                >
+                                  {link.type === 'Deck' && <Presentation size={12} />}
+                                  {link.type === 'PRD' && <FileText size={12} />}
+                                  {link.type === 'Figma' && <Figma size={12} />}
+                                  <span>{link.type}</span>
+                                </a>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
+            </div>
+
+            {/* Footer */}
+            <div className="search-footer">
+              <span className="search-footer-hint">
+                <kbd>↑</kbd> <kbd>↓</kbd> to navigate • <kbd>↵</kbd> to select
+              </span>
             </div>
           </div>
         </div>

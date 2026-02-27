@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import sqlite3 from 'sqlite3';
 import path from 'path';
+import { searchProjects, searchTeam, searchBusinessLines } from './search';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -283,134 +284,38 @@ app.get('/api/brandOptions', async (req, res) => {
 });
 
 // ============ SEARCH ============
-// Normalize string for loose search (remove apostrophes, hyphens, etc.)
-const normalize = (s: string) => s?.toLowerCase().replace(/['"-]/g, '').replace(/\s+/g, ' ').trim() || '';
+// Smart search with word boundaries and relevance scoring
 
 app.get('/api/search', async (req, res) => {
   try {
-    const query = normalize(req.query.q as string || '');
-    const queryOriginal = (req.query.q as string || '').toLowerCase().trim();
+    const query = (req.query.q as string || '').trim();
+    const scopes = {
+      projects: req.query.projects !== 'false',
+      team: req.query.team !== 'false',
+      businessLines: req.query.businessLines !== 'false'
+    };
+
     if (!query || query.length < 2) {
       return res.json({ projects: [], team: [], businessLines: [] });
     }
 
-    // Search projects
-    const projects = await all('SELECT * FROM projects').then(p => p.map(proj => {
-      const customLinks = proj.customLinks ? JSON.parse(proj.customLinks) : [];
-      const designers = proj.designers ? JSON.parse(proj.designers) : [];
-      const businessLines = proj.businessLine ? (() => { try { return JSON.parse(proj.businessLine); } catch { return [proj.businessLine]; } })() : [];
-      
-      // Check if main fields match
-      const matchesMainFields = 
-        normalize(proj.name).includes(query) ||
-        businessLines.some((bl: string) => normalize(bl).includes(query)) ||
-        normalize(proj.description || '').includes(query) ||
-        (Array.isArray(designers) && designers.some((d: string) => normalize(d).includes(query)));
-      
-      // Build all asset links
-      const allLinks = [
-        proj.deckName ? { name: proj.deckName, url: proj.deckLink || '', type: 'Deck' } : null,
-        proj.prdName ? { name: proj.prdName, url: proj.prdLink || '', type: 'PRD' } : null,
-        proj.briefName ? { name: proj.briefName, url: proj.briefLink || '', type: 'Brief' } : null,
-        proj.figmaLink ? { name: 'Figma', url: proj.figmaLink, type: 'Figma' } : null,
-        ...customLinks.map((l: { name: string; url: string }) => ({ ...l, type: 'Link' }))
-      ].filter(Boolean);
-      
-      // Check if query matches any link type (deck, prd, brief, figma, link)
-      const hasDeck = allLinks.some((l: any) => l.type === 'Deck');
-      const hasPrd = allLinks.some((l: any) => l.type === 'PRD');
-      const hasBrief = allLinks.some((l: any) => l.type === 'Brief');
-      const hasFigma = allLinks.some((l: any) => l.type === 'Figma');
-      const hasLink = allLinks.some((l: any) => l.type === 'Link');
-      
-      const queryLower = query.toLowerCase();
-      const matchesAssetType = 
-        (queryLower.includes('deck') && hasDeck) ||
-        (queryLower.includes('prd') && hasPrd) ||
-        (queryLower.includes('brief') && hasBrief) ||
-        (queryLower.includes('figma') && hasFigma) ||
-        (queryLower.includes('link') && hasLink);
-      
-      // If main fields match or matches asset type, show all links. Otherwise only show matching links.
-      const matchedLinks = (matchesMainFields || matchesAssetType)
-        ? allLinks 
-        : allLinks.filter((l: any) => normalize(l.name).includes(query) || normalize(l.url).includes(query));
-      
-      return {
-        ...proj,
-        timeline: proj.timeline ? JSON.parse(proj.timeline) : [],
-        customLinks: customLinks,
-        matchedLinks: matchedLinks,
-        designers: designers,
-        businessLines: businessLines
-      };
-    }).filter(proj => 
-      normalize(proj.name).includes(query) ||
-      (proj.businessLines || []).some((bl: string) => normalize(bl).includes(query)) ||
-      normalize(proj.description || '').includes(query) ||
-      (Array.isArray(proj.designers) && proj.designers.some((d: string) => normalize(d).includes(query))) ||
-      (proj as any).matchedLinks?.length > 0
-    ));
+    // Run searches based on scopes
+    const [projectResults, teamResults, blResults] = await Promise.all([
+      scopes.projects ? searchProjects(query, all) : Promise.resolve([]),
+      scopes.team ? searchTeam(query, all) : Promise.resolve([]),
+      scopes.businessLines ? searchBusinessLines(query, all) : Promise.resolve([])
+    ]);
 
-    // Search team members
-    const team = await all('SELECT * FROM team').then(m => m.map(t => ({
-      ...t,
-      brands: JSON.parse(t.brands || '[]'),
-      timeOff: t.timeOff ? JSON.parse(t.timeOff) : []
-    })).filter(member =>
-      normalize(member.name).includes(query) ||
-      normalize(member.role).includes(query) ||
-      member.brands?.some((b: string) => normalize(b).includes(query))
-    ));
-
-    // Search business lines
-    const businessLines = await all('SELECT * FROM business_lines').then(l => l.map(bl => {
-      const customLinks = bl.customLinks ? JSON.parse(bl.customLinks) : [];
-      
-      // Check if main field (name) matches
-      const matchesMainField = normalize(bl.name).includes(query);
-      
-      // Build all asset links
-      const allLinks = [
-        bl.deckName ? { name: bl.deckName, url: bl.deckLink || '', type: 'Deck' } : null,
-        bl.prdName ? { name: bl.prdName, url: bl.prdLink || '', type: 'PRD' } : null,
-        bl.briefName ? { name: bl.briefName, url: bl.briefLink || '', type: 'Brief' } : null,
-        bl.figmaLink ? { name: 'Figma', url: bl.figmaLink, type: 'Figma' } : null,
-        ...customLinks.map((l: { name: string; url: string }) => ({ ...l, type: 'Link' }))
-      ].filter(Boolean);
-      
-      // Check if query matches any link type
-      const hasDeck = allLinks.some((l: any) => l.type === 'Deck');
-      const hasPrd = allLinks.some((l: any) => l.type === 'PRD');
-      const hasBrief = allLinks.some((l: any) => l.type === 'Brief');
-      const hasFigma = allLinks.some((l: any) => l.type === 'Figma');
-      const hasLink = allLinks.some((l: any) => l.type === 'Link');
-      
-      const queryLower = query.toLowerCase();
-      const matchesAssetType = 
-        (queryLower.includes('deck') && hasDeck) ||
-        (queryLower.includes('prd') && hasPrd) ||
-        (queryLower.includes('brief') && hasBrief) ||
-        (queryLower.includes('figma') && hasFigma) ||
-        (queryLower.includes('link') && hasLink);
-      
-      // If name matches or matches asset type, show all links. Otherwise only show matching links.
-      const matchedLinks = (matchesMainField || matchesAssetType)
-        ? allLinks
-        : allLinks.filter((l: any) => normalize(l.name).includes(query) || normalize(l.url).includes(query));
-      
-      return {
-        ...bl,
-        customLinks: customLinks,
-        matchedLinks: matchedLinks
-      };
-    }).filter(bl =>
-      normalize(bl.name).includes(query) ||
-      (bl as any).matchedLinks?.length > 0
-    ));
-
-    res.json({ projects, team, businessLines });
-  } catch (e) { res.status(500).json({error: e.message}); }
+    // Format response (remove score/matches from items, just return the items)
+    res.json({
+      projects: projectResults.map(r => r.item),
+      team: teamResults.map(r => r.item),
+      businessLines: blResults.map(r => r.item)
+    });
+  } catch (e) {
+    console.error('Search error:', e);
+    res.status(500).json({error: e.message});
+  }
 });
 
 // ============ COMBINED DATA ============
@@ -622,8 +527,8 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 // Format: YYYY.MM.DD.hhmm (e.g., 2026.02.26.2059) → displays as "2026.02.26 2059"
 
-const SITE_VERSION = '2026.02.26.2059'  // Manual update on code changes
-const SITE_TIME = '2059'
+const SITE_VERSION = '2026.02.26.2144'  // Manual update on code changes
+const SITE_TIME = '2144'
 
 const VERSION_KEY = 'dcc_versions'
 
