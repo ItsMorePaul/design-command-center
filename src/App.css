@@ -1995,7 +1995,8 @@
 }
 
 .priority-bl-select {
-  padding: 6px 12px;
+  height: 29px;
+  padding: 0 12px;
   border-radius: 4px;
   border: 1px solid var(--color-border);
   background: var(--color-bg-secondary);
@@ -2004,6 +2005,7 @@
   cursor: pointer;
   outline: none;
   transition: border-color 0.15s ease;
+  box-sizing: border-box;
 }
 
 .priority-bl-select:focus {
