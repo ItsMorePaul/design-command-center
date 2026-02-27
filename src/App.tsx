@@ -261,19 +261,25 @@ function App() {
   const [timelineFormData, setTimelineFormData] = useState({ name: '', startDate: '', endDate: '' })
   
   const [isLoaded, setIsLoaded] = useState(false)
-  const [projectSortBy, setProjectSortBy] = useState<'name' | 'businessLine' | 'designer' | 'dueDate' | 'status'>('name')
-  const [projectFilters, setProjectFilters] = useState({
-    businessLines: [] as string[],
-    designers: [] as string[],
-    statuses: [] as string[],
-    project: null as string | null
-  })
+  const [projectSortBy, setProjectSortBy] = useState<'name' | 'businessLine' | 'designer' | 'dueDate' | 'status'>(() => { try { return (localStorage.getItem('dcc_projectSortBy') as any) || 'name' } catch { return 'name' } })
+  const [projectFilters, setProjectFilters] = useState<{businessLines:string[],designers:string[],statuses:string[],project:string|null}>(() => {
+  try {
+    const s = localStorage.getItem('dcc_projectFilters')
+    if (s) return JSON.parse(s)
+  } catch {}
+  return {businessLines:[],designers:[],statuses:[],project:null}
+})
   const [calendarFilters, setCalendarFilters] = useState({
     designers: [] as string[],
     projects: [] as string[],
     brands: [] as string[]
   })
-  const [showFilters, setShowFilters] = useState(false)
+  useEffect(() => {
+  try { localStorage.setItem('dcc_projectSortBy', localStorage.getItem('dcc_projectSortBy') || 'name') } catch {}
+  try { localStorage.setItem('dcc_projectFilters', JSON.stringify(projectFilters)) } catch {}
+}, [projectFilters])
+
+const [showFilters, setShowFilters] = useState(false)
   const [assignmentForm, setAssignmentForm] = useState({ project_id: '', designer_id: '', allocation_percent: 0 })
   const [hoursDraft, setHoursDraft] = useState<Record<string, number>>({})
   const [assignmentDraft, setAssignmentDraft] = useState<Record<string, number>>({})
@@ -593,6 +599,10 @@ function App() {
     setProjects(apiData.projects || [])
   }
 
+  // Persist sort/filter to localStorage
+  useEffect(() => { try { localStorage.setItem('dcc_projectSortBy', projectSortBy) } catch {} }, [projectSortBy])
+  useEffect(() => { try { localStorage.setItem('dcc_projectFilters', JSON.stringify(projectFilters)) } catch {} }, [projectFilters])
+
   // Refresh projects list from server
   const refreshProjects = async () => {
     try {
@@ -613,10 +623,8 @@ function App() {
   const handleEventClick = (event: CalendarEvent) => {
     if (event.type === 'project' && event.projectName) {
       setSelectedDay(null)
-      setProjectFilters({
-        ...projectFilters,
-        project: event.projectName
-      })
+      setProjectFilters({ businessLines: [], designers: [], statuses: [], project: event.projectName || null })
+      setProjectSortBy('name')
       setActiveTab('projects')
     }
   }
@@ -2003,7 +2011,7 @@ function App() {
                                     className="chip-project-link"
                                     onClick={() => {
                                       setActiveTab('projects')
-                                      setProjectFilters({ ...projectFilters, project: assignment.project_name || '' })
+                                      setProjectFilters({ businessLines: [], designers: [], statuses: [], project: assignment.project_name || null }); setProjectSortBy('name')
                                     }}
                                   >
                                     {assignment.project_name || 'Project'}
@@ -2886,7 +2894,7 @@ function App() {
                   <h3>Projects</h3>
                   {filteredResults.projects.map(project => (
                     <div key={project.id}>
-                      <div className="search-result-item" onClick={() => { setActiveTab('projects'); setProjectFilters({ ...projectFilters, project: project.name }); setShowSearch(false); setSearchQuery(''); }}>
+                      <div className="search-result-item" onClick={() => { setActiveTab('projects'); setProjectFilters({ businessLines: [], designers: [], statuses: [], project: project.name || null }); setProjectSortBy('name'); setShowSearch(false); setSearchQuery(''); }}>
                         <span className="search-result-icon">📋</span>
                         <span className="search-result-name">{project.name}</span>
                         <span className="search-result-meta">{project.businessLines?.join(', ')}</span>

@@ -2170,19 +2170,17 @@ input:checked + .slider:before {
 }
 
 .filter-pill {
-  padding: 0.5rem 0.875rem;
-  font-size: 0.8125rem;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.78rem;
   background: var(--color-bg);
   border: 1px solid var(--color-border);
-  border-radius: 20px;
+  border-radius: 999px;
   color: var(--color-text-muted);
   cursor: pointer;
-  transition: all 0.2s ease;
-  height: 32px;
-  box-sizing: border-box;
+  transition: all 0.15s ease;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  white-space: nowrap;
 }
 
 /* Default hover (white) for projects and brands */
@@ -2229,19 +2227,16 @@ input:checked + .slider:before {
 }
 
 .filter-clear-pill {
-  padding: 0.5rem 0.875rem;
-  font-size: 0.8125rem;
+  padding: 0.15rem 0.7rem;
+  font-size: 0.78rem;
   background: transparent;
   border: 1px dashed var(--color-border);
-  border-radius: 20px;
+  border-radius: 999px;
   color: var(--color-text-muted);
   cursor: pointer;
   transition: all 0.2s ease;
-  height: 32px;
-  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
 }
 
 .filter-clear-pill:hover {
@@ -3454,4 +3449,118 @@ select:focus-visible {
   color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+/* Modal with header/body/footer layout */
+.modal {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.modal-header {
+  padding: 1.5rem 2rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.modal-body {
+  padding: 1.5rem 2rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.modal-footer {
+  padding: 1rem 2rem 1.5rem;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.modal-footer .secondary-btn {
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+/* Form sections */
+.form-section {
+  padding: 1.25rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.form-section:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.form-section-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: 1rem;
+}
+
+/* Form row for side-by-side fields */
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.form-label-hint {
+  font-weight: 400;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+/* Timeline list with border and scroll */
+.timeline-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 250px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.5rem;
+}
+
+/* Timeline item */
+.timeline-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: var(--color-bg-secondary);
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+}
+
+.drag-handle {
+  cursor: grab;
+  color: var(--color-text-muted);
+  font-size: 1rem;
+  padding: 0 0.5rem;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.timeline-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
