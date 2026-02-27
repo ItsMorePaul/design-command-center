@@ -497,7 +497,7 @@ const [showFilters, setShowFilters] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<{ projects: Project[], team: TeamMember[], businessLines: BusinessLine[] }>({ projects: [], team: [], businessLines: [] })
-  const [searchFilters, setSearchFilters] = useState<{ projects: boolean, team: boolean, businessLines: boolean }>({ projects: true, team: true, businessLines: true })
+  const [searchFilters] = useState<{ projects: boolean, team: boolean, businessLines: boolean }>({ projects: true, team: true, businessLines: true })
 
   // Business Lines (Settings)
   const [businessLines, setBusinessLines] = useState<BusinessLine[]>([])
@@ -1063,13 +1063,14 @@ const [showFilters, setShowFilters] = useState(false)
       .sort((a, b) => a.brand.localeCompare(b.brand))
   }
 
-  const getMemberStatusColor = (status: TeamMember['status']) => {
-    switch (status) {
-      case 'online': return 'bg-green-500'
-      case 'away': return 'bg-yellow-500'
-      case 'offline': return 'bg-gray-500'
-    }
-  }
+  // Unused function - keeping for potential future use
+  // const _getMemberStatusColor = (status: TeamMember['status']) => {
+  //   switch (status) {
+  //     case 'online': return 'bg-green-500'
+  //     case 'away': return 'bg-yellow-500'
+  //     case 'offline': return 'bg-gray-500'
+  //   }
+  // }
 
   // Check if current date falls within any time off period
   const getStatusFromTimeOff = (timeOff: { startDate: string; endDate: string }[]): TeamMember['status'] | null => {
