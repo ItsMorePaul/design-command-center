@@ -2385,7 +2385,7 @@ const [showFilters, setShowFilters] = useState(false)
                           setFormData({ ...formData, timeOff: newTimeOff });
                         }}
                       >
-                        ×
+                        <Trash2 size={14} />
                       </button>
                     </div>
                   ))}
@@ -2590,7 +2590,7 @@ const [showFilters, setShowFilters] = useState(false)
                         setProjectFormData({ ...projectFormData, customLinks: newLinks })
                         closeConfirmModal()
                       })}
-                    >×</button>
+                    ><Trash2 size={14} /></button>
                   </div>
                 ))}
                 {(!projectFormData.customLinks || projectFormData.customLinks.length < 3) && (
@@ -3004,7 +3004,7 @@ const [showFilters, setShowFilters] = useState(false)
                       setBusinessLineFormData({ ...businessLineFormData, customLinks: newLinks })
                     }}
                   >
-                    ×
+                    <Trash2 size={14} />
                   </button>
                 </div>
               ))}
