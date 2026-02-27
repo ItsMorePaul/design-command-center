@@ -317,6 +317,71 @@ function SortablePriorityItem({
   )
 }
 
+// Sortable done item component (for dragging out of done zone)
+function SortableDoneItem({
+  project,
+  onEdit,
+}: {
+  project: Project
+  onEdit: (p: Project) => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: `done-${project.id}` })
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }
+  const statusColors: Record<string, string> = { active: '#3b82f6', review: '#f59e0b', done: '#22c55e', blocked: '#ef4444' }
+  const statusLabel: Record<string, string> = { active: 'Active', review: 'In Review', done: 'Done', blocked: 'Blocked' }
+
+  return (
+    <div ref={setNodeRef} style={style} className="priority-item unranked done-item">
+      <button type="button" className="action-btn drag-handle" {...attributes} {...listeners} tabIndex={-1}>
+        <GripVertical size={14} />
+      </button>
+      <span className="priority-rank-empty">—</span>
+      <div className="priority-info">
+        <span className="priority-name">{project.name}</span>
+        <span className="priority-meta">{project.designers?.join(', ') || '—'}</span>
+      </div>
+      <span className="priority-status-label" style={{ color: statusColors[project.status] }}>
+        <span className="priority-status-dot" style={{ background: statusColors[project.status] }} />
+        {statusLabel[project.status]}
+      </span>
+      <button type="button" className="action-btn" onClick={() => onEdit(project)}><Pencil size={14} /></button>
+    </div>
+  )
+}
+
+// Sortable done item — draggable out of the Done zone
+function SortableDoneItem({
+  project,
+  onEdit,
+}: {
+  project: Project
+  onEdit: (p: Project) => void
+}) {
+  const sortableId = `done:${project.id}`
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sortableId })
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }
+  const statusColors: Record<string, string> = { active: '#3b82f6', review: '#f59e0b', done: '#22c55e', blocked: '#ef4444' }
+  const statusLabel: Record<string, string> = { active: 'Active', review: 'In Review', done: 'Done', blocked: 'Blocked' }
+
+  return (
+    <div ref={setNodeRef} style={style} className="priority-item unranked">
+      <button type="button" className="action-btn drag-handle" {...attributes} {...listeners} tabIndex={-1}>
+        <GripVertical size={14} />
+      </button>
+      <span className="priority-rank-empty">—</span>
+      <div className="priority-info">
+        <span className="priority-name">{project.name}</span>
+        <span className="priority-meta">{project.designers?.join(', ') || '—'}</span>
+      </div>
+      <span className="priority-status-label" style={{ color: statusColors[project.status] }}>
+        <span className="priority-status-dot" style={{ background: statusColors[project.status] }} />
+        {statusLabel[project.status]}
+      </span>
+      <button type="button" className="action-btn" onClick={() => onEdit(project)}><Pencil size={14} /></button>
+    </div>
+  )
+}
+
 // Sortable timeline item component
 function SortableTimelineItem({
   range,
@@ -975,6 +1040,27 @@ const [showFilters, setShowFilters] = useState(false)
     savePriorities(blId, newRankedIds)
     // Persist to backend
     await fetch(`/api/projects/${projectId}/done`, { method: 'PUT' })
+  }
+
+  const unmarkProjectDone = async (projectId: string, blId: string, currentRankedIds: string[]) => {
+    // Optimistic: update local state
+    setProjects(prev => prev.map(p => p.id === projectId ? { ...p, status: 'active' as const } : p))
+    // Add back to priority ranking at the end
+    const newRankedIds = [...currentRankedIds, projectId]
+    savePriorities(blId, newRankedIds)
+    // Persist to backend
+    await fetch(`/api/projects/${projectId}/undone`, { method: 'PUT' })
+  }
+
+  const markProjectUndone = async (projectId: string, blId: string, currentRankedIds: string[], insertIndex: number) => {
+    // Optimistic: restore status to active
+    setProjects(prev => prev.map(p => p.id === projectId ? { ...p, status: 'active' as const } : p))
+    // Insert into priority ranking at the specified position
+    const newRankedIds = [...currentRankedIds]
+    newRankedIds.splice(insertIndex, 0, projectId)
+    savePriorities(blId, newRankedIds)
+    // Persist to backend
+    await fetch(`/api/projects/${projectId}/undone`, { method: 'PUT' })
   }
 
   const handleSaveProject = async () => {
@@ -1757,6 +1843,9 @@ const [showFilters, setShowFilters] = useState(false)
                     .map(p => p.id)
                   const allRankedIds = [...savedRankedIds, ...unrankedLiveIds]
                   const ranked = allRankedIds.map(id => liveProjects.find(p => p.id === id)).filter(Boolean) as Project[]
+                  const doneSorted = doneProjects.sort((a, b) => a.name.localeCompare(b.name))
+                  const doneItemIds = doneSorted.map(p => `done:${p.id}`)
+                  const allSortableIds = [...allRankedIds, ...doneItemIds]
 
                   if (blProjects.length === 0 && isAllView) return null
 
@@ -1769,6 +1858,11 @@ const [showFilters, setShowFilters] = useState(false)
                         <DndContext
                           sensors={prioritySensors}
                           collisionDetection={(args) => {
+                            const activeId = String(args.active.id)
+                            const isDoneItem = activeId.startsWith('done:')
+                            // When dragging a done item, skip the done zone — target live list only
+                            if (isDoneItem) return closestCenter(args)
+                            // When dragging a live item, prefer done zone if pointer is over it
                             const pointerCollisions = pointerWithin(args)
                             const doneHit = pointerCollisions.find(c => c.id === doneZoneId)
                             if (doneHit) return [doneHit]
@@ -1780,18 +1874,32 @@ const [showFilters, setShowFilters] = useState(false)
                             setActiveDragId(null)
                             const { active, over } = e
                             if (!over) return
-                            if (over.id === doneZoneId) {
-                              markProjectDone(String(active.id), blId, allRankedIds)
+                            const activeStr = String(active.id)
+                            const overStr = String(over.id)
+
+                            // Dragging a done project back to live list
+                            if (activeStr.startsWith('done:')) {
+                              const projectId = activeStr.replace('done:', '')
+                              // Determine insert position: if dropped on a live item, insert at its index; otherwise append
+                              const overIndex = allRankedIds.indexOf(overStr)
+                              const insertIndex = overIndex !== -1 ? overIndex : allRankedIds.length
+                              markProjectUndone(projectId, blId, allRankedIds, insertIndex)
+                              return
+                            }
+
+                            // Dragging a live project to done zone
+                            if (overStr === doneZoneId) {
+                              markProjectDone(activeStr, blId, allRankedIds)
                               return
                             }
                             if (active.id === over.id) return
-                            const oldIndex = allRankedIds.indexOf(String(active.id))
-                            const newIndex = allRankedIds.indexOf(String(over.id))
+                            const oldIndex = allRankedIds.indexOf(activeStr)
+                            const newIndex = allRankedIds.indexOf(overStr)
                             if (oldIndex === -1 || newIndex === -1) return
                             savePriorities(blId, arrayMove(allRankedIds, oldIndex, newIndex))
                           }}
                         >
-                          <SortableContext items={allRankedIds} strategy={verticalListSortingStrategy}>
+                          <SortableContext items={allSortableIds} strategy={verticalListSortingStrategy}>
                             <div className="priority-list">
                               {ranked.map((p, i) => (
                                 <SortablePriorityItem key={p.id} project={p} rank={i + 1} onEdit={handleEditProject} />
@@ -1799,20 +1907,10 @@ const [showFilters, setShowFilters] = useState(false)
                             </div>
                           </SortableContext>
 
-                          {/* Done drop zone — always visible */}
+                          {/* Done drop zone — always visible, done items are draggable */}
                           <DoneDropZone id={doneZoneId}>
-                            {doneProjects.sort((a, b) => a.name.localeCompare(b.name)).map(p => (
-                              <div key={p.id} className="priority-item unranked">
-                                <span className="priority-rank-empty">—</span>
-                                <div className="priority-info">
-                                  <span className="priority-name">{p.name}</span>
-                                  <span className="priority-meta">{p.designers?.join(', ') || '—'}</span>
-                                </div>
-                                <span className="priority-status-label" style={{ color: statusColors[p.status] }}>
-                                  <span className="priority-status-dot" style={{ background: statusColors[p.status] }} />
-                                  {statusLabel[p.status]}
-                                </span>
-                              </div>
+                            {doneSorted.map(p => (
+                              <SortableDoneItem key={p.id} project={p} onEdit={handleEditProject} />
                             ))}
                           </DoneDropZone>
                         </DndContext>

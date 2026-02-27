@@ -188,6 +188,15 @@ app.put('/api/projects/:id/done', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
+// Mark project as undone: restore status to 'active'
+app.put('/api/projects/:id/undone', async (req, res) => {
+  try {
+    await run("UPDATE projects SET status = 'active', updatedAt = datetime('now') WHERE id = ?", [req.params.id])
+    await updateDbVersion()
+    res.json({ success: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
 // ============ BUSINESS LINES ============
 app.get('/api/business-lines', async (req, res) => {
   try {
@@ -588,8 +597,8 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 // Format: YYYY.MM.DD.hhmm (e.g., 2026.02.26.2059) → displays as "2026.02.26 2059"
 
-const SITE_VERSION = '2026.02.27.0927'
-const SITE_TIME = '0927'
+const SITE_VERSION = '2026.02.27.0940'
+const SITE_TIME = '0940'
 
 const VERSION_KEY = 'dcc_versions'
 
