@@ -303,7 +303,7 @@ function SortablePriorityItem({
       </button>
       <span className="priority-rank">{rank}</span>
       <div className="priority-info">
-        <span className="priority-name">{isOverdue && <span className="overdue-label">Overdue</span>}{project.name}</span>
+        <span className="priority-name">{isOverdue && <span className="overdue-label">Overdue</span>}{isOverdue && ' '}{project.name}</span>
         <span className="priority-meta">
           {project.designers?.join(', ') || '—'}
           {project.endDate ? ` · ${formatShortDate(project.endDate)}` : ''}
@@ -340,7 +340,7 @@ function SortableDoneItem({
       </button>
       <span className="priority-rank-empty">—</span>
       <div className="priority-info">
-        <span className="priority-name">{isOverdue && <span className="overdue-label">Overdue</span>}{project.name}</span>
+        <span className="priority-name">{isOverdue && <span className="overdue-label">Overdue</span>}{isOverdue && ' '}{project.name}</span>
         <span className="priority-meta">{project.designers?.join(', ') || '—'}</span>
       </div>
       <span className="priority-status-label" style={{ color: statusColors[project.status] }}>
