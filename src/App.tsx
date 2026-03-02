@@ -294,6 +294,7 @@ function SortablePriorityItem({
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }
   const statusColors: Record<string, string> = { active: '#3b82f6', review: '#f59e0b', done: '#22c55e', blocked: '#ef4444' }
   const statusLabel: Record<string, string> = { active: 'Active', review: 'In Review', done: 'Done', blocked: 'Blocked' }
+  const isOverdue = project.endDate && project.status !== 'done' && new Date(project.endDate) < new Date(new Date().toISOString().split('T')[0])
 
   return (
     <div ref={setNodeRef} style={style} className="priority-item">
@@ -302,7 +303,7 @@ function SortablePriorityItem({
       </button>
       <span className="priority-rank">{rank}</span>
       <div className="priority-info">
-        <span className="priority-name">{project.name}</span>
+        <span className="priority-name">{isOverdue && <span className="overdue-label">Overdue</span>}{project.name}</span>
         <span className="priority-meta">
           {project.designers?.join(', ') || '—'}
           {project.endDate ? ` · ${formatShortDate(project.endDate)}` : ''}
@@ -330,6 +331,7 @@ function SortableDoneItem({
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }
   const statusColors: Record<string, string> = { active: '#3b82f6', review: '#f59e0b', done: '#22c55e', blocked: '#ef4444' }
   const statusLabel: Record<string, string> = { active: 'Active', review: 'In Review', done: 'Done', blocked: 'Blocked' }
+  const isOverdue = project.endDate && project.status !== 'done' && new Date(project.endDate) < new Date(new Date().toISOString().split('T')[0])
 
   return (
     <div ref={setNodeRef} style={style} className="priority-item unranked">
@@ -338,7 +340,7 @@ function SortableDoneItem({
       </button>
       <span className="priority-rank-empty">—</span>
       <div className="priority-info">
-        <span className="priority-name">{project.name}</span>
+        <span className="priority-name">{isOverdue && <span className="overdue-label">Overdue</span>}{project.name}</span>
         <span className="priority-meta">{project.designers?.join(', ') || '—'}</span>
       </div>
       <span className="priority-status-label" style={{ color: statusColors[project.status] }}>
