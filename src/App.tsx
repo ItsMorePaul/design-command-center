@@ -20,6 +20,14 @@ import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, 
 import { Tooltip } from './Tooltip'
 import './App.css'
 import initialData from './data.json'
+import { WebHaptics } from 'web-haptics'
+
+// Mobile haptic helper — only triggers on mobile breakpoints
+const isMobile = () => window.matchMedia('(max-width: 768px)').matches
+const haptics = new WebHaptics()
+const hapticLight = () => isMobile() && haptics.trigger([{ duration: 30, intensity: 0.3 }])
+const hapticMedium = () => isMobile() && haptics.trigger([{ duration: 50, intensity: 0.6 }])
+const hapticHeavy = () => isMobile() && haptics.trigger([{ duration: 80, intensity: 1.0 }])
 
 // US Holidays (2026)
 const usHolidays2026 = [
@@ -889,6 +897,7 @@ const [showFilters, setShowFilters] = useState(false)
       try {
         await deleteProject(id)
         setProjects(projects.filter(p => p.id !== id))
+        hapticHeavy()
       } catch (err) {
         console.error('Delete failed:', err)
         alert('Failed to delete project')
@@ -1075,6 +1084,7 @@ const [showFilters, setShowFilters] = useState(false)
       refreshCapacity()
       refreshProjects()
     }
+    hapticMedium()
     setShowProjectModal(false)
   }
 
@@ -1352,6 +1362,7 @@ const [showFilters, setShowFilters] = useState(false)
     openConfirmModal('Remove team member?', 'This will remove the team member and related assignment links.', async () => {
       await deleteTeamMember(id)
       setTeam(team.filter(m => m.id !== id))
+      hapticHeavy()
       closeConfirmModal()
     })
   }
@@ -1381,6 +1392,7 @@ const [showFilters, setShowFilters] = useState(false)
       setTeam([...team, newMember])
       refreshCalendar()
     }
+    hapticMedium()
     setShowModal(false)
   }
 
@@ -1396,7 +1408,7 @@ const [showFilters, setShowFilters] = useState(false)
         <nav className="nav">
           <button
             className={`nav-item ${activeTab === 'projects' ? 'active' : ''}`}
-            onClick={() => setActiveTab('projects')}
+            onClick={() => { hapticLight(); setActiveTab('projects') }}
             aria-label="Projects"
           >
             <span className="nav-icon"><FileText size={18} /></span>
@@ -1404,7 +1416,7 @@ const [showFilters, setShowFilters] = useState(false)
           </button>
           <button
             className={`nav-item ${activeTab === 'team' ? 'active' : ''}`}
-            onClick={() => setActiveTab('team')}
+            onClick={() => { hapticLight(); setActiveTab('team') }}
             aria-label="Team"
           >
             <span className="nav-icon"><Users size={18} /></span>
@@ -1412,7 +1424,7 @@ const [showFilters, setShowFilters] = useState(false)
           </button>
           <button
             className={`nav-item ${activeTab === 'capacity' ? 'active' : ''}`}
-            onClick={() => setActiveTab('capacity')}
+            onClick={() => { hapticLight(); setActiveTab('capacity') }}
             aria-label="Capacity"
           >
             <span className="nav-icon"><Gauge size={18} /></span>
@@ -1420,7 +1432,7 @@ const [showFilters, setShowFilters] = useState(false)
           </button>
           <button
             className={`nav-item ${activeTab === 'calendar' ? 'active' : ''}`}
-            onClick={() => setActiveTab('calendar')}
+            onClick={() => { hapticLight(); setActiveTab('calendar') }}
             aria-label="Calendar"
           >
             <span className="nav-icon"><Calendar size={18} /></span>
@@ -1842,12 +1854,14 @@ const [showFilters, setShowFilters] = useState(false)
                               const overIndex = allRankedIds.indexOf(overStr)
                               const insertIndex = overIndex !== -1 ? overIndex : allRankedIds.length
                               markProjectUndone(projectId, blId, allRankedIds, insertIndex)
+                              hapticMedium()
                               return
                             }
 
                             // Dragging a live project to done zone
                             if (overStr === doneZoneId) {
                               markProjectDone(activeStr, blId, allRankedIds)
+                              hapticMedium()
                               return
                             }
                             if (active.id === over.id) return
@@ -1855,6 +1869,7 @@ const [showFilters, setShowFilters] = useState(false)
                             const newIndex = allRankedIds.indexOf(overStr)
                             if (oldIndex === -1 || newIndex === -1) return
                             savePriorities(blId, arrayMove(allRankedIds, oldIndex, newIndex))
+                            hapticLight()
                           }}
                         >
                           <SortableContext items={allSortableIds} strategy={verticalListSortingStrategy}>
@@ -2683,7 +2698,7 @@ const [showFilters, setShowFilters] = useState(false)
 
       {/* Modal */}
       {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+        <div className="modal-overlay" onClick={() => { hapticLight(); setShowModal(false) }}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2>{editingMember ? 'Edit Team Member' : 'Add Team Member'}</h2>
@@ -2792,7 +2807,7 @@ const [showFilters, setShowFilters] = useState(false)
             </div>
 
             <div className="modal-footer">
-              <button className="secondary-btn" onClick={() => setShowModal(false)}>Cancel</button>
+              <button className="secondary-btn" onClick={() => { hapticLight(); setShowModal(false) }}>Cancel</button>
               <button className="primary-btn" onClick={handleSave}>
                 {editingMember ? 'Save Changes' : 'Add Member'}
               </button>
