@@ -1175,7 +1175,7 @@ const [showFilters, setShowFilters] = useState(false)
       const start = new Date(off.startDate)
       const end = new Date(off.endDate)
       if (today >= start && today <= end) {
-        return 'offline'
+        return 'away'
       }
     }
     return null
@@ -1387,7 +1387,7 @@ const [showFilters, setShowFilters] = useState(false)
       return
     }
 
-    // Auto-set status to offline if current date falls within time off
+    // Auto-set status to away if current date falls within time off
     const timeOffStatus = getStatusFromTimeOff(formData.timeOff || [])
     const finalStatus = timeOffStatus || formData.status
 
@@ -2032,7 +2032,7 @@ const [showFilters, setShowFilters] = useState(false)
                           )
                         })()}
                       </div>
-                      {member.status === 'offline' && (
+                      {member.status === 'away' && (
                         <Tooltip content={(() => {
                           const closest = getClosestTimeOff(member.timeOff || [])
                           if (closest) {
