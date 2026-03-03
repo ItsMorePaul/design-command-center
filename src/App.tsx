@@ -2589,6 +2589,7 @@ const [showFilters, setShowFilters] = useState(false)
                                       setActiveTab('projects')
                                       setProjectFilters({ businessLines: [], designers: [], statuses: [], project: assignment.project_name || null })
                                       setProjectSortBy('name')
+                                      setProjectViewMode('list')
                                     }}
                                   >
                                     {assignment.project_name || 'Project'}
