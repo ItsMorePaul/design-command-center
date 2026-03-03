@@ -1181,19 +1181,22 @@ const [showFilters, setShowFilters] = useState(false)
     return null
   }
 
-  // Check for upcoming time off within 9 days
+  // Check for nearest upcoming time off
   const getUpcomingTimeOff = (timeOff: { startDate: string; endDate: string; name?: string }[]): { days: number; name: string } | null => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
+    let nearest: { days: number; name: string } | null = null
     for (const off of timeOff) {
       const start = new Date(off.startDate)
       const diffTime = start.getTime() - today.getTime()
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-      if (diffDays > 0 && diffDays <= 9) {
-        return { days: diffDays, name: off.name || 'Time Off' }
+      if (diffDays > 0) {
+        if (!nearest || diffDays < nearest.days) {
+          nearest = { days: diffDays, name: off.name || 'Time Off' }
+        }
       }
     }
-    return null
+    return nearest
   }
 
   // Gantt chart helper functions
