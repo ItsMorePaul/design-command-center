@@ -7,8 +7,9 @@ import {
   useSensor,
   useSensors,
   useDroppable,
+  DragOverlay,
 } from '@dnd-kit/core'
-import type { DragEndEvent, DragStartEvent, UniqueIdentifier } from '@dnd-kit/core'
+import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
 import {
   SortableContext,
   useSortable,
@@ -1008,8 +1009,8 @@ const [showFilters, setShowFilters] = useState(false)
     })
   }
 
-  // Track active drag for done-drop highlight (setter only, variable read via callback)
-  const [, setActiveDragId] = useState<UniqueIdentifier | null>(null)
+  // Track active drag for drag overlay
+  const [activeDragProject, setActiveDragProject] = useState<Project | null>(null)
 
   const markProjectDone = async (projectId: string, blId: string, currentRankedIds: string[]) => {
     // Optimistic: update local state
@@ -1836,10 +1837,14 @@ const [showFilters, setShowFilters] = useState(false)
                         <DndContext
                           sensors={prioritySensors}
                           collisionDetection={pointerWithin}
-                          onDragStart={(e: DragStartEvent) => setActiveDragId(e.active.id)}
-                          onDragCancel={() => setActiveDragId(null)}
+                          onDragStart={(e: DragStartEvent) => {
+                            const id = String(e.active.id).replace('done:', '')
+                            const proj = projects.find(p => p.id === id) || null
+                            setActiveDragProject(proj)
+                          }}
+                          onDragCancel={() => { setActiveDragProject(null) }}
                           onDragEnd={(e: DragEndEvent) => {
-                            setActiveDragId(null)
+                            setActiveDragProject(null)
                             const { active, over } = e
                             if (!over) return
                             const activeStr = String(active.id)
@@ -1894,6 +1899,24 @@ const [showFilters, setShowFilters] = useState(false)
                               ))}
                             </DoneDropZone>
                           </SortableContext>
+
+                          {/* Drag overlay for cross-zone dragging */}
+                          <DragOverlay>
+                            {activeDragProject ? (
+                              <div className="priority-item drag-overlay">
+                                <button type="button" className="action-btn drag-handle"><GripVertical size={14} /></button>
+                                <span className="priority-rank">—</span>
+                                <div className="priority-info">
+                                  <span className="priority-name">{activeDragProject.name}</span>
+                                  <span className="priority-meta">{activeDragProject.designers?.join(', ') || '—'}</span>
+                                </div>
+                                <span className="priority-status-label">
+                                  <span className="priority-status-dot" />
+                                  Done
+                                </span>
+                              </div>
+                            ) : null}
+                          </DragOverlay>
                         </DndContext>
                       )}
                     </div>
