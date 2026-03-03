@@ -1725,12 +1725,9 @@
 
 /* Team member status countdown */
 .status-countdown {
-  font-size: 0.7rem;
-  font-weight: 600;
+  font-size: 0.75rem;
+  font-weight: 500;
   color: var(--color-text-secondary);
-  background: var(--color-bg-tertiary);
-  padding: 0.15rem 0.4rem;
-  border-radius: 4px;
   white-space: nowrap;
 }
 
