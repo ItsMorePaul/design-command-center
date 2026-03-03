@@ -1181,6 +1181,21 @@ const [showFilters, setShowFilters] = useState(false)
     return null
   }
 
+  // Check for upcoming time off within 9 days
+  const getUpcomingTimeOff = (timeOff: { startDate: string; endDate: string; name?: string }[]): { days: number; name: string } | null => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    for (const off of timeOff) {
+      const start = new Date(off.startDate)
+      const diffTime = start.getTime() - today.getTime()
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+      if (diffDays > 0 && diffDays <= 9) {
+        return { days: diffDays, name: off.name || 'Time Off' }
+      }
+    }
+    return null
+  }
+
   // Gantt chart helper functions
   const getGanttRange = (project: Project) => {
     if (!project.timeline || project.timeline.length === 0) return null
@@ -2032,17 +2047,30 @@ const [showFilters, setShowFilters] = useState(false)
                           )
                         })()}
                       </div>
-                      {member.status === 'away' && (
-                        <Tooltip content={(() => {
-                          const closest = getClosestTimeOff(member.timeOff || [])
-                          if (closest) {
-                            return `${closest.name}: ${closest.isStart ? 'Starts' : 'Ends'} ${formatShortDate(closest.date)}`
-                          }
-                          return 'Away'
-                        })()}>
-                          <span className="status-emoji">🌴</span>
-                        </Tooltip>
-                      )}
+                      {(() => {
+                        const upcoming = getUpcomingTimeOff(member.timeOff || [])
+                        if (upcoming) {
+                          return (
+                            <Tooltip content={`${upcoming.name} starts ${formatShortDate(member.timeOff?.find(t => t.name === upcoming.name)?.startDate || '')}`}>
+                              <span className="status-countdown">OOO in {upcoming.days}d</span>
+                            </Tooltip>
+                          )
+                        }
+                        if (member.status === 'away') {
+                          return (
+                            <Tooltip content={(() => {
+                              const closest = getClosestTimeOff(member.timeOff || [])
+                              if (closest) {
+                                return `${closest.name}: ${closest.isStart ? 'Starts' : 'Ends'} ${formatShortDate(closest.date)}`
+                              }
+                              return 'Away'
+                            })()}>
+                              <span className="status-emoji">🌴</span>
+                            </Tooltip>
+                          )
+                        }
+                        return null
+                      })()}
                     </div>
                     <div className="team-card-footer">
                       <div className="member-links">
