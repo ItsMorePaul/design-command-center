@@ -1234,7 +1234,11 @@ const [showFilters, setShowFilters] = useState(false)
   }
 
   // Sort team by name (fixed - no sort UI)
-  const sortedTeam = [...team].sort((a, b) => {
+  const sortedTeam = [...team].map(m => {
+    // Recompute status based on current time off dates
+    const timeOffStatus = getStatusFromTimeOff(m.timeOff || [])
+    return { ...m, status: timeOffStatus || m.status }
+  }).sort((a, b) => {
     return a.name.localeCompare(b.name)
   })
 
