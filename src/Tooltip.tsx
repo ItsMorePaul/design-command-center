@@ -46,15 +46,15 @@ export function Tooltip({ content, children }: TooltipProps) {
 
   return (
     <>
-      <div
+      <span
         ref={refs.setReference}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className="tooltip-trigger action-btn"
+        className="tooltip-trigger"
         style={{ display: 'inline-flex' }}
       >
         {children}
-      </div>
+      </span>
       
       {isMounted && (
         <div
