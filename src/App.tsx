@@ -1824,7 +1824,6 @@ const [showFilters, setShowFilters] = useState(false)
                   const ranked = allRankedIds.map(id => liveProjects.find(p => p.id === id)).filter(Boolean) as Project[]
                   const doneSorted = doneProjects.sort((a, b) => a.name.localeCompare(b.name))
                   const doneItemIds = doneSorted.map(p => `done:${p.id}`)
-                  const allSortableIds = [...allRankedIds, ...doneItemIds]
 
                   if (blProjects.length === 0 && isAllView) return null
 
@@ -1836,17 +1835,7 @@ const [showFilters, setShowFilters] = useState(false)
                       ) : (
                         <DndContext
                           sensors={prioritySensors}
-                          collisionDetection={(args) => {
-                            const activeId = String(args.active.id)
-                            const isDoneItem = activeId.startsWith('done:')
-                            // When dragging a done item, skip the done zone — target live list only
-                            if (isDoneItem) return closestCenter(args)
-                            // When dragging a live item, prefer done zone if pointer is over it
-                            const pointerCollisions = pointerWithin(args)
-                            const doneHit = pointerCollisions.find(c => c.id === doneZoneId)
-                            if (doneHit) return [doneHit]
-                            return closestCenter(args)
-                          }}
+                          collisionDetection={pointerWithin}
                           onDragStart={(e: DragStartEvent) => setActiveDragId(e.active.id)}
                           onDragCancel={() => setActiveDragId(null)}
                           onDragEnd={(e: DragEndEvent) => {
@@ -1858,7 +1847,7 @@ const [showFilters, setShowFilters] = useState(false)
 
                             // Dragging a done project back to live list
                             if (activeStr.startsWith('done:')) {
-                              // Ignore if dropped back in the done zone
+                              // Ignore if dropped back in the done zone or on another done item
                               if (overStr === doneZoneId || overStr.startsWith('done:')) {
                                 return
                               }
@@ -1885,7 +1874,8 @@ const [showFilters, setShowFilters] = useState(false)
                             hapticLight()
                           }}
                         >
-                          <SortableContext items={allSortableIds} strategy={verticalListSortingStrategy}>
+                          {/* Separate SortableContext for In Progress — doesn't interact with Done items */}
+                          <SortableContext items={allRankedIds} strategy={verticalListSortingStrategy}>
                             <div className="priority-in-progress-zone">
                               <div className="priority-zone-label">In Progress</div>
                               <div className="priority-list">
@@ -1894,8 +1884,10 @@ const [showFilters, setShowFilters] = useState(false)
                                 ))}
                               </div>
                             </div>
+                          </SortableContext>
 
-                            {/* Done drop zone — always visible, done items are draggable */}
+                          {/* Separate SortableContext for Done — items can be dragged out but don't sort with In Progress */}
+                          <SortableContext items={doneItemIds} strategy={verticalListSortingStrategy}>
                             <DoneDropZone id={doneZoneId}>
                               {doneSorted.map(p => (
                                 <SortableDoneItem key={p.id} project={p} onEdit={handleEditProject} />
