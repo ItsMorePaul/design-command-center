@@ -76,6 +76,91 @@ v<YYMMDD>-<short-descriptor>
 ```
 Examples: `v260226-modal-polish`, `v260226-capacity-gauges`, `v260227-search-redesign`
 
+---
+
+## DEPLOYMENT PROTOCOL (CRITICAL — POST-INCIDENT 2026-03-03)
+
+**Incident:** Deployment overwrote Railway production DB with local data, losing capacity percentages.
+**Root Cause:** The `/api/seed` endpoint in `server.ts` clears and rewrites all tables. Deploying code that includes seed operations overwrites production data.
+**Status:** FIXED — Procedures below prevent recurrence.
+
+### The Golden Rule
+**Code deployments and data syncs are SEPARATE operations.**
+- Deploy code = push to GitHub (Railway auto-deploys)
+- Sync data = manual operation with explicit backup
+
+### Pre-Deployment Checklist (MUST VERIFY)
+
+Before ANY `git push` to origin/main:
+
+```bash
+# 1. Verify NO seed/sync operations in the commit
+# Check server.ts for any dangerous endpoints being called
+grep -n "DELETE FROM\|run('DELETE\|seed\|sync.*railway" server.ts
+
+# 2. Verify the seed endpoint is NOT being auto-called on startup
+grep -n "app.listen\|seed\|init.*data" server.ts | head -10
+
+# 3. Confirm what files changed
+git diff --name-only HEAD~1
+
+# 4. If data/shared.db is in the diff, STOP and ask Paul
+```
+
+### Safe Deployment Procedure
+
+**Step 1: Backup Railway DB (BEFORE any risky operation)**
+```bash
+cd ~/.openclaw/workspace/design-command-center
+./scripts/backup-railway.sh  # Creates timestamped backup
+```
+
+**Step 2: Deploy code only (if only code changed)**
+```bash
+git push origin main
+# Wait for Railway deploy (check /api/versions)
+```
+
+**Step 3: Verify data intact after deploy**
+```bash
+curl -s https://design-command-center-production.up.railway.app/api/capacity | jq '.assignments | length'
+# Should match expected count (was 28)
+```
+
+### Data Sync Procedure (Manual, Explicit)
+
+**ONLY when Paul explicitly says "sync data to Railway":**
+
+```bash
+# 1. Create backup first
+./scripts/backup-railway.sh
+
+# 2. Verify local data is correct
+sqlite3 data/shared.db "SELECT COUNT(*) FROM project_assignments;"
+
+# 3. Sync with confirmation
+./scripts/sync-to-railway-safe.sh  # Interactive confirmation required
+```
+
+### What Is NEVER Allowed
+
+❌ **NEVER push local `data/shared.db` file to GitHub**  
+❌ **NEVER run `/api/seed` against Railway without explicit backup**  
+❌ **NEVER assume in-memory API data is persisted to SQLite**  
+❌ **NEVER deploy without verifying the commit doesn't include DB files**
+
+### Post-Incident Verification Commands
+
+After ANY deployment, verify within 60 seconds:
+```bash
+# Check assignment counts match
+echo "Railway assignments: $(curl -s https://design-command-center-production.up.railway.app/api/capacity | jq '.assignments | length')"
+echo "Local assignments: $(sqlite3 data/shared.db 'SELECT COUNT(*) FROM project_assignments;')"
+
+# Check specific designer data
+curl -s https://design-command-center-production.up.railway.app/api/capacity | jq '.assignments[] | select(.designer_name | contains("Fariah")) | {project_name, allocation_percent}'
+```
+
 ### To roll back to any checkpoint (local)
 ```bash
 cd ~/.openclaw/workspace/design-command-center
