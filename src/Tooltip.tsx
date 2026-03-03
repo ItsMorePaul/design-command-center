@@ -51,7 +51,7 @@ export function Tooltip({ content, children }: TooltipProps) {
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         className="tooltip-trigger action-btn"
-        style={{ display: 'inline-flex' }}
+        style={{ display: 'inline-flex', width: 'auto', padding: '0 3px' }}
       >
         {children}
       </div>
