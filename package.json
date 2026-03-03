@@ -10,7 +10,8 @@
     "build": "tsc -b && vite build",
     "start": "npx tsx server.ts",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "echo 'Run ../../scripts/test-suite.sh for full system tests' && exit 0"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

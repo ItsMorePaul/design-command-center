@@ -1026,6 +1026,15 @@ const [showFilters, setShowFilters] = useState(false)
     setProjects(prev => prev.map(p => p.id === projectId ? { ...p, status: 'active' as const } : p))
     // Insert into priority ranking at the specified position
     const newRankedIds = [...currentRankedIds]
+    // Remove if already exists (prevent duplicates when dragging from Done)
+    const existingIndex = newRankedIds.indexOf(projectId)
+    if (existingIndex !== -1) {
+      newRankedIds.splice(existingIndex, 1)
+      // Adjust insert index if we removed before the insertion point
+      if (existingIndex < insertIndex) {
+        insertIndex--
+      }
+    }
     newRankedIds.splice(insertIndex, 0, projectId)
     savePriorities(blId, newRankedIds)
     // Persist to backend
@@ -1849,6 +1858,10 @@ const [showFilters, setShowFilters] = useState(false)
 
                             // Dragging a done project back to live list
                             if (activeStr.startsWith('done:')) {
+                              // Ignore if dropped back in the done zone
+                              if (overStr === doneZoneId || overStr.startsWith('done:')) {
+                                return
+                              }
                               const projectId = activeStr.replace('done:', '')
                               // Determine insert position: if dropped on a live item, insert at its index; otherwise append
                               const overIndex = allRankedIds.indexOf(overStr)
