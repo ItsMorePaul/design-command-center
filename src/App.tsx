@@ -1008,8 +1008,9 @@ const [showFilters, setShowFilters] = useState(false)
     })
   }
 
-  // Track active drag for drag overlay
+  // Track active drag for drag overlay and placeholder position
   const [activeDragProject, setActiveDragProject] = useState<Project | null>(null)
+  const [dropPlaceholderIndex, setDropPlaceholderIndex] = useState<number | null>(null)
 
   const markProjectDone = async (projectId: string, blId: string, currentRankedIds: string[]) => {
     // Optimistic: update local state
@@ -1841,9 +1842,23 @@ const [showFilters, setShowFilters] = useState(false)
                             const proj = projects.find(p => p.id === id) || null
                             setActiveDragProject(proj)
                           }}
-                          onDragCancel={() => { setActiveDragProject(null) }}
+                          onDragMove={(e) => {
+                            const activeStr = String(e.active.id)
+                            // Only show placeholder when dragging from Done to In Progress
+                            if (activeStr.startsWith('done:')) {
+                              const overStr = e.over ? String(e.over.id) : null
+                              if (overStr && overStr !== doneZoneId && !overStr.startsWith('done:')) {
+                                const overIndex = allRankedIds.indexOf(overStr)
+                                setDropPlaceholderIndex(overIndex !== -1 ? overIndex : allRankedIds.length)
+                              } else if (overStr === doneZoneId || overStr?.startsWith('done:')) {
+                                setDropPlaceholderIndex(null)
+                              }
+                            }
+                          }}
+                          onDragCancel={() => { setActiveDragProject(null); setDropPlaceholderIndex(null) }}
                           onDragEnd={(e: DragEndEvent) => {
                             setActiveDragProject(null)
+                            setDropPlaceholderIndex(null)
                             const { active, over } = e
                             if (!over) return
                             const activeStr = String(active.id)
@@ -1878,17 +1893,54 @@ const [showFilters, setShowFilters] = useState(false)
                             hapticLight()
                           }}
                         >
-                          {/* Combined SortableContext for visual feedback during cross-zone drag */}
-                          <SortableContext items={[...allRankedIds, ...doneItemIds]} strategy={verticalListSortingStrategy}>
+                          {/* In Progress zone - separate context so items don't visually cross zones */}
+                          <SortableContext items={allRankedIds} strategy={verticalListSortingStrategy}>
                             <div className="priority-in-progress-zone">
                               <div className="priority-zone-label">In Progress</div>
                               <div className="priority-list">
-                                {ranked.map((p, i) => (
-                                  <SortablePriorityItem key={p.id} project={p} rank={i + 1} onEdit={handleEditProject} />
-                                ))}
+                                {(() => {
+                                  // Insert placeholder when dragging from Done
+                                  const items: React.ReactElement[] = []
+                                  let rankOffset = 0
+                                  for (let i = 0; i < ranked.length; i++) {
+                                    // Show placeholder before this item if drop index matches
+                                    if (activeDragProject && dropPlaceholderIndex === i) {
+                                      items.push(
+                                        <div key="placeholder" className="priority-item placeholder">
+                                          <button type="button" className="action-btn drag-handle"><GripVertical size={14} /></button>
+                                          <span className="priority-rank">—</span>
+                                          <div className="priority-info">
+                                            <span className="priority-name">{activeDragProject.name}</span>
+                                          </div>
+                                          <span className="priority-status-label">Drop here</span>
+                                        </div>
+                                      )
+                                      rankOffset = 1
+                                    }
+                                    const p = ranked[i]
+                                    items.push(<SortablePriorityItem key={p.id} project={p} rank={i + 1 + rankOffset} onEdit={handleEditProject} />)
+                                  }
+                                  // Show placeholder at end if drop index is beyond last item
+                                  if (activeDragProject && dropPlaceholderIndex === ranked.length) {
+                                    items.push(
+                                      <div key="placeholder" className="priority-item placeholder">
+                                        <button type="button" className="action-btn drag-handle"><GripVertical size={14} /></button>
+                                        <span className="priority-rank">—</span>
+                                        <div className="priority-info">
+                                          <span className="priority-name">{activeDragProject.name}</span>
+                                        </div>
+                                        <span className="priority-status-label">Drop here</span>
+                                      </div>
+                                    )
+                                  }
+                                  return items
+                                })()}
                               </div>
                             </div>
+                          </SortableContext>
 
+                          {/* Done zone - separate context so items don't visually cross zones */}
+                          <SortableContext items={doneItemIds} strategy={verticalListSortingStrategy}>
                             <DoneDropZone id={doneZoneId}>
                               {doneSorted.map(p => (
                                 <SortableDoneItem key={p.id} project={p} onEdit={handleEditProject} />

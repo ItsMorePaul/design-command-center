@@ -1707,6 +1707,22 @@
   }
 }
 
+/* Priority drag placeholder */
+.priority-item.placeholder {
+  background: var(--color-bg-tertiary);
+  border: 2px dashed var(--color-border);
+  opacity: 0.6;
+}
+
+.priority-item.placeholder .priority-name {
+  color: var(--color-text-secondary);
+}
+
+.priority-item.placeholder .priority-status-label {
+  color: var(--color-text-tertiary);
+  font-size: 0.75rem;
+}
+
 /* Example Card */
 .example-card {
   background: var(--color-bg-secondary);
