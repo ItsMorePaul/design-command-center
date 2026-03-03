@@ -2052,7 +2052,7 @@ const [showFilters, setShowFilters] = useState(false)
                         if (upcoming) {
                           return (
                             <Tooltip content={`${upcoming.name} starts ${formatShortDate(member.timeOff?.find(t => t.name === upcoming.name)?.startDate || '')}`}>
-                              <span className="status-countdown">OOO in {upcoming.days}d</span>
+                              <span className="status-emoji">🌴</span>
                             </Tooltip>
                           )
                         }
