@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import {
   DndContext,
   closestCenter,
-  pointerWithin,
   PointerSensor,
   useSensor,
   useSensors,
@@ -1836,7 +1835,7 @@ const [showFilters, setShowFilters] = useState(false)
                       ) : (
                         <DndContext
                           sensors={prioritySensors}
-                          collisionDetection={pointerWithin}
+                          collisionDetection={closestCenter}
                           onDragStart={(e: DragStartEvent) => {
                             const id = String(e.active.id).replace('done:', '')
                             const proj = projects.find(p => p.id === id) || null
@@ -1879,8 +1878,8 @@ const [showFilters, setShowFilters] = useState(false)
                             hapticLight()
                           }}
                         >
-                          {/* Separate SortableContext for In Progress — doesn't interact with Done items */}
-                          <SortableContext items={allRankedIds} strategy={verticalListSortingStrategy}>
+                          {/* Combined SortableContext for visual feedback during cross-zone drag */}
+                          <SortableContext items={[...allRankedIds, ...doneItemIds]} strategy={verticalListSortingStrategy}>
                             <div className="priority-in-progress-zone">
                               <div className="priority-zone-label">In Progress</div>
                               <div className="priority-list">
@@ -1889,10 +1888,7 @@ const [showFilters, setShowFilters] = useState(false)
                                 ))}
                               </div>
                             </div>
-                          </SortableContext>
 
-                          {/* Separate SortableContext for Done — items can be dragged out but don't sort with In Progress */}
-                          <SortableContext items={doneItemIds} strategy={verticalListSortingStrategy}>
                             <DoneDropZone id={doneZoneId}>
                               {doneSorted.map(p => (
                                 <SortableDoneItem key={p.id} project={p} onEdit={handleEditProject} />
