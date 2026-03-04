@@ -725,6 +725,30 @@ const getKbDb = () => {
   }
 };
 
+// Get full content for a note from work-kb.db
+app.get('/api/notes/:id/full-content', async (req, res) => {
+  try {
+    const kb = getKbDb()
+    if (!kb) {
+      return res.status(503).json({ error: 'Work KB not available' })
+    }
+    // Note IDs in DCC are like "gemini_123", which match source_id in work-kb.db
+    const source = await kb.get(
+      'SELECT content, content_preview FROM sources WHERE source_id = ?',
+      [req.params.id]
+    )
+    kb.db.close()
+
+    if (!source) {
+      return res.status(404).json({ error: 'Full content not found' })
+    }
+
+    res.json({ content: (source as any).content || (source as any).content_preview || '' })
+  } catch (e: any) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
 // KB Search - full-text search across work knowledge base
 app.get('/api/kb/search', async (req, res) => {
   const { q, project, person, limit: limitStr } = req.query as { q?: string; project?: string; person?: string; limit?: string };

@@ -16,7 +16,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Bell, Gauge, ChevronDown, Settings, GripVertical, Folder, StickyNote, RefreshCw, User } from 'lucide-react'
+import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Bell, Gauge, ChevronDown, ChevronRight, Settings, GripVertical, Folder, StickyNote, RefreshCw, User } from 'lucide-react'
 import { Tooltip } from './Tooltip'
 import './App.css'
 import initialData from './data.json'
@@ -224,6 +224,24 @@ interface Note {
   updated_at?: string
   linkedProjectIds: string[]
   linkedTeamIds: string[]
+}
+
+// Parse Gemini note content_preview to extract structured sections
+function parseNoteContent(content: string | undefined | null): { summary: string | null; attendees: string | null; fullText: string | null } {
+  if (!content) return { summary: null, attendees: null, fullText: null }
+
+  // Content sections are marked by \u200B (zero-width space) delimiters
+  // Format: Date \u200BTitle\u200B \u200BInvited\u200B attendees \u200BAttachments\u200B ... \u200BSummary\u200B actual summary
+  const summaryMatch = content.match(/\u200BSummary\u200B\s*([\s\S]+)/)
+  const invitedMatch = content.match(/\u200BInvited\u200B\s*([\s\S]+?)(?=\u200BAttachments\u200B|\u200BSummary\u200B|$)/)
+
+  const cleanText = (t: string) => t.replace(/\u200B/g, '').replace(/\s+/g, ' ').trim()
+
+  return {
+    summary: summaryMatch ? cleanText(summaryMatch[1]) : null,
+    attendees: invitedMatch ? cleanText(invitedMatch[1]) : null,
+    fullText: content.replace(/\u200B/g, '').trim()
+  }
 }
 
 interface Notification {
@@ -588,6 +606,9 @@ const [showFilters, setShowFilters] = useState(false)
   const [notesSyncing, setNotesSyncing] = useState(false)
   const [notesFilter, setNotesFilter] = useState<{ project: string | null; person: string | null; search: string }>({ project: null, person: null, search: '' })
   const [selectedNote, setSelectedNote] = useState<Note | null>(null)
+  const [noteFullContent, setNoteFullContent] = useState<string | null>(null)
+  const [noteFullContentLoading, setNoteFullContentLoading] = useState(false)
+  const [noteFullContentExpanded, setNoteFullContentExpanded] = useState(false)
 
   // Load versions from server on mount
   useEffect(() => {
@@ -1537,6 +1558,7 @@ const [showFilters, setShowFilters] = useState(false)
           >
             <span className="nav-icon"><StickyNote size={18} /></span>
             <span>Notes</span>
+            <span className="nav-badge-beta">beta</span>
           </button>
         </nav>
 
@@ -2896,7 +2918,11 @@ const [showFilters, setShowFilters] = useState(false)
                   return <div className="notes-empty"><p>No notes match your filters.</p></div>
                 }
                 return filtered.map(note => (
-                  <div key={note.id} className="note-card" onClick={() => setSelectedNote(note)}>
+                  <div key={note.id} className="note-card" onClick={() => {
+                    setSelectedNote(note)
+                    setNoteFullContent(null)
+                    setNoteFullContentExpanded(false)
+                  }}>
                     <div className="note-card-header">
                       <h3 className="note-card-title">{note.title || 'Untitled Note'}</h3>
                       {note.date && (
@@ -2907,9 +2933,13 @@ const [showFilters, setShowFilters] = useState(false)
                         </span>
                       )}
                     </div>
-                    {note.content_preview && (
-                      <p className="note-card-preview">{note.content_preview.slice(0, 200)}...</p>
-                    )}
+                    {(() => {
+                      const parsed = parseNoteContent(note.content_preview)
+                      const previewText = parsed.summary || note.content_preview
+                      return previewText ? (
+                        <p className="note-card-preview">{previewText.replace(/\u200B/g, '').slice(0, 200)}{previewText.length > 200 ? '...' : ''}</p>
+                      ) : null
+                    })()}
                     <div className="note-card-meta">
                       {note.linkedProjectIds.length > 0 && (
                         <div className="note-card-tags">
@@ -3009,10 +3039,63 @@ const [showFilters, setShowFilters] = useState(false)
                 </div>
               )}
 
+              {/* Summary - parsed from content_preview to show actual summary, not attendees */}
+              {(() => {
+                const parsed = parseNoteContent(selectedNote.content_preview)
+                const summaryText = parsed.summary
+                return summaryText ? (
+                  <div className="note-detail-section">
+                    <h4>Summary</h4>
+                    <p className="note-detail-content">{summaryText}</p>
+                  </div>
+                ) : selectedNote.content_preview && !parsed.attendees ? (
+                  <div className="note-detail-section">
+                    <h4>Summary</h4>
+                    <p className="note-detail-content">{selectedNote.content_preview.replace(/\u200B/g, '')}</p>
+                  </div>
+                ) : null
+              })()}
+
+              {/* Full Notes - expandable section with complete content from KB */}
               {selectedNote.content_preview && (
                 <div className="note-detail-section">
-                  <h4>Summary</h4>
-                  <p className="note-detail-content">{selectedNote.content_preview}</p>
+                  <button
+                    className="note-full-toggle"
+                    onClick={async () => {
+                      if (noteFullContentExpanded) {
+                        setNoteFullContentExpanded(false)
+                        return
+                      }
+                      setNoteFullContentExpanded(true)
+                      if (!noteFullContent) {
+                        setNoteFullContentLoading(true)
+                        try {
+                          const res = await fetch(`/api/notes/${selectedNote.id}/full-content`)
+                          if (res.ok) {
+                            const data = await res.json()
+                            setNoteFullContent(data.content || selectedNote.content_preview?.replace(/\u200B/g, '') || null)
+                          } else {
+                            setNoteFullContent(selectedNote.content_preview?.replace(/\u200B/g, '') || null)
+                          }
+                        } catch {
+                          setNoteFullContent(selectedNote.content_preview?.replace(/\u200B/g, '') || null)
+                        }
+                        setNoteFullContentLoading(false)
+                      }
+                    }}
+                  >
+                    {noteFullContentExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                    <span>Full Notes</span>
+                  </button>
+                  {noteFullContentExpanded && (
+                    <div className="note-full-content">
+                      {noteFullContentLoading ? (
+                        <p className="note-detail-content" style={{ fontStyle: 'italic', opacity: 0.6 }}>Loading...</p>
+                      ) : (
+                        <p className="note-detail-content">{noteFullContent}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
