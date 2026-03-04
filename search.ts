@@ -251,4 +251,65 @@ const searchBusinessLines = async (query: string, allFn: (sql: string, params?: 
   return results.sort((a, b) => b.score - a.score);
 };
 
-export { searchProjects, searchTeam, searchBusinessLines, SearchResult };
+// Search notes with relevance scoring
+const searchNotes = async (query: string, allFn: (sql: string, params?: any[]) => Promise<any[]>): Promise<SearchResult[]> => {
+  const allNotes = await allFn('SELECT * FROM notes');
+  const results: SearchResult[] = [];
+  const allowContains = query.length >= 3;
+
+  for (const note of allNotes) {
+    let score = 0;
+    const matches: string[] = [];
+
+    // Check title (highest weight: 1.0)
+    const titleMatch = getMatchType(note.title, query, allowContains);
+    if (titleMatch) {
+      score += calculateScore(titleMatch.type, 1.0);
+      matches.push(`title:${titleMatch.type}`);
+    }
+
+    // Check projects_raw (weight: 0.8)
+    if (note.projects_raw) {
+      const projMatch = getMatchType(note.projects_raw, query, allowContains);
+      if (projMatch) {
+        score += calculateScore(projMatch.type, 0.8);
+        matches.push(`projects:${projMatch.type}`);
+      }
+    }
+
+    // Check people_raw (weight: 0.7)
+    if (note.people_raw) {
+      const peopleMatch = getMatchType(note.people_raw, query, allowContains);
+      if (peopleMatch) {
+        score += calculateScore(peopleMatch.type, 0.7);
+        matches.push(`people:${peopleMatch.type}`);
+      }
+    }
+
+    // Check content_preview (weight: 0.5)
+    if (note.content_preview) {
+      const contentMatch = getMatchType(note.content_preview, query, allowContains);
+      if (contentMatch) {
+        score += calculateScore(contentMatch.type, 0.5);
+        matches.push(`content:${contentMatch.type}`);
+      }
+    }
+
+    // Check source_filename (weight: 0.3)
+    if (note.source_filename) {
+      const fnMatch = getMatchType(note.source_filename.replace(/_/g, ' '), query, allowContains);
+      if (fnMatch) {
+        score += calculateScore(fnMatch.type, 0.3);
+        matches.push(`filename:${fnMatch.type}`);
+      }
+    }
+
+    if (score > 0) {
+      results.push({ item: note, score, matches });
+    }
+  }
+
+  return results.sort((a, b) => b.score - a.score);
+};
+
+export { searchProjects, searchTeam, searchBusinessLines, searchNotes, SearchResult };

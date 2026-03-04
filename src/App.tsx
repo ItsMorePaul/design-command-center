@@ -16,7 +16,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Bell, Gauge, ChevronDown, Settings, GripVertical, Folder } from 'lucide-react'
+import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Bell, Gauge, ChevronDown, Settings, GripVertical, Folder, StickyNote, RefreshCw, User } from 'lucide-react'
 import { Tooltip } from './Tooltip'
 import './App.css'
 import initialData from './data.json'
@@ -207,6 +207,23 @@ interface TeamMember {
   slack?: string
   email?: string
   timeOff?: { name: string; startDate: string; endDate: string; id: string }[]
+}
+
+interface Note {
+  id: string
+  source_id?: number
+  source_filename?: string
+  title: string
+  date?: string
+  content_preview?: string
+  people_raw?: string
+  projects_raw?: string
+  drive_url?: string
+  source_created_at?: string
+  created_at?: string
+  updated_at?: string
+  linkedProjectIds: string[]
+  linkedTeamIds: string[]
 }
 
 interface Notification {
@@ -408,7 +425,7 @@ function DoneDropZone({ children, id = 'done-drop-zone' }: { children?: React.Re
 }
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'projects' | 'team' | 'calendar' | 'capacity' | 'settings'>('projects')
+  const [activeTab, setActiveTab] = useState<'projects' | 'team' | 'calendar' | 'capacity' | 'notes' | 'settings'>('projects')
   const [notifications] = useState(mockNotifications)
   const [team, setTeam] = useState<TeamMember[]>([])
   const [projects, setProjects] = useState<Project[]>([])
@@ -555,7 +572,7 @@ const [showFilters, setShowFilters] = useState(false)
   // Search
   const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<{ projects: Project[], team: TeamMember[], businessLines: BusinessLine[] }>({ projects: [], team: [], businessLines: [] })
+  const [searchResults, setSearchResults] = useState<{ projects: Project[], team: TeamMember[], businessLines: BusinessLine[], notes: Note[] }>({ projects: [], team: [], businessLines: [], notes: [] })
   const [searchFilters] = useState<{ projects: boolean, team: boolean, businessLines: boolean }>({ projects: true, team: true, businessLines: true })
 
   // Business Lines (Settings)
@@ -566,6 +583,12 @@ const [showFilters, setShowFilters] = useState(false)
     name: '', customLinks: [] as { name: string; url: string }[]
   })
   
+  // Notes state
+  const [notes, setNotes] = useState<Note[]>([])
+  const [notesSyncing, setNotesSyncing] = useState(false)
+  const [notesFilter, setNotesFilter] = useState<{ project: string | null; person: string | null; search: string }>({ project: null, person: null, search: '' })
+  const [selectedNote, setSelectedNote] = useState<Note | null>(null)
+
   // Load versions from server on mount
   useEffect(() => {
     const loadVersions = async () => {
@@ -664,6 +687,40 @@ const [showFilters, setShowFilters] = useState(false)
       loadCapacity()
     }
   }, [activeTab])
+
+  // Load notes when switching to notes tab
+  useEffect(() => {
+    if (activeTab === 'notes' && notes.length === 0) {
+      const loadNotes = async () => {
+        try {
+          const res = await fetch('/api/notes')
+          const data = await res.json()
+          setNotes(data)
+        } catch (err) {
+          console.error('Error loading notes:', err)
+        }
+      }
+      loadNotes()
+    }
+  }, [activeTab])
+
+  const syncNotes = async () => {
+    setNotesSyncing(true)
+    try {
+      const res = await fetch('/api/notes/sync', { method: 'POST' })
+      const data = await res.json()
+      if (data.success) {
+        // Reload notes after sync
+        const notesRes = await fetch('/api/notes')
+        const notesData = await notesRes.json()
+        setNotes(notesData)
+      }
+    } catch (err) {
+      console.error('Error syncing notes:', err)
+    } finally {
+      setNotesSyncing(false)
+    }
+  }
 
   // Refresh calendar data when projects or team change
   const refreshCalendar = async () => {
@@ -779,7 +836,7 @@ const [showFilters, setShowFilters] = useState(false)
   const handleSearch = async (query: string) => {
     setSearchQuery(query)
     if (query.trim().length < 2) {
-      setSearchResults({ projects: [], team: [], businessLines: [] })
+      setSearchResults({ projects: [], team: [], businessLines: [], notes: [] })
       return
     }
     try {
@@ -799,7 +856,8 @@ const [showFilters, setShowFilters] = useState(false)
   const filteredResults = {
     projects: searchResults.projects,
     team: searchResults.team,
-    businessLines: searchResults.businessLines
+    businessLines: searchResults.businessLines,
+    notes: searchResults.notes || []
   }
 
   // Re-search when filters change (to update backend query)
@@ -922,10 +980,10 @@ const [showFilters, setShowFilters] = useState(false)
 
   const handleDeleteTimeline = (id: string) => {
     openConfirmModal('Delete timeline range?', 'This will remove the timeline range from this project.', () => {
-      setProjectFormData({
-        ...projectFormData,
-        timeline: projectFormData.timeline.filter(t => t.id !== id)
-      })
+      setProjectFormData(prev => ({
+        ...prev,
+        timeline: prev.timeline.filter(t => t.id !== id)
+      }))
       closeConfirmModal()
     })
   }
@@ -983,7 +1041,7 @@ const [showFilters, setShowFilters] = useState(false)
   }
 
   const handleDeleteTimeOff = (id: string) => {
-    setFormData({ ...formData, timeOff: formData.timeOff.filter(o => o.id !== id) })
+    setFormData(prev => ({ ...prev, timeOff: prev.timeOff.filter(o => o.id !== id) }))
   }
 
   const handleSaveTimeOff = () => {
@@ -992,9 +1050,11 @@ const [showFilters, setShowFilters] = useState(false)
     if (new Date(timeOffFormData.endDate) < new Date(timeOffFormData.startDate)) { alert('End date must be after start date'); return }
 
     if (editingTimeOff) {
-      setFormData({ ...formData, timeOff: formData.timeOff.map(o => o.id === editingTimeOff.id ? { ...o, ...timeOffFormData } : o) })
+      const updatedTimeOff = { ...editingTimeOff, ...timeOffFormData }
+      setFormData(prev => ({ ...prev, timeOff: prev.timeOff.map(o => o.id === editingTimeOff.id ? updatedTimeOff : o) }))
     } else {
-      setFormData({ ...formData, timeOff: [...(formData.timeOff || []), { ...timeOffFormData, id: Date.now().toString() }] })
+      const newEntry = { ...timeOffFormData, id: Date.now().toString() }
+      setFormData(prev => ({ ...prev, timeOff: [...(prev.timeOff || []), newEntry] }))
     }
     setShowTimeOffModal(false)
   }
@@ -1412,7 +1472,7 @@ const [showFilters, setShowFilters] = useState(false)
     if (editingMember) {
       const updated = { ...editingMember, ...formData, status: finalStatus }
       await saveTeamMember(updated)
-      setTeam(team.map(m => m.id === editingMember.id ? updated : m))
+      setTeam(prev => prev.map(m => m.id === editingMember.id ? updated : m))
       refreshCalendar()
     } else {
       const newMember: TeamMember = {
@@ -1421,7 +1481,7 @@ const [showFilters, setShowFilters] = useState(false)
         status: finalStatus
       }
       await saveTeamMember(newMember)
-      setTeam([...team, newMember])
+      setTeam(prev => [...prev, newMember])
       refreshCalendar()
     }
     hapticMedium()
@@ -1470,6 +1530,14 @@ const [showFilters, setShowFilters] = useState(false)
             <span className="nav-icon"><Calendar size={18} /></span>
             <span>Calendar</span>
           </button>
+          <button
+            className={`nav-item ${activeTab === 'notes' ? 'active' : ''}`}
+            onClick={() => { hapticLight(); setActiveTab('notes') }}
+            aria-label="Notes"
+          >
+            <span className="nav-icon"><StickyNote size={18} /></span>
+            <span>Notes</span>
+          </button>
         </nav>
 
         <div className="sidebar-footer">
@@ -1496,6 +1564,7 @@ const [showFilters, setShowFilters] = useState(false)
               {activeTab === 'team' && 'Team'}
               {activeTab === 'calendar' && 'Calendar'}
               {activeTab === 'capacity' && 'Capacity'}
+              {activeTab === 'notes' && 'Notes'}
               {activeTab === 'settings' && 'Settings'}
             </h1>
             <p className="date">{getTodayFormatted()}</p>
@@ -2742,6 +2811,222 @@ const [showFilters, setShowFilters] = useState(false)
         </div>
       )}
 
+      {/* Notes View */}
+      {activeTab === 'notes' && (
+        <div className="notes-page">
+          <div className="notes-header">
+            <div className="notes-stats">
+              <div className="stat-card">
+                <span className="stat-value">{notes.length}</span>
+                <span className="stat-label">Total Notes</span>
+              </div>
+              <div className="stat-card">
+                <span className="stat-value">{notes.filter(n => n.linkedProjectIds.length > 0).length}</span>
+                <span className="stat-label">Linked to Projects</span>
+              </div>
+              <div className="stat-card">
+                <span className="stat-value">{notes.filter(n => n.linkedTeamIds.length > 0).length}</span>
+                <span className="stat-label">Linked to People</span>
+              </div>
+            </div>
+            <div className="notes-actions">
+              <button className="secondary-btn" onClick={syncNotes} disabled={notesSyncing}>
+                <RefreshCw size={14} className={notesSyncing ? 'spin' : ''} />
+                {notesSyncing ? 'Syncing...' : 'Sync from Gemini'}
+              </button>
+            </div>
+          </div>
+
+          <div className="notes-filters">
+            <div className="notes-search-bar">
+              <Search size={14} />
+              <input
+                type="text"
+                placeholder="Search notes..."
+                value={notesFilter.search}
+                onChange={e => setNotesFilter({ ...notesFilter, search: e.target.value })}
+              />
+            </div>
+            <select
+              value={notesFilter.project || ''}
+              onChange={e => setNotesFilter({ ...notesFilter, project: e.target.value || null })}
+              className="notes-filter-select"
+            >
+              <option value="">All Projects</option>
+              {projects.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            <select
+              value={notesFilter.person || ''}
+              onChange={e => setNotesFilter({ ...notesFilter, person: e.target.value || null })}
+              className="notes-filter-select"
+            >
+              <option value="">All People</option>
+              {team.map(m => (
+                <option key={m.id} value={m.id}>{m.name}</option>
+              ))}
+            </select>
+            {(notesFilter.search || notesFilter.project || notesFilter.person) && (
+              <button className="text-btn" onClick={() => setNotesFilter({ project: null, person: null, search: '' })}>
+                Clear filters
+              </button>
+            )}
+          </div>
+
+          <div className="notes-list">
+            {notes.length === 0 ? (
+              <div className="notes-empty">
+                <StickyNote size={48} />
+                <p>No notes yet. Click "Sync from Gemini" to import your meeting notes.</p>
+              </div>
+            ) : (
+              (() => {
+                const filtered = notes.filter(note => {
+                  if (notesFilter.project && !note.linkedProjectIds.includes(notesFilter.project)) return false
+                  if (notesFilter.person && !note.linkedTeamIds.includes(notesFilter.person)) return false
+                  if (notesFilter.search) {
+                    const q = notesFilter.search.toLowerCase()
+                    const searchable = `${note.title} ${note.projects_raw || ''} ${note.people_raw || ''} ${note.content_preview || ''}`.toLowerCase()
+                    if (!searchable.includes(q)) return false
+                  }
+                  return true
+                })
+                if (filtered.length === 0) {
+                  return <div className="notes-empty"><p>No notes match your filters.</p></div>
+                }
+                return filtered.map(note => (
+                  <div key={note.id} className="note-card" onClick={() => setSelectedNote(note)}>
+                    <div className="note-card-header">
+                      <h3 className="note-card-title">{note.title || 'Untitled Note'}</h3>
+                      {note.date && (
+                        <span className="note-card-date">
+                          {note.date.length === 8
+                            ? `${note.date.slice(0,4)}-${note.date.slice(4,6)}-${note.date.slice(6,8)}`
+                            : note.date}
+                        </span>
+                      )}
+                    </div>
+                    {note.content_preview && (
+                      <p className="note-card-preview">{note.content_preview.slice(0, 200)}...</p>
+                    )}
+                    <div className="note-card-meta">
+                      {note.linkedProjectIds.length > 0 && (
+                        <div className="note-card-tags">
+                          <FileText size={12} />
+                          {note.linkedProjectIds.map(pid => {
+                            const proj = projects.find(p => p.id === pid)
+                            return proj ? <span key={pid} className="note-tag project-tag">{proj.name}</span> : null
+                          })}
+                        </div>
+                      )}
+                      {note.linkedTeamIds.length > 0 && (
+                        <div className="note-card-tags">
+                          <User size={12} />
+                          {note.linkedTeamIds.map(tid => {
+                            const member = team.find(m => m.id === tid)
+                            return member ? <span key={tid} className="note-tag person-tag">{member.name}</span> : null
+                          })}
+                        </div>
+                      )}
+                      {note.projects_raw && !note.linkedProjectIds.length && (
+                        <div className="note-card-tags">
+                          <span className="note-tag raw-tag">{note.projects_raw}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              })()
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Note Detail Modal */}
+      {selectedNote && (
+        <div className="modal-overlay" onClick={() => setSelectedNote(null)}>
+          <div className="modal note-detail-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>{selectedNote.title || 'Untitled Note'}</h2>
+              <button className="icon-btn" onClick={() => setSelectedNote(null)}>&times;</button>
+            </div>
+            <div className="modal-body">
+              {selectedNote.date && (
+                <div className="note-detail-row">
+                  <Calendar size={14} />
+                  <span>
+                    {selectedNote.date.length === 8
+                      ? formatShortDate(`${selectedNote.date.slice(0,4)}-${selectedNote.date.slice(4,6)}-${selectedNote.date.slice(6,8)}`)
+                      : selectedNote.date}
+                  </span>
+                </div>
+              )}
+
+              {selectedNote.linkedProjectIds.length > 0 && (
+                <div className="note-detail-section">
+                  <h4><FileText size={14} /> Linked Projects</h4>
+                  <div className="note-detail-tags">
+                    {selectedNote.linkedProjectIds.map(pid => {
+                      const proj = projects.find(p => p.id === pid)
+                      return proj ? (
+                        <button key={pid} className="note-tag project-tag clickable"
+                          onClick={() => {
+                            setSelectedNote(null)
+                            setProjectFilters({ businessLines: [], designers: [], statuses: [], project: proj.name })
+                            setActiveTab('projects')
+                          }}>
+                          {proj.name}
+                        </button>
+                      ) : null
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {selectedNote.linkedTeamIds.length > 0 && (
+                <div className="note-detail-section">
+                  <h4><Users size={14} /> Linked People</h4>
+                  <div className="note-detail-tags">
+                    {selectedNote.linkedTeamIds.map(tid => {
+                      const member = team.find(m => m.id === tid)
+                      return member ? (
+                        <span key={tid} className="note-tag person-tag">{member.name}</span>
+                      ) : null
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {selectedNote.projects_raw && (
+                <div className="note-detail-section">
+                  <h4>Topics</h4>
+                  <div className="note-detail-tags">
+                    {selectedNote.projects_raw.split(',').map((p, i) => (
+                      <span key={i} className="note-tag raw-tag">{p.trim()}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedNote.content_preview && (
+                <div className="note-detail-section">
+                  <h4>Summary</h4>
+                  <p className="note-detail-content">{selectedNote.content_preview}</p>
+                </div>
+              )}
+
+              {selectedNote.source_filename && (
+                <div className="note-detail-section">
+                  <h4>Source</h4>
+                  <p className="note-detail-source">{selectedNote.source_filename}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Settings View */}
       {activeTab === 'settings' && (
         <div className="settings-page">
@@ -2824,7 +3109,7 @@ const [showFilters, setShowFilters] = useState(false)
                       id="name"
                       type="text"
                       value={formData.name}
-                      onChange={e => setFormData({ ...formData, name: e.target.value })}
+                      onChange={e => { const v = e.target.value; setFormData(prev => ({ ...prev, name: v })) }}
                       placeholder=" "
                     />
                     <label htmlFor="name">Name</label>
@@ -2834,7 +3119,7 @@ const [showFilters, setShowFilters] = useState(false)
                       id="role"
                       type="text"
                       value={formData.role}
-                      onChange={e => setFormData({ ...formData, role: e.target.value })}
+                      onChange={e => { const v = e.target.value; setFormData(prev => ({ ...prev, role: v })) }}
                       placeholder=" "
                     />
                     <label htmlFor="role">Role</label>
@@ -2850,7 +3135,7 @@ const [showFilters, setShowFilters] = useState(false)
                       id="slack"
                       type="url"
                       value={formData.slack}
-                      onChange={e => setFormData({ ...formData, slack: e.target.value })}
+                      onChange={e => { const v = e.target.value; setFormData(prev => ({ ...prev, slack: v })) }}
                       placeholder=" "
                     />
                     <label htmlFor="slack">Slack Link</label>
@@ -2860,7 +3145,7 @@ const [showFilters, setShowFilters] = useState(false)
                       id="email"
                       type="url"
                       value={formData.email}
-                      onChange={e => setFormData({ ...formData, email: e.target.value })}
+                      onChange={e => { const v = e.target.value; setFormData(prev => ({ ...prev, email: v })) }}
                       placeholder=" "
                     />
                     <label htmlFor="email">Email Link</label>
@@ -2880,9 +3165,9 @@ const [showFilters, setShowFilters] = useState(false)
                           checked={formData.brands.includes(brand)}
                           onChange={(e) => {
                             if (e.target.checked) {
-                              setFormData({ ...formData, brands: [...formData.brands, brand] })
+                              setFormData(prev => ({ ...prev, brands: [...prev.brands, brand] }))
                             } else {
-                              setFormData({ ...formData, brands: formData.brands.filter(b => b !== brand) })
+                              setFormData(prev => ({ ...prev, brands: prev.brands.filter(b => b !== brand) }))
                             }
                           }}
                         />
@@ -3387,7 +3672,7 @@ const [showFilters, setShowFilters] = useState(false)
 
       {/* Search Modal */}
       {showSearch && (
-        <div className="modal-overlay" onClick={() => { setShowSearch(false); setSearchQuery(''); setSearchResults({ projects: [], team: [], businessLines: [] }); }}>
+        <div className="modal-overlay" onClick={() => { setShowSearch(false); setSearchQuery(''); setSearchResults({ projects: [], team: [], businessLines: [], notes: [] }); }}>
           <div className="modal search-modal search-modal-v2" onClick={e => e.stopPropagation()}>
             {/* Search Header with Close */}
             <div className="search-modal-header">
@@ -3404,7 +3689,7 @@ const [showFilters, setShowFilters] = useState(false)
               </div>
               <button
                 className="search-close-btn"
-                onClick={() => { setShowSearch(false); setSearchQuery(''); setSearchResults({ projects: [], team: [], businessLines: [] }); }}
+                onClick={() => { setShowSearch(false); setSearchQuery(''); setSearchResults({ projects: [], team: [], businessLines: [], notes: [] }); }}
               >
                 ×
               </button>
@@ -3415,10 +3700,10 @@ const [showFilters, setShowFilters] = useState(false)
               {searchQuery.length < 2 ? (
                 <div className="search-empty-state">
                   <Search size={48} className="search-empty-icon" />
-                  <p>Start typing to search across projects, team, and business lines</p>
+                  <p>Start typing to search across projects, team, business lines, and notes</p>
                   <span className="search-empty-hint">Try "Barron's", "Jason", or "IBD"</span>
                 </div>
-              ) : filteredResults.projects.length === 0 && filteredResults.team.length === 0 && filteredResults.businessLines.length === 0 ? (
+              ) : filteredResults.projects.length === 0 && filteredResults.team.length === 0 && filteredResults.businessLines.length === 0 && filteredResults.notes.length === 0 ? (
                 <div className="search-empty-state">
                   <p className="search-no-results">No results found for "{searchQuery}"</p>
                   <span className="search-empty-hint">Try a different search term</span>
@@ -3514,12 +3799,12 @@ const [showFilters, setShowFilters] = useState(false)
                       </div>
                       {filteredResults.businessLines.map(bl => (
                         <div key={bl.id} className="search-result-card">
-                          <div 
+                          <div
                             className="search-result-main"
-                            onClick={() => { 
-                              setActiveTab('settings'); 
-                              setShowSearch(false); 
-                              setSearchQuery(''); 
+                            onClick={() => {
+                              setActiveTab('settings');
+                              setShowSearch(false);
+                              setSearchQuery('');
                             }}
                           >
                             <div className="search-result-title">{bl.name}</div>
@@ -3527,10 +3812,10 @@ const [showFilters, setShowFilters] = useState(false)
                           {bl.matchedLinks && bl.matchedLinks.length > 0 && (
                             <div className="search-result-links">
                               {bl.matchedLinks.map((link, idx) => (
-                                <a 
-                                  key={idx} 
-                                  href={link.url} 
-                                  target="_blank" 
+                                <a
+                                  key={idx}
+                                  href={link.url}
+                                  target="_blank"
                                   rel="noopener noreferrer"
                                   className="search-result-link"
                                   onClick={e => e.stopPropagation()}
@@ -3543,6 +3828,34 @@ const [showFilters, setShowFilters] = useState(false)
                               ))}
                             </div>
                           )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {filteredResults.notes.length > 0 && (
+                    <div className="search-result-group">
+                      <div className="search-group-header">
+                        <StickyNote size={14} />
+                        <span>Notes</span>
+                      </div>
+                      {filteredResults.notes.map(note => (
+                        <div key={note.id} className="search-result-card"
+                          onClick={() => {
+                            setActiveTab('notes')
+                            setShowSearch(false)
+                            setSearchQuery('')
+                          }}
+                        >
+                          <div className="search-result-main">
+                            <div className="search-result-title">{note.title || 'Untitled Note'}</div>
+                            <div className="search-result-sub">
+                              {note.date && (
+                                <span>{note.date.length === 8 ? `${note.date.slice(0,4)}-${note.date.slice(4,6)}-${note.date.slice(6,8)}` : note.date}</span>
+                              )}
+                              {note.projects_raw && <span> · {note.projects_raw}</span>}
+                            </div>
+                          </div>
                         </div>
                       ))}
                     </div>

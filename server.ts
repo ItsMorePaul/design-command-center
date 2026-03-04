@@ -2,11 +2,13 @@ import express from 'express';
 import cors from 'cors';
 import sqlite3 from 'sqlite3';
 import path from 'path';
-import { searchProjects, searchTeam, searchBusinessLines } from './search';
+import { searchProjects, searchTeam, searchBusinessLines, searchNotes } from './search';
+import { homedir } from 'os';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 const DB_PATH = process.env.DB_PATH || path.join(process.cwd(), 'data', 'shared.db');
+const GEMINI_NOTES_DB = process.env.GEMINI_NOTES_DB || path.join(homedir(), '.openclaw', 'workspace', 'data', 'gemini-notes.db');
 
 interface CalendarEvent {
   type: 'project' | 'timeoff'
@@ -316,25 +318,28 @@ app.get('/api/search', async (req, res) => {
     const scopes = {
       projects: req.query.projects !== 'false',
       team: req.query.team !== 'false',
-      businessLines: req.query.businessLines !== 'false'
+      businessLines: req.query.businessLines !== 'false',
+      notes: req.query.notes !== 'false'
     };
 
     if (!query || query.length < 2) {
-      return res.json({ projects: [], team: [], businessLines: [] });
+      return res.json({ projects: [], team: [], businessLines: [], notes: [] });
     }
 
     // Run searches based on scopes
-    const [projectResults, teamResults, blResults] = await Promise.all([
+    const [projectResults, teamResults, blResults, noteResults] = await Promise.all([
       scopes.projects ? searchProjects(query, all) : Promise.resolve([]),
       scopes.team ? searchTeam(query, all) : Promise.resolve([]),
-      scopes.businessLines ? searchBusinessLines(query, all) : Promise.resolve([])
+      scopes.businessLines ? searchBusinessLines(query, all) : Promise.resolve([]),
+      scopes.notes ? searchNotes(query, all) : Promise.resolve([])
     ]);
 
     // Format response (remove score/matches from items, just return the items)
     res.json({
       projects: projectResults.map(r => r.item),
       team: teamResults.map(r => r.item),
-      businessLines: blResults.map(r => r.item)
+      businessLines: blResults.map(r => r.item),
+      notes: noteResults.map(r => r.item)
     });
   } catch (e) {
     console.error('Search error:', e);
@@ -500,6 +505,416 @@ app.get('/api/calendar', async (req, res) => {
   } catch (e) { res.status(500).json({error: e.message}); }
 });
 
+// ============ NOTES ============
+// Gemini meeting notes ingested from gemini-notes.db
+
+// Get notes linked to a specific project (before :id routes)
+app.get('/api/notes/by-project/:projectId', async (req, res) => {
+  try {
+    const notes = await all(
+      `SELECT n.* FROM notes n
+       JOIN note_project_links npl ON n.id = npl.note_id
+       WHERE npl.project_id = ?
+       ORDER BY n.date DESC`,
+      [req.params.projectId]
+    )
+    res.json(notes)
+  } catch (e: any) { res.status(500).json({ error: e.message }) }
+})
+
+// Get notes linked to a specific team member
+app.get('/api/notes/by-person/:teamId', async (req, res) => {
+  try {
+    const notes = await all(
+      `SELECT n.* FROM notes n
+       JOIN note_people_links npl ON n.id = npl.note_id
+       WHERE npl.team_id = ?
+       ORDER BY n.date DESC`,
+      [req.params.teamId]
+    )
+    res.json(notes)
+  } catch (e: any) { res.status(500).json({ error: e.message }) }
+})
+
+// List all notes
+app.get('/api/notes', async (req, res) => {
+  try {
+    const notes = await all('SELECT * FROM notes ORDER BY date DESC, created_at DESC')
+    const projectLinks = await all('SELECT * FROM note_project_links')
+    const peopleLinks = await all('SELECT * FROM note_people_links')
+
+    const projectMap: Record<string, string[]> = {}
+    for (const link of projectLinks as any[]) {
+      if (!projectMap[link.note_id]) projectMap[link.note_id] = []
+      projectMap[link.note_id].push(link.project_id)
+    }
+
+    const peopleMap: Record<string, string[]> = {}
+    for (const link of peopleLinks as any[]) {
+      if (!peopleMap[link.note_id]) peopleMap[link.note_id] = []
+      peopleMap[link.note_id].push(link.team_id)
+    }
+
+    res.json((notes as any[]).map(n => ({
+      ...n,
+      linkedProjectIds: projectMap[n.id] || [],
+      linkedTeamIds: peopleMap[n.id] || []
+    })))
+  } catch (e: any) { res.status(500).json({ error: e.message }) }
+})
+
+// Get single note by id
+app.get('/api/notes/:id', async (req, res) => {
+  try {
+    const note = await get('SELECT * FROM notes WHERE id = ?', [req.params.id])
+    if (!note) return res.status(404).json({ error: 'Note not found' })
+
+    const projectLinks = await all('SELECT project_id FROM note_project_links WHERE note_id = ?', [req.params.id])
+    const peopleLinks = await all('SELECT team_id FROM note_people_links WHERE note_id = ?', [req.params.id])
+
+    res.json({
+      ...note,
+      linkedProjectIds: (projectLinks as any[]).map(l => l.project_id),
+      linkedTeamIds: (peopleLinks as any[]).map(l => l.team_id)
+    })
+  } catch (e: any) { res.status(500).json({ error: e.message }) }
+})
+
+// Sync notes from gemini-notes.db into DCC
+app.post('/api/notes/sync', async (req, res) => {
+  try {
+    // Open the Gemini notes database
+    const geminiDb = new sqlite3.Database(GEMINI_NOTES_DB)
+    const geminiAll = (sql: string, params: any[] = []) => new Promise<any[]>((resolve, reject) => {
+      geminiDb.all(sql, params, (err, rows) => {
+        if (err) reject(err)
+        else resolve(rows)
+      })
+    })
+
+    const geminiNotes = await geminiAll('SELECT * FROM notes ORDER BY id')
+    geminiDb.close()
+
+    // Get existing DCC projects and team for matching
+    const dccProjects = await all('SELECT id, name FROM projects') as { id: string; name: string }[]
+    const dccTeam = await all('SELECT id, name FROM team') as { id: string; name: string }[]
+
+    let inserted = 0
+    let updated = 0
+    let projectLinksCreated = 0
+    let peopleLinksCreated = 0
+
+    for (const gNote of geminiNotes as any[]) {
+      const noteId = `gemini_${gNote.id}`
+
+      // Clean up title - use filename-derived title if title field is just a date
+      let title = gNote.title || ''
+      if (!title || /^\w{3}\s\d{1,2},\s\d{4}$/.test(title)) {
+        // Extract meeting name from filename
+        const fnMatch = gNote.filename?.match(/^(.+?)\s*-\s*\d{4}/) || gNote.filename?.match(/^Notes_\s*"(.+?)"/)
+        if (fnMatch) {
+          title = fnMatch[1].replace(/_/g, ' ').replace(/Notes\s*"/, '').replace(/"$/, '').trim()
+        } else if (gNote.filename) {
+          title = gNote.filename.replace(/\.pdf$/i, '').replace(/_/g, ' ').trim()
+        }
+      }
+
+      const existing = await get('SELECT id FROM notes WHERE id = ?', [noteId])
+      if (existing) {
+        await run(
+          `UPDATE notes SET title = ?, date = ?, content_preview = ?, people_raw = ?, projects_raw = ?,
+           drive_url = ?, source_filename = ?, source_created_at = ?, updated_at = datetime('now')
+           WHERE id = ?`,
+          [title, gNote.date || '', gNote.content_preview || '', gNote.people || '',
+           gNote.projects || '', gNote.drive_url || '', gNote.filename || '',
+           gNote.created_at || '', noteId]
+        )
+        updated++
+      } else {
+        await run(
+          `INSERT INTO notes (id, source_id, source_filename, title, date, content_preview, people_raw, projects_raw, drive_url, source_created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [noteId, gNote.id, gNote.filename || '', title, gNote.date || '',
+           gNote.content_preview || '', gNote.people || '', gNote.projects || '',
+           gNote.drive_url || '', gNote.created_at || '']
+        )
+        inserted++
+      }
+
+      // Clear and rebuild links for this note
+      await run('DELETE FROM note_project_links WHERE note_id = ?', [noteId])
+      await run('DELETE FROM note_people_links WHERE note_id = ?', [noteId])
+
+      // Match note projects to DCC projects
+      const noteProjects = (gNote.projects || '').split(',').map((p: string) => p.trim()).filter(Boolean)
+      for (const noteProject of noteProjects) {
+        const npLower = noteProject.toLowerCase()
+        for (const dccProject of dccProjects) {
+          const dccLower = dccProject.name.toLowerCase()
+          // Match if note project keyword appears in DCC project name or vice versa
+          if (dccLower.includes(npLower) || npLower.includes(dccLower) ||
+              // Also check word-level matching for multi-word names
+              npLower.split(/\s+/).every(word => dccLower.includes(word))) {
+            await run(
+              'INSERT OR IGNORE INTO note_project_links (note_id, project_id) VALUES (?, ?)',
+              [noteId, dccProject.id]
+            )
+            projectLinksCreated++
+          }
+        }
+      }
+
+      // Match note people to DCC team members
+      const peopleRaw = gNote.people || ''
+      // Also check the content preview and filename for names
+      const searchText = `${peopleRaw} ${gNote.content_preview || ''} ${gNote.filename || ''}`
+      for (const member of dccTeam) {
+        const nameParts = member.name.split(/\s+/)
+        const firstName = nameParts[0]?.toLowerCase()
+        const lastName = nameParts[nameParts.length - 1]?.toLowerCase()
+        const fullName = member.name.toLowerCase()
+        const textLower = searchText.toLowerCase()
+
+        // Match on full name or (first + last name appearing near each other)
+        if (textLower.includes(fullName) ||
+            (firstName && lastName && textLower.includes(firstName) && textLower.includes(lastName))) {
+          await run(
+            'INSERT OR IGNORE INTO note_people_links (note_id, team_id) VALUES (?, ?)',
+            [noteId, member.id]
+          )
+          peopleLinksCreated++
+        }
+      }
+    }
+
+    await updateDbVersion()
+    res.json({
+      success: true,
+      stats: { total: geminiNotes.length, inserted, updated, projectLinksCreated, peopleLinksCreated }
+    })
+  } catch (e: any) {
+    console.error('Notes sync error:', e)
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// ==========================================
+// Work Knowledge Base API (Gemini Notes KB)
+// ==========================================
+const WORK_KB_DB = process.env.WORK_KB_DB || path.join(homedir(), '.openclaw', 'workspace', 'kb', 'work', 'data', 'work-kb.db');
+
+// Helper to open KB database (separate from main DCC db)
+const getKbDb = () => {
+  try {
+    const kbDb = new sqlite3.Database(WORK_KB_DB);
+    const kbAll = (sql: string, params: any[] = []) => new Promise<any[]>((resolve, reject) => {
+      kbDb.all(sql, params, (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      });
+    });
+    const kbGet = (sql: string, params: any[] = []) => new Promise<any>((resolve, reject) => {
+      kbDb.get(sql, params, (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+    return { db: kbDb, all: kbAll, get: kbGet };
+  } catch (e) {
+    return null;
+  }
+};
+
+// KB Search - full-text search across work knowledge base
+app.get('/api/kb/search', async (req, res) => {
+  const { q, project, person, limit: limitStr } = req.query as { q?: string; project?: string; person?: string; limit?: string };
+  if (!q) return res.status(400).json({ error: 'Query parameter q is required' });
+
+  const limit = parseInt(limitStr || '10', 10);
+  const kb = getKbDb();
+  if (!kb) return res.status(503).json({ error: 'Work KB not available' });
+
+  try {
+    const ftsQuery = q.replace(/"/g, '""');
+
+    // Source-level FTS search
+    let sourceResults = await kb.all(`
+      SELECT s.source_id, s.title, s.date, s.content_preview, s.people,
+             s.projects, s.drive_url, s.content_type
+      FROM sources_fts fts
+      JOIN sources s ON fts.rowid = s.id
+      WHERE sources_fts MATCH ?
+      ORDER BY rank
+      LIMIT ?
+    `, [ftsQuery, limit * 3]);
+
+    // Apply filters
+    if (project) {
+      const pLower = project.toLowerCase();
+      sourceResults = sourceResults.filter((r: any) => (r.projects || '').toLowerCase().includes(pLower));
+    }
+    if (person) {
+      const personLower = person.toLowerCase();
+      sourceResults = sourceResults.filter((r: any) => (r.people || '').toLowerCase().includes(personLower));
+    }
+
+    // Chunk-level search for additional context
+    const chunkResults = await kb.all(`
+      SELECT c.source_id, c.content as chunk, c.chunk_index,
+             s.title, s.date, s.people, s.projects, s.drive_url
+      FROM chunks_fts cfts
+      JOIN chunks c ON cfts.rowid = c.id
+      JOIN sources s ON c.source_id = s.source_id
+      WHERE chunks_fts MATCH ?
+      ORDER BY rank
+      LIMIT ?
+    `, [ftsQuery, limit]);
+
+    // Merge results
+    const seen = new Set<string>();
+    const results: any[] = [];
+
+    for (const r of sourceResults.slice(0, limit)) {
+      results.push({ ...r, match_type: 'source' });
+      seen.add(r.source_id);
+    }
+    for (const r of chunkResults) {
+      if (!seen.has(r.source_id)) {
+        results.push({ ...r, match_type: 'chunk' });
+        seen.add(r.source_id);
+      }
+    }
+
+    kb.db.close();
+    res.json({ query: q, results: results.slice(0, limit), total: results.length });
+  } catch (e: any) {
+    kb.db.close();
+    console.error('KB search error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// KB Stats
+app.get('/api/kb/stats', async (_req, res) => {
+  const kb = getKbDb();
+  if (!kb) return res.status(503).json({ error: 'Work KB not available' });
+
+  try {
+    const sourceCount = await kb.get('SELECT COUNT(*) as count FROM sources');
+    const chunkCount = await kb.get('SELECT COUNT(*) as count FROM chunks');
+    const dateRange = await kb.get("SELECT MIN(date) as earliest, MAX(date) as latest FROM sources WHERE date IS NOT NULL AND date != ''");
+    const projects = await kb.all("SELECT DISTINCT projects FROM sources WHERE projects IS NOT NULL AND projects != ''");
+
+    const uniqueProjects = new Set<string>();
+    for (const row of projects) {
+      for (const p of (row as any).projects.split(',')) {
+        const trimmed = p.trim();
+        if (trimmed) uniqueProjects.add(trimmed);
+      }
+    }
+
+    kb.db.close();
+    res.json({
+      sources: sourceCount?.count || 0,
+      chunks: chunkCount?.count || 0,
+      projects: Array.from(uniqueProjects).sort(),
+      dateRange: { earliest: dateRange?.earliest, latest: dateRange?.latest }
+    });
+  } catch (e: any) {
+    kb.db.close();
+    console.error('KB stats error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// KB Recent - get recent notes from KB
+app.get('/api/kb/recent', async (req, res) => {
+  const { limit: limitStr, project, person } = req.query as { limit?: string; project?: string; person?: string };
+  const limit = parseInt(limitStr || '20', 10);
+  const kb = getKbDb();
+  if (!kb) return res.status(503).json({ error: 'Work KB not available' });
+
+  try {
+    let rows = await kb.all(`
+      SELECT source_id, title, date, content_preview, people, projects,
+             drive_url, content_type, ingested_at
+      FROM sources
+      ORDER BY date DESC, ingested_at DESC
+      LIMIT ?
+    `, [limit * 3]);
+
+    if (project) {
+      const pLower = project.toLowerCase();
+      rows = rows.filter((r: any) => (r.projects || '').toLowerCase().includes(pLower));
+    }
+    if (person) {
+      const personLower = person.toLowerCase();
+      rows = rows.filter((r: any) => (r.people || '').toLowerCase().includes(personLower));
+    }
+
+    kb.db.close();
+    res.json({ results: rows.slice(0, limit) });
+  } catch (e: any) {
+    kb.db.close();
+    console.error('KB recent error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// KB Show - get full details of a source
+app.get('/api/kb/source/:sourceId', async (req, res) => {
+  const kb = getKbDb();
+  if (!kb) return res.status(503).json({ error: 'Work KB not available' });
+
+  try {
+    const source = await kb.get('SELECT * FROM sources WHERE source_id = ?', [req.params.sourceId]);
+    if (!source) {
+      kb.db.close();
+      return res.status(404).json({ error: 'Source not found' });
+    }
+
+    const chunks = await kb.all(
+      'SELECT chunk_index, content FROM chunks WHERE source_id = ? ORDER BY chunk_index',
+      [req.params.sourceId]
+    );
+
+    kb.db.close();
+    res.json({ ...source, chunks });
+  } catch (e: any) {
+    kb.db.close();
+    console.error('KB source error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// KB Sync - trigger ingestion from Gemini notes into work KB
+app.post('/api/kb/sync', async (_req, res) => {
+  try {
+    const { execSync } = require('child_process');
+    const scriptPath = path.join(homedir(), '.openclaw', 'workspace', 'kb', 'work', 'scripts', 'ingest_gemini.py');
+    const result = execSync(`python3 "${scriptPath}"`, {
+      timeout: 120000,
+      encoding: 'utf-8',
+      env: { ...process.env, GEMINI_NOTES_DB }
+    });
+
+    // Parse the JSON output from the script
+    const lines = result.trim().split('\n');
+    const jsonLine = lines[lines.length - 1];
+    let stats;
+    try {
+      stats = JSON.parse(jsonLine);
+    } catch {
+      stats = { raw_output: result.trim() };
+    }
+
+    res.json({ success: true, stats });
+  } catch (e: any) {
+    console.error('KB sync error:', e);
+    res.status(500).json({ error: e.message || 'KB sync failed' });
+  }
+});
+
 // Serve static files in production
 const DIST_PATH = path.join(process.cwd(), 'dist');
 const isProduction = process.env.NODE_ENV === 'production';
@@ -597,8 +1012,8 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 // Format: YYYY.MM.DD.hhmm (e.g., 2026.02.26.2059) → displays as "2026.02.26 2059"
 
-const SITE_VERSION = '2026.03.03.1643'
-const SITE_TIME = '1643'
+const SITE_VERSION = '2026.03.04.1048'
+const SITE_TIME = '1048'
 
 const VERSION_KEY = 'dcc_versions'
 
@@ -681,6 +1096,34 @@ run(`CREATE TABLE IF NOT EXISTS business_lines (
   createdAt TEXT DEFAULT (datetime('now')),
   updatedAt TEXT DEFAULT (datetime('now'))
 )`).catch((e) => console.error('business_lines init error:', e.message))
+
+// Notes tables
+run(`CREATE TABLE IF NOT EXISTS notes (
+  id TEXT PRIMARY KEY,
+  source_id INTEGER,
+  source_filename TEXT,
+  title TEXT NOT NULL DEFAULT '',
+  date TEXT,
+  content_preview TEXT,
+  people_raw TEXT,
+  projects_raw TEXT,
+  drive_url TEXT,
+  source_created_at TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+)`).catch(e => console.error('notes init error:', e.message))
+
+run(`CREATE TABLE IF NOT EXISTS note_project_links (
+  note_id TEXT NOT NULL,
+  project_id TEXT NOT NULL,
+  PRIMARY KEY (note_id, project_id)
+)`).catch(e => console.error('note_project_links init error:', e.message))
+
+run(`CREATE TABLE IF NOT EXISTS note_people_links (
+  note_id TEXT NOT NULL,
+  team_id TEXT NOT NULL,
+  PRIMARY KEY (note_id, team_id)
+)`).catch(e => console.error('note_people_links init error:', e.message))
 
 // Seed default business lines if empty
 const seedBusinessLines = async () => {
