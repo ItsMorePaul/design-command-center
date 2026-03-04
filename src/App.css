@@ -4609,27 +4609,76 @@ select:focus-visible {
 .note-detail-modal {
   max-width: 640px;
   max-height: 80vh;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
 }
 
-.note-detail-row {
+.note-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.25rem 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.note-detail-header h2 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+  line-height: 1.4;
+  flex: 1;
+}
+
+.note-close-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  color: var(--color-text-secondary);
-  font-size: 0.85rem;
-  margin-bottom: 1rem;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  margin-top: -4px;
+}
+
+.note-close-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-text);
+}
+
+.note-detail-body {
+  padding: 1rem 1.25rem 1.25rem;
+  overflow-y: auto;
+  flex: 1;
 }
 
 .note-detail-section {
   margin-bottom: 1.25rem;
 }
 
+.note-detail-section:last-child {
+  margin-bottom: 0;
+}
+
+.note-summary-section .note-detail-content {
+  max-height: none;
+}
+
 .note-detail-section h4 {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--color-text-muted);
   text-transform: uppercase;
@@ -4656,6 +4705,70 @@ select:focus-visible {
   color: var(--color-text-muted);
   word-break: break-all;
   margin: 0;
+}
+
+/* Next Steps */
+.note-next-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.note-next-step-item {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  padding-left: 1rem;
+  position: relative;
+}
+
+.note-next-step-item::before {
+  content: '•';
+  position: absolute;
+  left: 0.25rem;
+  color: var(--color-text-muted);
+}
+
+/* Details List */
+.note-details-list {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.note-details-list li {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  margin-bottom: 0.5rem;
+}
+
+.note-details-list li:last-child {
+  margin-bottom: 0;
+}
+
+/* Attachments */
+.note-attachments {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.note-attachment-link {
+  font-size: 0.85rem;
+  color: var(--accent-blue, #60a5fa);
+  text-decoration: none;
+  line-height: 1.5;
+  word-break: break-all;
+}
+
+.note-attachment-link:hover {
+  text-decoration: underline;
+}
+
+.note-attachment-text {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
 }
 
 /* Beta badge for nav items */

@@ -16,7 +16,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Bell, Gauge, ChevronDown, ChevronRight, Settings, GripVertical, Folder, StickyNote, RefreshCw, User } from 'lucide-react'
+import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Bell, Gauge, ChevronDown, ChevronRight, Settings, GripVertical, Folder, StickyNote, RefreshCw, User, CheckSquare } from 'lucide-react'
 import { Tooltip } from './Tooltip'
 import './App.css'
 import initialData from './data.json'
@@ -224,6 +224,9 @@ interface Note {
   updated_at?: string
   linkedProjectIds: string[]
   linkedTeamIds: string[]
+  next_steps?: string
+  details?: string
+  attachments?: string
 }
 
 // Parse Gemini note content_preview to extract structured sections
@@ -606,8 +609,6 @@ const [showFilters, setShowFilters] = useState(false)
   const [notesSyncing, setNotesSyncing] = useState(false)
   const [notesFilter, setNotesFilter] = useState<{ project: string | null; person: string | null; search: string }>({ project: null, person: null, search: '' })
   const [selectedNote, setSelectedNote] = useState<Note | null>(null)
-  const [noteFullContent, setNoteFullContent] = useState<string | null>(null)
-  const [noteFullContentLoading, setNoteFullContentLoading] = useState(false)
   const [noteFullContentExpanded, setNoteFullContentExpanded] = useState(false)
 
   // Load versions from server on mount
@@ -2920,7 +2921,6 @@ const [showFilters, setShowFilters] = useState(false)
                 return filtered.map(note => (
                   <div key={note.id} className="note-card" onClick={() => {
                     setSelectedNote(note)
-                    setNoteFullContent(null)
                     setNoteFullContentExpanded(false)
                   }}>
                     <div className="note-card-header">
@@ -2977,22 +2977,11 @@ const [showFilters, setShowFilters] = useState(false)
       {selectedNote && (
         <div className="modal-overlay" onClick={() => setSelectedNote(null)}>
           <div className="modal note-detail-modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
+            <div className="note-detail-header">
               <h2>{selectedNote.title || 'Untitled Note'}</h2>
-              <button className="icon-btn" onClick={() => setSelectedNote(null)}>&times;</button>
+              <button className="note-close-btn" onClick={() => setSelectedNote(null)}>&times;</button>
             </div>
-            <div className="modal-body">
-              {selectedNote.date && (
-                <div className="note-detail-row">
-                  <Calendar size={14} />
-                  <span>
-                    {selectedNote.date.length === 8
-                      ? formatShortDate(`${selectedNote.date.slice(0,4)}-${selectedNote.date.slice(4,6)}-${selectedNote.date.slice(6,8)}`)
-                      : selectedNote.date}
-                  </span>
-                </div>
-              )}
-
+            <div className="note-detail-body">
               {selectedNote.linkedProjectIds.length > 0 && (
                 <div className="note-detail-section">
                   <h4><FileText size={14} /> Linked Projects</h4>
@@ -3039,63 +3028,66 @@ const [showFilters, setShowFilters] = useState(false)
                 </div>
               )}
 
-              {/* Summary - parsed from content_preview to show actual summary, not attendees */}
-              {(() => {
-                const parsed = parseNoteContent(selectedNote.content_preview)
-                const summaryText = parsed.summary
-                return summaryText ? (
-                  <div className="note-detail-section">
-                    <h4>Summary</h4>
-                    <p className="note-detail-content">{summaryText}</p>
-                  </div>
-                ) : selectedNote.content_preview && !parsed.attendees ? (
-                  <div className="note-detail-section">
-                    <h4>Summary</h4>
-                    <p className="note-detail-content">{selectedNote.content_preview.replace(/\u200B/g, '')}</p>
-                  </div>
-                ) : null
-              })()}
-
-              {/* Full Notes - expandable section with complete content from KB */}
+              {/* Summary - show full content */}
               {selectedNote.content_preview && (
+                <div className="note-detail-section note-summary-section">
+                  <h4>Summary</h4>
+                  <p className="note-detail-content">{selectedNote.content_preview.replace(/\u200B/g, '')}</p>
+                </div>
+              )}
+
+              {/* Next Steps - show action items if available */}
+              {selectedNote.next_steps && (
+                <div className="note-detail-section">
+                  <h4><CheckSquare size={14} /> Next Steps</h4>
+                  <div className="note-next-steps">
+                    {selectedNote.next_steps.split(/\n|•/).filter(s => s.trim()).map((step, i) => (
+                      <div key={i} className="note-next-step-item">{step.trim()}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Full Details - expandable section with bullets */}
+              {selectedNote.details && (
                 <div className="note-detail-section">
                   <button
                     className="note-full-toggle"
-                    onClick={async () => {
-                      if (noteFullContentExpanded) {
-                        setNoteFullContentExpanded(false)
-                        return
-                      }
-                      setNoteFullContentExpanded(true)
-                      if (!noteFullContent) {
-                        setNoteFullContentLoading(true)
-                        try {
-                          const res = await fetch(`/api/notes/${selectedNote.id}/full-content`)
-                          if (res.ok) {
-                            const data = await res.json()
-                            setNoteFullContent(data.content || selectedNote.content_preview?.replace(/\u200B/g, '') || null)
-                          } else {
-                            setNoteFullContent(selectedNote.content_preview?.replace(/\u200B/g, '') || null)
-                          }
-                        } catch {
-                          setNoteFullContent(selectedNote.content_preview?.replace(/\u200B/g, '') || null)
-                        }
-                        setNoteFullContentLoading(false)
-                      }
-                    }}
+                    onClick={() => setNoteFullContentExpanded(!noteFullContentExpanded)}
                   >
                     {noteFullContentExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                    <span>Full Notes</span>
+                    <span>Full details...</span>
                   </button>
                   {noteFullContentExpanded && (
                     <div className="note-full-content">
-                      {noteFullContentLoading ? (
-                        <p className="note-detail-content" style={{ fontStyle: 'italic', opacity: 0.6 }}>Loading...</p>
-                      ) : (
-                        <p className="note-detail-content">{noteFullContent}</p>
-                      )}
+                      <ul className="note-details-list">
+                        {selectedNote.details.split('|').filter(d => d.trim()).map((detail, i) => (
+                          <li key={i}>{detail.trim()}</li>
+                        ))}
+                      </ul>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Attachments - show as clickable links */}
+              {selectedNote.attachments && (
+                <div className="note-detail-section">
+                  <h4><LinkIcon size={14} /> Attachments</h4>
+                  <div className="note-attachments">
+                    {selectedNote.attachments.split('|').map((att, i) => {
+                      const match = att.match(/^(.+?):\s*(https?:\/\/.+)$/)
+                      if (match) {
+                        const [, name, url] = match
+                        return (
+                          <a key={i} href={url.trim()} target="_blank" rel="noopener" className="note-attachment-link">
+                            {name.trim()}
+                          </a>
+                        )
+                      }
+                      return <span key={i} className="note-attachment-text">{att.trim()}</span>
+                    })}
+                  </div>
                 </div>
               )}
 
