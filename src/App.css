@@ -4711,6 +4711,7 @@ select:focus-visible {
 .note-steps-list {
   margin: 0;
   padding-left: 1.25rem;
+  list-style-type: disc;
 }
 
 .note-steps-list li {
@@ -4718,6 +4719,11 @@ select:focus-visible {
   color: var(--color-text-secondary);
   line-height: 1.6;
   margin-bottom: 0.6rem;
+  display: list-item;
+}
+
+.note-steps-list li::marker {
+  color: var(--color-text-muted);
 }
 
 .note-steps-list li:last-child {
