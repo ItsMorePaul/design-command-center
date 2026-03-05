@@ -340,7 +340,14 @@ function SortablePriorityItem({
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }
   const statusColors: Record<string, string> = { active: '#3b82f6', review: '#f59e0b', done: '#22c55e', blocked: '#ef4444' }
   const statusLabel: Record<string, string> = { active: 'Active', review: 'In Review', done: 'Done', blocked: 'Blocked' }
-  const isOverdue = project.endDate && project.status !== 'done' && new Date(project.endDate) < new Date(new Date().toISOString().split('T')[0])
+  const isOverdue = (() => {
+    if (!project.endDate || project.status === 'done') return false
+    const end = parseLocalDate(project.endDate)
+    if (!end) return false
+    const today = new Date()
+    today.setHours(12, 0, 0, 0)
+    return end < today
+  })()
 
   return (
     <div ref={setNodeRef} style={style} className="priority-item">
@@ -377,7 +384,14 @@ function SortableDoneItem({
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }
   const statusColors: Record<string, string> = { active: '#3b82f6', review: '#f59e0b', done: '#22c55e', blocked: '#ef4444' }
   const statusLabel: Record<string, string> = { active: 'Active', review: 'In Review', done: 'Done', blocked: 'Blocked' }
-  const isOverdue = project.endDate && project.status !== 'done' && new Date(project.endDate) < new Date(new Date().toISOString().split('T')[0])
+  const isOverdue = (() => {
+    if (!project.endDate || project.status === 'done') return false
+    const end = parseLocalDate(project.endDate)
+    if (!end) return false
+    const today = new Date()
+    today.setHours(12, 0, 0, 0)
+    return end < today
+  })()
 
   return (
     <div ref={setNodeRef} style={style} className="priority-item unranked">
@@ -1065,7 +1079,9 @@ const [showFilters, setShowFilters] = useState(false)
       alert('Please select start and end dates')
       return
     }
-    if (new Date(timelineFormData.endDate) < new Date(timelineFormData.startDate)) {
+    const tlStart = parseLocalDate(timelineFormData.startDate)
+    const tlEnd = parseLocalDate(timelineFormData.endDate)
+    if (tlStart && tlEnd && tlEnd < tlStart) {
       alert('End date must be after start date')
       return
     }
@@ -1107,7 +1123,8 @@ const [showFilters, setShowFilters] = useState(false)
   const handleSaveTimeOff = () => {
     if (!timeOffFormData.name.trim()) { alert('Please enter a label'); return }
     if (!timeOffFormData.startDate || !timeOffFormData.endDate) { alert('Please select start and end dates'); return }
-    if (new Date(timeOffFormData.endDate) < new Date(timeOffFormData.startDate)) { alert('End date must be after start date'); return }
+    const toStart = parseLocalDate(timeOffFormData.startDate); const toEnd = parseLocalDate(timeOffFormData.endDate)
+    if (toStart && toEnd && toEnd < toStart) { alert('End date must be after start date'); return }
 
     if (editingTimeOff) {
       const updatedTimeOff = { ...editingTimeOff, ...timeOffFormData }
@@ -1177,7 +1194,9 @@ const [showFilters, setShowFilters] = useState(false)
       alert('Please select an end date')
       return
     }
-    if (new Date(projectFormData.endDate) < new Date(projectFormData.startDate)) {
+    const parsedStart = parseLocalDate(projectFormData.startDate)
+    const parsedEnd = parseLocalDate(projectFormData.endDate)
+    if (parsedStart && parsedEnd && parsedEnd < parsedStart) {
       alert('End date must be after start date')
       return
     }
@@ -1292,10 +1311,11 @@ const [showFilters, setShowFilters] = useState(false)
   // Check if current date falls within any time off period
   const getStatusFromTimeOff = (timeOff: { startDate: string; endDate: string }[]): TeamMember['status'] | null => {
     const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    today.setHours(12, 0, 0, 0)
     for (const off of timeOff) {
-      const start = new Date(off.startDate)
-      const end = new Date(off.endDate)
+      const start = parseLocalDate(off.startDate)
+      const end = parseLocalDate(off.endDate)
+      if (!start || !end) continue
       if (today >= start && today <= end) {
         return 'away'
       }
@@ -1306,12 +1326,13 @@ const [showFilters, setShowFilters] = useState(false)
   // Check for nearest upcoming time off
   const getUpcomingTimeOff = (timeOff: { startDate: string; endDate: string; name?: string }[]): { days: number; name: string } | null => {
     const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    today.setHours(12, 0, 0, 0)
     let nearest: { days: number; name: string } | null = null
     for (const off of timeOff) {
-      const start = new Date(off.startDate)
+      const start = parseLocalDate(off.startDate)
+      if (!start) continue
       const diffTime = start.getTime() - today.getTime()
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+      const diffDays = Math.ceil(diffTime / DAY_MS)
       if (diffDays > 0) {
         if (!nearest || diffDays < nearest.days) {
           nearest = { days: diffDays, name: off.name || 'Time Off' }
@@ -1779,11 +1800,17 @@ const [showFilters, setShowFilters] = useState(false)
                   <span>Due Date</span>
                 </div>
                 {filteredProjects.map(project => {
-                  const isOverdue = project.endDate && project.status !== 'done' && new Date(project.endDate) < new Date(new Date().toISOString().split('T')[0])
+                  const isOverdue = (() => {
+                    if (!project.endDate || project.status === 'done') return false
+                    const end = parseLocalDate(project.endDate)
+                    if (!end) return false
+                    const today = new Date()
+                    today.setHours(12, 0, 0, 0)
+                    return end < today
+                  })()
                   const formatDate = (dateStr?: string) => {
                     if (!dateStr) return ''
-                    const d = new Date(dateStr)
-                    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                    return formatShortDate(dateStr)
                   }
                   return (
                   <div key={project.id} className="project-row">

@@ -380,47 +380,55 @@ app.get('/api/calendar', async (req, res) => {
       timeOff: t.timeOff ? JSON.parse(t.timeOff) : []
     })));
     
+    // Parse YYYY-MM-DD as local date (avoids UTC off-by-one)
+    const toLocalDate = (dateStr: string): Date | null => {
+      if (!dateStr) return null
+      const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+      if (!match) return null
+      return new Date(+match[1], +match[2] - 1, +match[3], 12, 0, 0, 0)
+    }
+
     // Find date range - start from current month
     const now = new Date();
-    let minDate = new Date(now.getFullYear(), now.getMonth(), 1); // Start of current month
-    let maxDate = new Date(now.getFullYear(), now.getMonth(), 1); // Start of current month
-    
+    let minDate = new Date(now.getFullYear(), now.getMonth(), 1, 12, 0, 0, 0); // Start of current month
+    let maxDate = new Date(now.getFullYear(), now.getMonth(), 1, 12, 0, 0, 0); // Start of current month
+
     // Check project dates
     projects.forEach(proj => {
       if (proj.startDate) {
-        const d = new Date(proj.startDate);
-        if (d < minDate) minDate = d;
+        const d = toLocalDate(proj.startDate);
+        if (d && d < minDate) minDate = d;
       }
       if (proj.endDate) {
-        const d = new Date(proj.endDate);
-        if (d > maxDate) maxDate = d;
+        const d = toLocalDate(proj.endDate);
+        if (d && d > maxDate) maxDate = d;
       }
       // Check timeline ranges
       if (proj.timeline) {
         proj.timeline.forEach((t: { startDate: string; endDate: string }) => {
           if (t.startDate) {
-            const d = new Date(t.startDate);
-            if (d < minDate) minDate = d;
+            const d = toLocalDate(t.startDate);
+            if (d && d < minDate) minDate = d;
           }
           if (t.endDate) {
-            const d = new Date(t.endDate);
-            if (d > maxDate) maxDate = d;
+            const d = toLocalDate(t.endDate);
+            if (d && d > maxDate) maxDate = d;
           }
         });
       }
     });
-    
+
     // Check team time off dates
     team.forEach(member => {
       if (member.timeOff) {
         member.timeOff.forEach((off: { startDate: string; endDate: string }) => {
           if (off.startDate) {
-            const d = new Date(off.startDate);
-            if (d < minDate) minDate = d;
+            const d = toLocalDate(off.startDate);
+            if (d && d < minDate) minDate = d;
           }
           if (off.endDate) {
-            const d = new Date(off.endDate);
-            if (d > maxDate) maxDate = d;
+            const d = toLocalDate(off.endDate);
+            if (d && d > maxDate) maxDate = d;
           }
         });
       }
