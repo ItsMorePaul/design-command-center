@@ -4708,6 +4708,22 @@ select:focus-visible {
 }
 
 /* Next Steps */
+.note-steps-list {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.note-steps-list li {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  margin-bottom: 0.6rem;
+}
+
+.note-steps-list li:last-child {
+  margin-bottom: 0;
+}
+
 .note-next-steps {
   display: flex;
   flex-direction: column;

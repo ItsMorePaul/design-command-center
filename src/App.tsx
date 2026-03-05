@@ -3040,11 +3040,18 @@ const [showFilters, setShowFilters] = useState(false)
               {selectedNote.next_steps && (
                 <div className="note-detail-section">
                   <h4><CheckSquare size={14} /> Next Steps</h4>
-                  <div className="note-next-steps">
-                    {selectedNote.next_steps.split(/\n|•/).filter(s => s.trim()).map((step, i) => (
-                      <div key={i} className="note-next-step-item">{step.trim()}</div>
-                    ))}
-                  </div>
+                  <ul className="note-steps-list">
+                    {selectedNote.next_steps
+                      .replace(/\u200B/g, '')
+                      .split(/\n|•/)
+                      .map(s => s.trim())
+                      .flatMap(s => s.split(/\.\s+/))
+                      .map(s => s.trim())
+                      .filter(s => s.length > 10)
+                      .map((step, i) => (
+                        <li key={i}>{step.replace(/\.$/, '')}</li>
+                      ))}
+                  </ul>
                 </div>
               )}
 
