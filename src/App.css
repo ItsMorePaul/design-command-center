@@ -4670,6 +4670,44 @@ select:focus-visible {
   flex: 1;
 }
 
+/* Note Detail Accordion */
+.note-detail-accordion-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.5rem 0;
+  margin-bottom: 0.75rem;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--color-border);
+  cursor: pointer;
+  color: var(--color-text-muted);
+  transition: color 0.15s ease;
+}
+
+.note-detail-accordion-toggle:hover {
+  color: var(--color-text);
+}
+
+.note-detail-accordion-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.note-detail-accordion-hint {
+  font-size: 0.7rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  opacity: 0.6;
+}
+
 .note-detail-section {
   margin-bottom: 1.25rem;
 }
