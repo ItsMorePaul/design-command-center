@@ -623,20 +623,20 @@ app.post('/api/notes/sync', async (req, res) => {
       if (existing) {
         await run(
           `UPDATE notes SET title = ?, date = ?, content_preview = ?, people_raw = ?, projects_raw = ?,
-           drive_url = ?, source_filename = ?, source_created_at = ?, updated_at = datetime('now')
+           drive_url = ?, source_filename = ?, source_created_at = ?, next_steps = ?, details = ?, attachments = ?, updated_at = datetime('now')
            WHERE id = ?`,
           [title, gNote.date || '', gNote.content_preview || '', gNote.people || '',
            gNote.projects || '', gNote.drive_url || '', gNote.filename || '',
-           gNote.created_at || '', noteId]
+           gNote.created_at || '', gNote.next_steps || '', gNote.details || '', gNote.attachments || '', noteId]
         )
         updated++
       } else {
         await run(
-          `INSERT INTO notes (id, source_id, source_filename, title, date, content_preview, people_raw, projects_raw, drive_url, source_created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO notes (id, source_id, source_filename, title, date, content_preview, people_raw, projects_raw, drive_url, source_created_at, next_steps, details, attachments)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [noteId, gNote.id, gNote.filename || '', title, gNote.date || '',
            gNote.content_preview || '', gNote.people || '', gNote.projects || '',
-           gNote.drive_url || '', gNote.created_at || '']
+           gNote.drive_url || '', gNote.created_at || '', gNote.next_steps || '', gNote.details || '', gNote.attachments || '']
         )
         inserted++
       }
@@ -1036,8 +1036,8 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 // Format: YYYY.MM.DD.hhmm (e.g., 2026.02.26.2059) → displays as "2026.02.26 2059"
 
-const SITE_VERSION = '2026.03.04.1539'
-const SITE_TIME = '1539'
+const SITE_VERSION = '2026.03.04.1645'
+const SITE_TIME = '1645'
 
 const VERSION_KEY = 'dcc_versions'
 
