@@ -3046,7 +3046,6 @@ const [showFilters, setShowFilters] = useState(false)
                 </div>
               )}
 
-              {/* Summary - always visible */}
               {selectedNote.content_preview && (
                 <div className="note-detail-section note-summary-section">
                   <h4>Summary</h4>
@@ -3054,7 +3053,6 @@ const [showFilters, setShowFilters] = useState(false)
                 </div>
               )}
 
-              {/* Next Steps - always visible */}
               {selectedNote.next_steps && (
                 <div className="note-detail-section">
                   <h4><CheckSquare size={14} /> Next Steps</h4>
@@ -3073,72 +3071,50 @@ const [showFilters, setShowFilters] = useState(false)
                 </div>
               )}
 
-              {/* Accordion toggle for details content */}
-              {(selectedNote.details || selectedNote.attachments || selectedNote.source_filename) && (
-                <>
+              {selectedNote.details && (
+                <div className="note-detail-section">
                   <button
                     className="note-detail-accordion-toggle"
                     onClick={() => setNoteDetailOpen(!noteDetailOpen)}
                   >
-                    <div className="note-detail-accordion-label">
-                      {noteDetailOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                      <span>Details</span>
-                    </div>
-                    {!noteDetailOpen && (
-                      <span className="note-detail-accordion-hint">
-                        {[
-                          selectedNote.details && 'details',
-                          selectedNote.attachments && 'attachments',
-                          selectedNote.source_filename && 'source',
-                        ].filter(Boolean).join(', ')}
-                      </span>
-                    )}
+                    {noteDetailOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                    <span>Details</span>
                   </button>
-
                   {noteDetailOpen && (
-                    <>
-                      {/* Full Details - show all bullets */}
-                      {selectedNote.details && (
-                        <div className="note-detail-section">
-                          <h4><FileText size={14} /> Details</h4>
-                          <ul className="note-details-list">
-                            {selectedNote.details.split('|').filter(d => d.trim()).map((detail, i) => (
-                              <li key={i}>{detail.trim()}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {/* Attachments - show as clickable links */}
-                      {selectedNote.attachments && (
-                        <div className="note-detail-section">
-                          <h4><LinkIcon size={14} /> Attachments</h4>
-                          <div className="note-attachments">
-                            {selectedNote.attachments.split('|').map((att, i) => {
-                              const match = att.match(/^(.+?):\s*(https?:\/\/.+)$/)
-                              if (match) {
-                                const [, name, url] = match
-                                return (
-                                  <a key={i} href={url.trim()} target="_blank" rel="noopener" className="note-attachment-link">
-                                    {name.trim()}
-                                  </a>
-                                )
-                              }
-                              return <span key={i} className="note-attachment-text">{att.trim()}</span>
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      {selectedNote.source_filename && (
-                        <div className="note-detail-section">
-                          <h4>Source</h4>
-                          <p className="note-detail-source">{selectedNote.source_filename}</p>
-                        </div>
-                      )}
-                    </>
+                    <ul className="note-details-list">
+                      {selectedNote.details.split('|').filter(d => d.trim()).map((detail, i) => (
+                        <li key={i}>{detail.trim()}</li>
+                      ))}
+                    </ul>
                   )}
-                </>
+                </div>
+              )}
+
+              {selectedNote.attachments && (
+                <div className="note-detail-section">
+                  <h4><LinkIcon size={14} /> Attachments</h4>
+                  <div className="note-attachments">
+                    {selectedNote.attachments.split('|').map((att, i) => {
+                      const match = att.match(/^(.+?):\s*(https?:\/\/.+)$/)
+                      if (match) {
+                        const [, name, url] = match
+                        return (
+                          <a key={i} href={url.trim()} target="_blank" rel="noopener" className="note-attachment-link">
+                            {name.trim()}
+                          </a>
+                        )
+                      }
+                      return <span key={i} className="note-attachment-text">{att.trim()}</span>
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {selectedNote.source_filename && (
+                <div className="note-detail-section">
+                  <h4>Source</h4>
+                  <p className="note-detail-source">{selectedNote.source_filename}</p>
+                </div>
               )}
             </div>
           </div>
