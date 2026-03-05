@@ -16,7 +16,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Bell, Gauge, ChevronDown, ChevronRight, Settings, GripVertical, Folder, StickyNote, RefreshCw, User, CheckSquare } from 'lucide-react'
+import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Bell, Gauge, ChevronDown, Settings, GripVertical, Folder, StickyNote, RefreshCw, User, CheckSquare } from 'lucide-react'
 import { Tooltip } from './Tooltip'
 import './App.css'
 import initialData from './data.json'
@@ -610,7 +610,7 @@ const [showFilters, setShowFilters] = useState(false)
   const [notesSyncing, setNotesSyncing] = useState(false)
   const [notesFilter, setNotesFilter] = useState<{ project: string | null; person: string | null; search: string }>({ project: null, person: null, search: '' })
   const [selectedNote, setSelectedNote] = useState<Note | null>(null)
-  const [noteFullContentExpanded, setNoteFullContentExpanded] = useState(false)
+
 
   // Load versions from server on mount
   useEffect(() => {
@@ -2938,7 +2938,6 @@ const [showFilters, setShowFilters] = useState(false)
                 return filtered.map(note => (
                   <div key={note.id} className="note-card" onClick={() => {
                     setSelectedNote(note)
-                    setNoteFullContentExpanded(false)
                   }}>
                     <div className="note-card-header">
                       <h3 className="note-card-title">{note.title || 'Untitled Note'}</h3>
@@ -3072,25 +3071,15 @@ const [showFilters, setShowFilters] = useState(false)
                 </div>
               )}
 
-              {/* Full Details - expandable section with bullets */}
+              {/* Full Details - show all bullets */}
               {selectedNote.details && (
                 <div className="note-detail-section">
-                  <button
-                    className="note-full-toggle"
-                    onClick={() => setNoteFullContentExpanded(!noteFullContentExpanded)}
-                  >
-                    {noteFullContentExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                    <span>Full details...</span>
-                  </button>
-                  {noteFullContentExpanded && (
-                    <div className="note-full-content">
-                      <ul className="note-details-list">
-                        {selectedNote.details.split('|').filter(d => d.trim()).map((detail, i) => (
-                          <li key={i}>{detail.trim()}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                  <h4><FileText size={14} /> Details</h4>
+                  <ul className="note-details-list">
+                    {selectedNote.details.split('|').filter(d => d.trim()).map((detail, i) => (
+                      <li key={i}>{detail.trim()}</li>
+                    ))}
+                  </ul>
                 </div>
               )}
 

@@ -8,8 +8,25 @@ interface SearchResult {
 }
 
 // Normalize for comparison (lowercase, remove punctuation, collapse spaces)
-const normalize = (s: string): string => 
-  s?.toLowerCase().replace(/['"-]/g, '').replace(/\s+/g, ' ').trim() || '';
+// Also normalize common brand name variations
+const normalize = (s: string): string => {
+  if (!s) return '';
+  let normalized = s.toLowerCase().replace(/['"-]/g, '').replace(/\s+/g, ' ').trim();
+  
+  // Map common variations to canonical form
+  const variations: Record<string, string> = {
+    'barons': 'barrons',
+    'barron': 'barrons',
+  };
+  
+  // Replace whole word variations
+  for (const [variant, canonical] of Object.entries(variations)) {
+    const regex = new RegExp(`\\b${variant}\\b`, 'g');
+    normalized = normalized.replace(regex, canonical);
+  }
+  
+  return normalized;
+};
 
 // Escape special regex characters
 const escapeRegex = (s: string): string => 
