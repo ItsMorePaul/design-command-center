@@ -867,12 +867,25 @@ const [showFilters, setShowFilters] = useState(false)
     await fetch(`/api/team/${id}`, { method: 'DELETE' })
   }
 
-  const saveProject = async (project: Project) => {
-    await fetch('/api/projects', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(project)
-    })
+  const saveProject = async (project: Project): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(project)
+      })
+      if (!res.ok) {
+        const err = await res.text()
+        console.error('Save project failed:', res.status, err)
+        alert(`Failed to save project: ${res.status} ${err}`)
+        return false
+      }
+      return true
+    } catch (err) {
+      console.error('Save project error:', err)
+      alert(`Network error saving project: ${err}`)
+      return false
+    }
   }
 
   const deleteProject = async (id: string) => {
@@ -1185,7 +1198,8 @@ const [showFilters, setShowFilters] = useState(false)
 
     if (editingProject) {
       const updated = { ...editingProject, ...projectFormData }
-      await saveProject(updated)
+      const success = await saveProject(updated)
+      if (!success) return
       setProjects(projects.map(p => p.id === editingProject.id ? updated : p))
       refreshCalendar()
       refreshCapacity()
@@ -1195,7 +1209,8 @@ const [showFilters, setShowFilters] = useState(false)
         ...projectFormData,
         id: Date.now().toString()
       }
-      await saveProject(newProject)
+      const success = await saveProject(newProject)
+      if (!success) return
       setProjects([...projects, newProject])
       refreshCalendar()
       refreshCapacity()
