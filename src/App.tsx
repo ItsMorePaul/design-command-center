@@ -3767,9 +3767,13 @@ const [showFilters, setShowFilters] = useState(false)
       {confirmModal.open && (
         <div className="modal-overlay" onClick={closeConfirmModal}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <h2>{confirmModal.title}</h2>
-            <p className="confirm-message">{confirmModal.message}</p>
-            <div className="modal-actions">
+            <div className="modal-header">
+              <h2>{confirmModal.title}</h2>
+            </div>
+            <div className="modal-body">
+              <p className="confirm-message">{confirmModal.message}</p>
+            </div>
+            <div className="modal-footer">
               <button className="secondary-btn" onClick={closeConfirmModal}>Cancel</button>
               <button
                 className="primary-btn danger-btn"
@@ -3988,70 +3992,74 @@ const [showFilters, setShowFilters] = useState(false)
       {showBusinessLineModal && (
         <div className="modal-overlay" onClick={() => setShowBusinessLineModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <h2>{editingBusinessLine ? 'Edit Business Line' : 'Add Business Line'}</h2>
-            
-            <div className="form-group">
-              <label>Name</label>
-              <input
-                id="bl-name"
-                type="text"
-                value={businessLineFormData.name}
-                onChange={e => setBusinessLineFormData({ ...businessLineFormData, name: e.target.value })}
-                placeholder="e.g., WSJ, Barron's, IBD"
-              />
+            <div className="modal-header">
+              <h2>{editingBusinessLine ? 'Edit Business Line' : 'Add Business Line'}</h2>
             </div>
 
-            <div className="form-group">
-              <label>Custom Links (max 3)</label>
-              {businessLineFormData.customLinks?.map((link, idx) => (
-                <div key={idx} className="custom-link-row">
-                  <input
-                    type="text"
-                    value={link.name}
-                    onChange={e => {
-                      const newLinks = [...businessLineFormData.customLinks];
-                      newLinks[idx].name = e.target.value;
-                      setBusinessLineFormData({ ...businessLineFormData, customLinks: newLinks });
-                    }}
-                    placeholder="Link name"
-                  />
-                  <input
-                    type="url"
-                    value={link.url}
-                    onChange={e => {
-                      const newLinks = [...businessLineFormData.customLinks];
-                      newLinks[idx].url = e.target.value;
-                      setBusinessLineFormData({ ...businessLineFormData, customLinks: newLinks });
-                    }}
-                    placeholder="https://..."
-                  />
+            <div className="modal-body">
+              <div className="form-group">
+                <label>Name</label>
+                <input
+                  id="bl-name"
+                  type="text"
+                  value={businessLineFormData.name}
+                  onChange={e => setBusinessLineFormData({ ...businessLineFormData, name: e.target.value })}
+                  placeholder="e.g., WSJ, Barron's, IBD"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Custom Links (max 3)</label>
+                {businessLineFormData.customLinks?.map((link, idx) => (
+                  <div key={idx} className="custom-link-row">
+                    <input
+                      type="text"
+                      value={link.name}
+                      onChange={e => {
+                        const newLinks = [...businessLineFormData.customLinks];
+                        newLinks[idx].name = e.target.value;
+                        setBusinessLineFormData({ ...businessLineFormData, customLinks: newLinks });
+                      }}
+                      placeholder="Link name"
+                    />
+                    <input
+                      type="url"
+                      value={link.url}
+                      onChange={e => {
+                        const newLinks = [...businessLineFormData.customLinks];
+                        newLinks[idx].url = e.target.value;
+                        setBusinessLineFormData({ ...businessLineFormData, customLinks: newLinks });
+                      }}
+                      placeholder="https://..."
+                    />
+                    <button
+                      type="button"
+                      className="remove-link-btn"
+                      onClick={() => {
+                        const newLinks = businessLineFormData.customLinks.filter((_, i) => i !== idx)
+                        setBusinessLineFormData({ ...businessLineFormData, customLinks: newLinks })
+                      }}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+                {(!businessLineFormData.customLinks || businessLineFormData.customLinks.length < 3) && (
                   <button
                     type="button"
-                    className="remove-link-btn"
+                    className="add-link-btn"
                     onClick={() => {
-                      const newLinks = businessLineFormData.customLinks.filter((_, i) => i !== idx)
-                      setBusinessLineFormData({ ...businessLineFormData, customLinks: newLinks })
+                      const newLinks = [...(businessLineFormData.customLinks || []), { name: '', url: '' }];
+                      setBusinessLineFormData({ ...businessLineFormData, customLinks: newLinks });
                     }}
                   >
-                    <Trash2 size={14} />
+                    + Add Custom Link
                   </button>
-                </div>
-              ))}
-              {(!businessLineFormData.customLinks || businessLineFormData.customLinks.length < 3) && (
-                <button
-                  type="button"
-                  className="add-link-btn"
-                  onClick={() => {
-                    const newLinks = [...(businessLineFormData.customLinks || []), { name: '', url: '' }];
-                    setBusinessLineFormData({ ...businessLineFormData, customLinks: newLinks });
-                  }}
-                >
-                  + Add Custom Link
-                </button>
-              )}
+                )}
+              </div>
             </div>
 
-            <div className="modal-actions">
+            <div className="modal-footer">
               <button className="secondary-btn" onClick={() => setShowBusinessLineModal(false)}>Cancel</button>
               <button className="primary-btn" onClick={async () => {
                 if (!businessLineFormData.name.trim()) return
