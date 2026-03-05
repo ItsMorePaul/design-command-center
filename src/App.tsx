@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   DndContext,
   closestCenter,
@@ -497,7 +497,8 @@ function App() {
 
   // Calendar day modal state
   const [selectedDay, setSelectedDay] = useState<{ date: string; events: CalendarEvent[]; dayName: string } | null>(null)
-  
+  const contentRef = useRef<HTMLDivElement>(null)
+
   const [isLoaded, setIsLoaded] = useState(false)
   const [projectSortBy, setProjectSortBy] = useState<'name' | 'businessLine' | 'designer' | 'dueDate' | 'status'>(() => { try { return (localStorage.getItem('dcc_projectSortBy') as any) || 'name' } catch { return 'name' } })
   const [projectFilters, setProjectFilters] = useState<{businessLines:string[],designers:string[],statuses:string[],project:string|null}>(() => {
@@ -680,6 +681,22 @@ const [showFilters, setShowFilters] = useState(false)
         }
       }
       loadCalendar()
+    }
+  }, [activeTab, calendarData])
+
+  // Auto-scroll to today's month when arriving at calendar view
+  useEffect(() => {
+    if (activeTab === 'calendar' && calendarData) {
+      const today = new Date()
+      const todayMonth = today.getMonth() + 1
+      const todayYear = today.getFullYear()
+      // Wait a tick for DOM to render
+      requestAnimationFrame(() => {
+        const el = contentRef.current?.querySelector(`[data-month="${todayYear}-${todayMonth}"]`) as HTMLElement | null
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+      })
     }
   }, [activeTab, calendarData])
 
@@ -1610,7 +1627,7 @@ const [showFilters, setShowFilters] = useState(false)
         </header>
 
         {/* Content Area */}
-        <div className={`content ${activeTab === 'calendar' ? 'content-calendar' : ''}`}>
+        <div ref={contentRef} className={`content ${activeTab === 'calendar' ? 'content-calendar' : ''}`}>
           {activeTab === 'projects' && (
             <div className="projects-grid">
               <div className="stats-row">
@@ -2396,7 +2413,7 @@ const [showFilters, setShowFilters] = useState(false)
                     </div>
 
                   {calendarData.months.map((month: CalendarMonth, idx: number) => (
-                    <div key={idx} className="calendar-month">
+                    <div key={idx} className="calendar-month" data-month={`${month.year}-${month.month}`}>
                       <h3 className="month-title">
                         {month.name} <span className="month-fiscal">({getDjFiscalLabel(month.month, month.year)})</span>
                       </h3>
