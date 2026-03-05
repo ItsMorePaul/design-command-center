@@ -685,6 +685,13 @@ const [showFilters, setShowFilters] = useState(false)
     }
   }, [activeTab, calendarData])
 
+  // Reset scroll position when switching tabs (non-calendar tabs should start at top)
+  useEffect(() => {
+    if (activeTab !== 'calendar' && contentRef.current) {
+      contentRef.current.scrollTop = 0
+    }
+  }, [activeTab])
+
   // Auto-scroll to today's month when arriving at calendar view
   useEffect(() => {
     if (activeTab === 'calendar' && calendarData) {
