@@ -3766,14 +3766,10 @@ const [showFilters, setShowFilters] = useState(false)
 
       {confirmModal.open && (
         <div className="modal-overlay" onClick={closeConfirmModal}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>{confirmModal.title}</h2>
-            </div>
-            <div className="modal-body">
-              <p className="confirm-message">{confirmModal.message}</p>
-            </div>
-            <div className="modal-footer">
+          <div className="modal confirm-modal" onClick={e => e.stopPropagation()}>
+            <h2>{confirmModal.title}</h2>
+            <p className="confirm-message">{confirmModal.message}</p>
+            <div className="confirm-actions">
               <button className="secondary-btn" onClick={closeConfirmModal}>Cancel</button>
               <button
                 className="primary-btn danger-btn"
