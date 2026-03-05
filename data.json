@@ -1,0 +1,20 @@
+{
+  "projects": [],
+  "team": [],
+  "brandOptions": ["Barron's","FN London","IBD","Mansion Global","Market Data","MarketWatch","Messaging","Mobile Apps","PEN","The Wall Street Journal","X-Brand"],
+  "assignments": [],
+  "priorities": [],
+  "businessLines": [
+    {"id":"barrons","name":"Barron's","icon":"📊"},
+    {"id":"fnlondon","name":"FN London","icon":"💷"},
+    {"id":"ibd","name":"IBD","icon":"📈"},
+    {"id":"mansion","name":"Mansion Global","icon":"🏘️"},
+    {"id":"marketdata","name":"Market Data","icon":"📉"},
+    {"id":"mw","name":"MarketWatch","icon":"💹"},
+    {"id":"messaging","name":"Messaging","icon":"✉️"},
+    {"id":"mobile","name":"Mobile Apps","icon":"📱"},
+    {"id":"pen","name":"PEN","icon":"🏦"},
+    {"id":"wsj","name":"The Wall Street Journal","icon":"📰"}
+  ],
+  "notes": []
+}
