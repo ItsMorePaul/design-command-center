@@ -431,5 +431,85 @@ git checkout v260226-period-version-format
 
 ---
 
+### ✅ v260306-3phase-workflow
+**Date:** 2026-03-06  
+**Time:** ~8:40 AM PST  
+**Git tag:** `v260306-3phase-workflow`  
+**Commit:** (pending — create after testing workflow)  
+**Site version:** `2026.03.06.0840`  
+**DB version at save:** (current)
+
+**To restore:**
+```bash
+git checkout v260306-3phase-workflow
+```
+
+#### What was built in this checkpoint
+**New 3-Phase Bidirectional Sync Workflow**
+
+**Problem solved:**
+- Old workflow had dangerous gaps: pulls overwrote local, pushes overwrote Railway, no preview, no rollback
+- Designers enter data online (Railway), Paul works locally, needs safe merge process
+- No documentation of the complete Pull → Work → Push cycle
+
+**Solution: 3-Phase Workflow**
+
+| Phase | Direction | Script | Safety |
+|-------|-----------|--------|--------|
+| 1. Pull | Railway → Local | `dcc-data-workflow.sh pull` | Auto-backup local before overwrite |
+| 2. Work | Local only | `dcc-data-workflow.sh backup` | Manual backup anytime |
+| 3. Push | Local → Railway | `dcc-push-to-railway.sh` | Auto-backup Railway, requires `DCC_DEPLOY_OK=1` |
+
+**New files created:**
+1. `scripts/dcc-data-workflow.sh` — Phase 1 & 2 management
+   - `status` — Compare Railway vs Local
+   - `preview` — Show diff before pull
+   - `pull` — Pull with auto-backup
+   - `backup` — Manual local backup
+   - `restore` — Restore from backup
+
+2. `scripts/dcc-push-to-railway.sh` — Phase 3 (integrated deployment)
+   - Backs up Railway before any changes
+   - Shows deployment preview
+   - Pushes code (GitHub → Railway auto-deploy)
+   - Syncs data via `/api/seed`
+   - Verifies deployment (health, counts, Fariah's data)
+
+**Updated files:**
+- `DEPLOYMENT_LOCK.md` — Completely rewritten with 3-phase workflow documentation
+- `AGENTS.md` — Added DCC workflow section (separate update)
+- `scripts/` — New commands added to standard workflow
+
+**Usage workflow:**
+```bash
+# Phase 1: Pull designer changes
+cd ~/.openclaw/workspace/work/design-command-center
+./scripts/dcc-data-workflow.sh status    # See current state
+./scripts/dcc-data-workflow.sh preview   # Preview changes
+./scripts/dcc-data-workflow.sh pull      # Pull with backup
+
+# Phase 2: Work locally
+# ... make changes ...
+./scripts/dcc-data-workflow.sh backup    # Manual backup
+
+# Phase 3: Push (when Paul says "deploy dcc")
+# Wilson runs: ./scripts/dcc-push-to-railway.sh
+# (Requires DCC_DEPLOY_OK=1, enforced by pre-push hook)
+```
+
+**Safety guarantees:**
+- Every pull: Local backed up to `backups/local/<timestamp>_pre_pull/`
+- Every push: Railway backed up to `backups/railway/pre_deploy_<timestamp>/`
+- Undo scripts auto-generated in each backup folder
+- Verification after every operation
+- No destructive operations without explicit preview
+
+**Legacy script status:**
+- `pull-from-railway.sh` — Still works, but lacks backup safety
+- `sync-to-railway-safe.sh` — Still works, but new integrated script preferred
+- `backup-railway.sh` — Used internally by new scripts
+
+---
+
 *Log started: 2026-02-26*  
 *Maintained by: Wilson 🦉*
