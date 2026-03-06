@@ -960,8 +960,13 @@ app.post('/api/seed', async (req, res) => {
     if (projects) {
       await run('DELETE FROM projects')
       for (const p of projects) {
+        // Handle designers field - may be array or already stringified
+        // Handle JSON fields - may be array/object or already stringified
+        const timelineValue = Array.isArray(p.timeline) ? JSON.stringify(p.timeline) : (p.timeline || '[]')
+        const customLinksValue = Array.isArray(p.customLinks) ? JSON.stringify(p.customLinks) : (p.customLinks || '[]')
+        const designersValue = Array.isArray(p.designers) ? JSON.stringify(p.designers) : (p.designers || '[]')
         await run(`INSERT INTO projects (id, name, status, dueDate, assignee, url, description, businessLine, deckLink, prdLink, briefLink, startDate, endDate, timeline, deckName, prdName, briefName, figmaLink, customLinks, designers) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [p.id, p.name, p.status || 'active', p.dueDate || null, p.assignee || null, p.url || '', p.description || '', p.businessLine || null, p.deckLink || '', p.prdLink || '', p.briefLink || '', p.startDate || null, p.endDate || null, JSON.stringify(p.timeline || []), p.deckName || '', p.prdName || '', p.briefName || '', p.figmaLink || '', JSON.stringify(p.customLinks || []), JSON.stringify(p.designers || [])])
+          [p.id, p.name, p.status || 'active', p.dueDate || null, p.assignee || null, p.url || '', p.description || '', p.businessLine || null, p.deckLink || '', p.prdLink || '', p.briefLink || '', p.startDate || null, p.endDate || null, timelineValue, p.deckName || '', p.prdName || '', p.briefName || '', p.figmaLink || '', customLinksValue, designersValue])
       }
     }
     
@@ -1044,8 +1049,8 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 // Format: YYYY.MM.DD.hhmm (e.g., 2026.02.26.2059) → displays as "2026.02.26 2059"
 
-const SITE_VERSION = '2026.03.06.0915'
-const SITE_TIME = '0915'
+const SITE_VERSION = '2026.03.06.0922'
+const SITE_TIME = '0922'
 
 const VERSION_KEY = 'dcc_versions'
 
