@@ -15,6 +15,13 @@
     <title>Design Command Center</title>
   </head>
   <body>
+    <script>
+      // Apply saved theme immediately to prevent flash of wrong theme
+      (function() {
+        var saved = localStorage.getItem('dcc-theme');
+        if (saved === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
