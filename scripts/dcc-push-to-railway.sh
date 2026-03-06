@@ -149,9 +149,10 @@ deploy_code() {
     info "Commits to push:"
     git log --oneline origin/main..HEAD 2>/dev/null || echo "  (none or already up to date)"
     
-    # Check for data/shared.db in commits
-    if git diff --name-only HEAD~5..HEAD 2>/dev/null | grep -q "data/shared.db"; then
-        error "COMMIT CONTAINS data/shared.db - DO NOT PUSH DB FILES"
+    # Check for data/shared.db being ADDED in commits (deletion is OK)
+    if git diff --name-status HEAD~5..HEAD 2>/dev/null | grep -E "^[AM].*data/shared.db"; then
+        error "COMMIT ADDS/MODIFIES data/shared.db - DO NOT PUSH DB FILES"
+        error "To fix: git rm --cached data/shared.db && git commit -m 'remove db from tracking'"
         exit 1
     fi
     
