@@ -23,9 +23,5 @@ dist-ssr
 *.sln
 *.sw?
 
-# Database files (NEVER commit SQLite DB)
-data/shared.db
-*.db
-
 # Backup directories
 backups/
