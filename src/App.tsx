@@ -16,7 +16,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Bell, Gauge, ChevronDown, ChevronRight, Settings, GripVertical, Folder, StickyNote, RefreshCw, User, CheckSquare } from 'lucide-react'
+import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Bell, Gauge, ChevronDown, ChevronRight, Settings, GripVertical, Folder, StickyNote, RefreshCw, User, CheckSquare, Sun, Moon } from 'lucide-react'
 import { Tooltip } from './Tooltip'
 import './App.css'
 import initialData from './data.json'
@@ -461,6 +461,10 @@ function DoneDropZone({ children, id = 'done-drop-zone' }: { children?: React.Re
 
 function App() {
   const [activeTab, setActiveTab] = useState<'projects' | 'team' | 'calendar' | 'capacity' | 'notes' | 'settings'>('projects')
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const saved = localStorage.getItem('dcc-theme')
+    return (saved === 'dark') ? 'dark' : 'light'
+  })
   const [notifications] = useState(mockNotifications)
   const [team, setTeam] = useState<TeamMember[]>([])
   const [projects, setProjects] = useState<Project[]>([])
@@ -527,6 +531,14 @@ function App() {
     projects: [] as string[],
     brands: [] as string[]
   })
+  // Apply theme to document
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    localStorage.setItem('dcc-theme', theme)
+  }, [theme])
+
+  const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light')
+
   useEffect(() => {
   try { localStorage.setItem('dcc_projectSortBy', localStorage.getItem('dcc_projectSortBy') || 'name') } catch {}
   try { localStorage.setItem('dcc_projectFilters', JSON.stringify(projectFilters)) } catch {}
@@ -1655,6 +1667,9 @@ const [showFilters, setShowFilters] = useState(false)
           </div>
           
           <div className="header-actions">
+            <button className="theme-toggle" aria-label="Toggle theme" onClick={toggleTheme}>
+              {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+            </button>
             <button className="icon-btn" aria-label="Notifications">
               <Bell size={18} />
               {unreadCount > 0 && <span className="badge">{unreadCount}</span>}

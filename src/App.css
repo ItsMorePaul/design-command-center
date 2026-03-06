@@ -12,7 +12,7 @@
   width: 260px;
   min-width: 260px;
   flex-shrink: 0;
-  background: linear-gradient(180deg, var(--color-bg-secondary) 0%, rgba(18, 18, 26, 0.95) 100%);
+  background: linear-gradient(180deg, var(--color-bg-secondary) 0%, var(--color-sidebar-gradient-end) 100%);
   border-right: 1px solid var(--color-border-subtle);
   display: flex;
   flex-direction: column;
@@ -69,7 +69,7 @@
 }
 
 .nav-item:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--color-hover-subtle);
   color: var(--color-text);
 }
 
@@ -323,7 +323,7 @@
 }
 
 .project-row:hover {
-  background-color: rgba(255, 255, 255, 0.02);
+  background-color: var(--color-hover-faint);
 }
 
 .project-actions {
@@ -454,8 +454,8 @@
 .brand-label {
   font-size: 0.65rem;
   font-weight: 500;
-  color: #6b7280;
-  background: #f3f4f6;
+  color: var(--color-badge-text);
+  background: var(--color-badge-bg);
   padding: 0.2rem 0.5rem;
   border-radius: 9999px;
   text-transform: uppercase;
@@ -481,7 +481,7 @@
 
 .member-role {
   font-size: 0.7rem;
-  color: white;
+  color: var(--color-text);
 }
 
 .status-dot {
@@ -577,7 +577,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.7);
+  background-color: var(--color-modal-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -870,36 +870,28 @@
 }
 
 .float-field input[type="date"]::-webkit-calendar-picker-indicator {
-  filter: brightness(0) invert(0.5);
+  filter: brightness(0) invert(var(--date-picker-invert));
+  opacity: 0.5;
   cursor: pointer;
   position: absolute;
   right: 1rem;
 }
 
 .float-field input[type="date"]:focus::-webkit-calendar-picker-indicator {
-  filter: brightness(0) invert(0.3);
+  opacity: 0.7;
 }
 
 /* Date input styling - more accessible */
 .form-group input[type="date"] {
   cursor: pointer;
-  background-color: var(--color-bg-tertiary, #f8fafc);
-  color: var(--color-text, #1e293b);
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text);
   font-weight: 500;
 }
 
-/* Dark mode - ensure date input is visible */
-@media (prefers-color-scheme: dark) {
-  .form-group input[type="date"] {
-    background-color: #334155;
-    color: #f1f5f9;
-    border-color: #475569;
-  }
-}
-
-/* Make calendar picker icon white */
+/* Calendar picker icon adapts to theme */
 .form-group input[type="date"]::-webkit-calendar-picker-indicator {
-  filter: brightness(0) invert(1);
+  filter: brightness(0) invert(var(--date-picker-invert));
   opacity: 0.8;
   cursor: pointer;
 }
@@ -1186,7 +1178,7 @@
   }
   
   .day-cell:active {
-    background: rgba(59, 130, 246, 0.15);
+    background: var(--color-accent-subtle);
   }
   
   .day-number {
@@ -1353,7 +1345,7 @@
 
 /* Project Link */
 .project-name-link {
-  color: white;
+  color: var(--color-text);
   text-decoration: none;
   font-weight: 500;
   transition: opacity 0.15s ease;
@@ -1478,7 +1470,7 @@
   flex-direction: column;
   gap: var(--gantt-header-gap);
   padding: 1rem 1.5rem;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.15) 0%, transparent 100%);
+  background: linear-gradient(180deg, var(--color-hover-subtle) 0%, transparent 100%);
   border-top: 1px solid var(--color-border-subtle);
 }
 
@@ -1547,7 +1539,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--color-hover-faint);
   border-radius: var(--radius-sm);
   overflow: visible;
   padding: var(--gantt-bars-pad);
@@ -1570,8 +1562,8 @@
   top: 0;
   bottom: 0;
   width: 1px;
-  background: rgba(255, 255, 255, 0.08);
-  border-right: 1px dashed rgba(255, 255, 255, 0.12);
+  background: var(--color-grid-line);
+  border-right: 1px dashed var(--color-grid-line-dashed);
 }
 
 .gantt-track {
@@ -1617,13 +1609,13 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-sm);
   transition: all 0.2s ease;
 }
 
 .gantt-bar:hover {
   filter: brightness(1.08);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-md);
   z-index: 5;
 }
 
@@ -1832,7 +1824,7 @@
 .designer-link {
   background: none;
   border: none;
-  color: white;
+  color: var(--color-text);
   font-size: 0.85rem;
   cursor: pointer;
   padding: 0;
@@ -2042,7 +2034,7 @@
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: white;
+  color: var(--color-text);
   margin-bottom: 0.5rem;
 }
 
@@ -2072,7 +2064,7 @@
 .priority-rank {
   font-size: 1rem;
   font-weight: 700;
-  color: rgb(59, 130, 246);
+  color: var(--color-accent);
   width: 1.75rem;
   text-align: center;
   flex-shrink: 0;
@@ -2298,8 +2290,8 @@
 }
 
 .projects-filter-row .filter-pill:hover {
-  border-color: white;
-  color: white;
+  border-color: var(--color-text);
+  color: var(--color-text);
 }
 
 .projects-filter-row .filter-pill.active {
@@ -2384,7 +2376,7 @@
   border-radius: 0;
   margin: 0 -2rem 0 -2rem;
   overflow: hidden;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.56);
+  box-shadow: var(--color-panel-shadow);
 }
 
 .calendar-panel-header {
@@ -2559,7 +2551,7 @@
 }
 
 input:checked + .slider {
-  background-color: #6b7280;
+  background-color: var(--color-accent);
 }
 
 input:checked + .slider:before {
@@ -2593,9 +2585,9 @@ input:checked + .slider:before {
   white-space: nowrap;
 }
 
-/* Default hover (white) for projects and brands */
+/* Default hover for projects and brands */
 .filter-pill:hover {
-  border-color: white !important;
+  border-color: var(--color-text) !important;
   color: var(--color-text);
 }
 
@@ -3614,7 +3606,7 @@ select:focus-visible {
   font-size: 0.7rem;
   color: #f59e0b;
   white-space: nowrap;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-md);
 }
 
 /* Seamless arrow using rotated square - works with Floating UI positioning */
@@ -3635,14 +3627,14 @@ select:focus-visible {
 .tooltip-arrow-down {
   border-top: none;
   border-left: none;
-  box-shadow: 2px 2px 3px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-sm);
 }
 
 /* Position arrow to point up (tooltip below target) */
 .tooltip-arrow-up {
   border-bottom: none;
   border-right: none;
-  box-shadow: -2px -2px 3px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-sm);
 }
 
 /* Settings Page */
@@ -4604,18 +4596,18 @@ select:focus-visible {
 }
 
 .note-tag.project-tag {
-  background: rgba(99, 102, 241, 0.15);
-  color: #818cf8;
+  background: var(--color-tag-project-bg);
+  color: var(--color-tag-project);
 }
 
 .note-tag.person-tag {
-  background: rgba(16, 185, 129, 0.15);
-  color: #34d399;
+  background: var(--color-tag-person-bg);
+  color: var(--color-tag-person);
 }
 
 .note-tag.raw-tag {
-  background: rgba(251, 191, 36, 0.15);
-  color: #fbbf24;
+  background: var(--color-tag-raw-bg);
+  color: var(--color-tag-raw);
 }
 
 .note-tag.clickable {
@@ -4675,7 +4667,7 @@ select:focus-visible {
 }
 
 .note-close-btn:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--color-hover-subtle);
   color: var(--color-text);
 }
 
@@ -4822,7 +4814,7 @@ select:focus-visible {
 
 .note-attachment-link {
   font-size: 0.85rem;
-  color: var(--accent-blue, #60a5fa);
+  color: var(--color-text-link);
   text-decoration: none;
   line-height: 1.5;
   word-break: break-all;
@@ -4876,15 +4868,36 @@ select:focus-visible {
 }
 
 .note-full-toggle:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--color-hover-subtle);
   color: var(--color-text);
 }
 
 .note-full-content {
   margin-top: 0.5rem;
   padding: 0.75rem;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--color-inset-bg);
   border-radius: var(--radius-sm);
   max-height: 400px;
   overflow-y: auto;
+}
+
+/* Theme Toggle */
+.theme-toggle {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.theme-toggle:hover {
+  background-color: var(--color-hover-subtle);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
 }

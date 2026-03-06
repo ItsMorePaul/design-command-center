@@ -1,6 +1,71 @@
 @import "tailwindcss";
 
+/* ===== Light Theme (default) ===== */
 :root {
+  --color-bg: #ffffff;
+  --color-bg-secondary: #f8fafc;
+  --color-bg-tertiary: #f1f5f9;
+  --color-text: #0f172a;
+  --color-text-muted: #64748b;
+  --color-text-dim: #94a3b8;
+  --color-accent: #3b82f6;
+  --color-accent-hover: #2563eb;
+  --color-accent-subtle: rgba(59, 130, 246, 0.1);
+  --color-primary: #3b82f6;
+  --color-border: #e2e8f0;
+  --color-border-subtle: #f1f5f9;
+  --color-border-hover: #cbd5e1;
+  --color-bg-subtle: #f8fafc;
+  --color-text-secondary: #475569;
+  --color-text-link: #3b82f6;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-gantt-1: #6366f1;
+  --color-gantt-2: #8b5cf6;
+  --color-gantt-3: #ec4899;
+  --color-gantt-4: #14b8a6;
+  --color-gantt-5: #f59e0b;
+
+  /* Theme-adaptive overlays */
+  --color-hover-subtle: rgba(0, 0, 0, 0.04);
+  --color-hover-faint: rgba(0, 0, 0, 0.02);
+  --color-grid-line: rgba(0, 0, 0, 0.06);
+  --color-grid-line-dashed: rgba(0, 0, 0, 0.10);
+  --color-modal-overlay: rgba(0, 0, 0, 0.4);
+  --color-sidebar-gradient-end: rgba(248, 250, 252, 0.95);
+  --color-inset-bg: rgba(0, 0, 0, 0.04);
+  --color-badge-bg: #f3f4f6;
+  --color-badge-text: #6b7280;
+  --color-panel-shadow: 0 8px 18px rgba(0, 0, 0, 0.1);
+
+  /* Modern effects */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --shadow-glow: 0 0 20px rgba(59, 130, 246, 0.15);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  /* Note tags */
+  --color-tag-project: #4f46e5;
+  --color-tag-project-bg: rgba(99, 102, 241, 0.12);
+  --color-tag-person: #059669;
+  --color-tag-person-bg: rgba(16, 185, 129, 0.12);
+  --color-tag-raw: #d97706;
+  --color-tag-raw-bg: rgba(251, 191, 36, 0.12);
+
+  /* Date picker */
+  --date-picker-invert: 0;
+
+  /* Body gradient */
+  --body-gradient-1: rgba(59, 130, 246, 0.03);
+  --body-gradient-2: rgba(59, 130, 246, 0.02);
+}
+
+/* ===== Dark Theme ===== */
+[data-theme="dark"] {
   --color-bg: #0a0a0f;
   --color-bg-secondary: #12121a;
   --color-bg-tertiary: #1a1a24;
@@ -13,6 +78,10 @@
   --color-primary: #3b82f6;
   --color-border: #2a2a35;
   --color-border-subtle: #1e1e28;
+  --color-border-hover: #3a3a48;
+  --color-bg-subtle: #12121a;
+  --color-text-secondary: #9ca3af;
+  --color-text-link: #60a5fa;
   --color-success: #10b981;
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
@@ -21,15 +90,39 @@
   --color-gantt-3: #ec4899;
   --color-gantt-4: #14b8a6;
   --color-gantt-5: #f59e0b;
-  
+
+  /* Theme-adaptive overlays */
+  --color-hover-subtle: rgba(255, 255, 255, 0.04);
+  --color-hover-faint: rgba(255, 255, 255, 0.02);
+  --color-grid-line: rgba(255, 255, 255, 0.08);
+  --color-grid-line-dashed: rgba(255, 255, 255, 0.12);
+  --color-modal-overlay: rgba(0, 0, 0, 0.7);
+  --color-sidebar-gradient-end: rgba(18, 18, 26, 0.95);
+  --color-inset-bg: rgba(0, 0, 0, 0.2);
+  --color-badge-bg: #374151;
+  --color-badge-text: #9ca3af;
+  --color-panel-shadow: 0 8px 18px rgba(0, 0, 0, 0.56);
+
   /* Modern effects */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
   --shadow-glow: 0 0 20px rgba(59, 130, 246, 0.2);
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
+
+  /* Note tags */
+  --color-tag-project: #818cf8;
+  --color-tag-project-bg: rgba(99, 102, 241, 0.15);
+  --color-tag-person: #34d399;
+  --color-tag-person-bg: rgba(16, 185, 129, 0.15);
+  --color-tag-raw: #fbbf24;
+  --color-tag-raw-bg: rgba(251, 191, 36, 0.15);
+
+  /* Date picker */
+  --date-picker-invert: 1;
+
+  /* Body gradient */
+  --body-gradient-1: rgba(59, 130, 246, 0.08);
+  --body-gradient-2: rgba(59, 130, 246, 0.05);
 }
 
 * {
@@ -49,9 +142,9 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-image: 
-    radial-gradient(ellipse at top left, rgba(59, 130, 246, 0.08) 0%, transparent 50%),
-    radial-gradient(ellipse at bottom right, rgba(59, 130, 246, 0.05) 0%, transparent 50%);
+  background-image:
+    radial-gradient(ellipse at top left, var(--body-gradient-1) 0%, transparent 50%),
+    radial-gradient(ellipse at bottom right, var(--body-gradient-2) 0%, transparent 50%);
   background-attachment: fixed;
 }
 
@@ -64,4 +157,9 @@ body {
 /* Smooth transitions */
 button, a {
   transition: all 0.15s ease;
+}
+
+/* Theme transition */
+body, .sidebar, .header, .content, .modal, .stat-card, .team-card, .project-row {
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
