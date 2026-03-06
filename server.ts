@@ -1044,8 +1044,8 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 // Format: YYYY.MM.DD.hhmm (e.g., 2026.02.26.2059) → displays as "2026.02.26 2059"
 
-const SITE_VERSION = '2026.03.06.0906'
-const SITE_TIME = '0906'
+const SITE_VERSION = '2026.03.06.0915'
+const SITE_TIME = '0915'
 
 const VERSION_KEY = 'dcc_versions'
 
@@ -1099,6 +1099,53 @@ const initVersions = async () => {
 // Ensure table exists
 run("CREATE TABLE IF NOT EXISTS app_versions (key TEXT PRIMARY KEY, db_version TEXT, db_time TEXT, updated_at TEXT)").then(() => initVersions())
 run("CREATE TABLE IF NOT EXISTS project_priorities (business_line_id TEXT NOT NULL, project_id TEXT NOT NULL, rank INTEGER NOT NULL, PRIMARY KEY (business_line_id, project_id))")
+
+// Core tables (auto-created on fresh deploy)
+run(`CREATE TABLE IF NOT EXISTS projects (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  status TEXT DEFAULT 'active',
+  dueDate TEXT,
+  assignee TEXT,
+  url TEXT,
+  description TEXT,
+  businessLine TEXT,
+  deckLink TEXT,
+  prdLink TEXT,
+  briefLink TEXT,
+  startDate TEXT,
+  endDate TEXT,
+  createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TEXT DEFAULT CURRENT_TIMESTAMP,
+  timeline TEXT,
+  deckName TEXT,
+  prdName TEXT,
+  briefName TEXT,
+  figmaLink TEXT,
+  customLinks TEXT,
+  designers TEXT
+)`).catch(e => console.error('projects init error:', e.message))
+
+run(`CREATE TABLE IF NOT EXISTS team (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  role TEXT,
+  brands TEXT,
+  status TEXT DEFAULT 'offline',
+  slack TEXT,
+  email TEXT,
+  avatar TEXT,
+  createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+  updatedAt TEXT DEFAULT CURRENT_TIMESTAMP,
+  timeOff TEXT,
+  weekly_hours REAL DEFAULT 35,
+  excluded INTEGER DEFAULT 0
+)`).catch(e => console.error('team init error:', e.message))
+
+run(`CREATE TABLE IF NOT EXISTS brand_options (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT UNIQUE NOT NULL
+)`).catch(e => console.error('brand_options init error:', e.message))
 
 // Capacity schema safety
 run(`CREATE TABLE IF NOT EXISTS project_assignments (
