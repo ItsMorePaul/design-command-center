@@ -3894,20 +3894,16 @@ const [showFilters, setShowFilters] = useState(false)
                           {project.matchedLinks && project.matchedLinks.length > 0 && (
                             <div className="search-result-links">
                               {project.matchedLinks.map((link, idx) => (
-                                <a 
-                                  key={idx} 
-                                  href={link.url} 
-                                  target="_blank" 
+                                <a
+                                  key={idx}
+                                  href={link.url}
+                                  target="_blank"
                                   rel="noopener noreferrer"
                                   className="search-result-link"
                                   onClick={e => e.stopPropagation()}
                                 >
-                                  {link.type === 'Deck' && <Presentation size={12} />}
-                                  {link.type === 'PRD' && <FileText size={12} />}
-                                  {link.type === 'Figma' && <Figma size={12} />}
-                                  {link.type === 'Brief' && <FileEdit size={12} />}
-                                  {link.type === 'Link' && <LinkIcon size={12} />}
-                                  <span>{link.type}</span>
+                                  <LinkIcon size={12} />
+                                  <span>{link.name}</span>
                                 </a>
                               ))}
                             </div>
@@ -3978,10 +3974,8 @@ const [showFilters, setShowFilters] = useState(false)
                                   className="search-result-link"
                                   onClick={e => e.stopPropagation()}
                                 >
-                                  {link.type === 'Deck' && <Presentation size={12} />}
-                                  {link.type === 'PRD' && <FileText size={12} />}
-                                  {link.type === 'Figma' && <Figma size={12} />}
-                                  <span>{link.type}</span>
+                                  <LinkIcon size={12} />
+                                  <span>{link.name}</span>
                                 </a>
                               ))}
                             </div>

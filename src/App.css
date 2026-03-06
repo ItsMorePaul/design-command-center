@@ -4211,8 +4211,8 @@ select:focus-visible {
 /* Result Links */
 .search-result-links {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
+  flex-direction: column;
+  gap: 0.25rem;
   margin-top: 0.5rem;
   padding-top: 0.5rem;
   border-top: 1px solid var(--color-border);
@@ -4221,21 +4221,20 @@ select:focus-visible {
 .search-result-link {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
-  padding: 0.25rem 0.5rem;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
+  gap: 0.35rem;
+  padding: 0.15rem 0;
   color: var(--color-text-muted);
   font-size: 0.7rem;
   text-decoration: none;
-  transition: all 0.15s ease;
+  transition: color 0.15s ease;
 }
 
 .search-result-link:hover {
-  border-color: var(--color-accent);
   color: var(--color-accent);
-  background: var(--color-accent-subtle);
+}
+
+.search-result-link:hover span {
+  text-decoration: underline;
 }
 
 /* Footer */

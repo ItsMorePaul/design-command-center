@@ -131,11 +131,11 @@ const searchProjects = async (query: string, allFn: (sql: string, params?: any[]
 
     // Check asset link names (weight: 0.3)
     const allLinks = [
-      proj.deckName ? { name: proj.deckName, type: 'Deck' } : null,
-      proj.prdName ? { name: proj.prdName, type: 'PRD' } : null,
-      proj.briefName ? { name: proj.briefName, type: 'Brief' } : null,
-      proj.figmaLink ? { name: 'Figma', type: 'Figma' } : null,
-      ...customLinks.map((l: any) => ({ name: l.name, type: 'Link' }))
+      proj.deckName ? { name: proj.deckName, url: proj.deckLink, type: 'Deck' } : null,
+      proj.prdName ? { name: proj.prdName, url: proj.prdLink, type: 'PRD' } : null,
+      proj.briefName ? { name: proj.briefName, url: proj.briefLink, type: 'Brief' } : null,
+      proj.figmaLink ? { name: 'Figma', url: proj.figmaLink, type: 'Figma' } : null,
+      ...customLinks.map((l: any) => ({ name: l.name, url: l.url, type: 'Link' }))
     ].filter(Boolean);
 
     for (const link of allLinks) {
@@ -237,11 +237,11 @@ const searchBusinessLines = async (query: string, allFn: (sql: string, params?: 
 
     // Check asset links (weight: 0.3)
     const allLinks = [
-      bl.deckName ? { name: bl.deckName, type: 'Deck' } : null,
-      bl.prdName ? { name: bl.prdName, type: 'PRD' } : null,
-      bl.briefName ? { name: bl.briefName, type: 'Brief' } : null,
-      bl.figmaLink ? { name: 'Figma', type: 'Figma' } : null,
-      ...customLinks.map((l: any) => ({ name: l.name, type: 'Link' }))
+      bl.deckName ? { name: bl.deckName, url: bl.deckLink, type: 'Deck' } : null,
+      bl.prdName ? { name: bl.prdName, url: bl.prdLink, type: 'PRD' } : null,
+      bl.briefName ? { name: bl.briefName, url: bl.briefLink, type: 'Brief' } : null,
+      bl.figmaLink ? { name: 'Figma', url: bl.figmaLink, type: 'Figma' } : null,
+      ...customLinks.map((l: any) => ({ name: l.name, url: l.url, type: 'Link' }))
     ].filter(Boolean);
 
     for (const link of allLinks) {
