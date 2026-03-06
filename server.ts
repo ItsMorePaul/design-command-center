@@ -954,7 +954,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 // Seed endpoint - replaces all data
 app.post('/api/seed', async (req, res) => {
   try {
-    const { projects, team, assignments, priorities, businessLines, brandOptions } = req.body
+    const { projects, team, assignments, priorities, businessLines, brandOptions, notes } = req.body
     
     // Clear and insert projects
     if (projects) {
@@ -1018,6 +1018,15 @@ app.post('/api/seed', async (req, res) => {
       }
     }
     
+    // Clear and insert notes (Gemini Notes)
+    if (notes && notes.length > 0) {
+      await run('DELETE FROM notes')
+      for (const n of notes) {
+        await run(`INSERT INTO notes (id, source_id, source_filename, title, date, content_preview, people_raw, projects_raw, drive_url, source_created_at, next_steps, details, attachments) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [n.id, n.source_id || null, n.source_filename || '', n.title || '', n.date || null, n.content_preview || '', n.people_raw || '[]', n.projects_raw || '[]', n.drive_url || '', n.source_created_at || null, n.next_steps || '', n.details || '', n.attachments || '[]'])
+      }
+    }
+    
     // Update DB version on seed
     await updateDbVersion()
     
@@ -1027,7 +1036,8 @@ app.post('/api/seed', async (req, res) => {
       assignments: assignments?.length ?? 0,
       priorities: priorities?.length ?? 0,
       businessLines: businessLines?.length ?? 0,
-      brandOptions: brandOptions?.length ?? 0
+      brandOptions: brandOptions?.length ?? 0,
+      notes: notes?.length ?? 0
     }})
   } catch (e) { res.status(500).json({error: e.message}); }
 })
@@ -1049,8 +1059,8 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 // Format: YYYY.MM.DD.hhmm (e.g., 2026.02.26.2059) → displays as "2026.02.26 2059"
 
-const SITE_VERSION = '2026.03.06.1010'
-const SITE_TIME = '1010'
+const SITE_VERSION = '2026.03.06.1015'
+const SITE_TIME = '1015'
 
 const VERSION_KEY = 'dcc_versions'
 
