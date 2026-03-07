@@ -480,7 +480,7 @@ function App() {
   const prioritySensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   const [showProjectModal, setShowProjectModal] = useState(false)
-  const [projectViewMode, setProjectViewMode] = useState<'list' | 'priority'>('priority')
+  const [projectViewMode, setProjectViewMode] = useState<'list' | 'priority'>('list')
   // priorities: { [business_line_id]: project_id[] } in rank order
   const [priorities, setPriorities] = useState<Record<string, string[]>>({})
   const [priorityBusinessLine, setPriorityBusinessLine] = useState<string>('')
@@ -518,7 +518,7 @@ function App() {
   const contentRef = useRef<HTMLDivElement>(null)
 
   const [isLoaded, setIsLoaded] = useState(false)
-  const [projectSortBy, setProjectSortBy] = useState<'name' | 'businessLine' | 'designer' | 'dueDate' | 'status'>(() => { try { return (localStorage.getItem('dcc_projectSortBy') as any) || 'name' } catch { return 'name' } })
+  const [projectSortBy, setProjectSortBy] = useState<'name' | 'businessLine' | 'designer' | 'dueDate' | 'status'>(() => { try { return (localStorage.getItem('dcc_projectSortBy') as any) || 'businessLine' } catch { return 'businessLine' } })
   const [projectFilters, setProjectFilters] = useState<{businessLines:string[],designers:string[],statuses:string[],project:string|null}>(() => {
   try {
     const s = localStorage.getItem('dcc_projectFilters')
@@ -1709,10 +1709,12 @@ const [showFilters, setShowFilters] = useState(false)
               </div>
 
               <div className="projects-sort-row">
-                <div className="view-toggle">
-                  <button className={`sort-btn ${projectViewMode === 'priority' ? 'active' : ''}`} onClick={() => setProjectViewMode('priority')}>Priority Ranking</button>
-                  <button className={`sort-btn ${projectViewMode === 'list' ? 'active' : ''}`} onClick={() => setProjectViewMode('list')}>List</button>
-                </div>
+                <label className="arrange-priority-toggle">
+                  <div className={`toggle-switch ${projectViewMode === 'priority' ? 'active' : ''}`} onClick={() => setProjectViewMode(projectViewMode === 'priority' ? 'list' : 'priority')}>
+                    <div className="toggle-knob" />
+                  </div>
+                  <span className="toggle-label" onClick={() => setProjectViewMode(projectViewMode === 'priority' ? 'list' : 'priority')}>Arrange priority</span>
+                </label>
                 <div className="sort-divider" />
                 {projectViewMode === 'list' ? (
                   <>
