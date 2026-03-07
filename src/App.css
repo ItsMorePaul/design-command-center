@@ -290,6 +290,27 @@
   overflow: visible;
 }
 
+.list-bl-section {
+  margin-bottom: 2rem;
+  margin-top: 2.5rem;
+}
+
+.list-bl-section:first-child {
+  margin-top: 0;
+}
+
+.list-bl-section:last-child {
+  margin-bottom: 0;
+}
+
+.list-bl-header {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.01em;
+}
+
 .list-header {
   display: grid;
   grid-template-columns: 2fr 1fr 1fr 1fr;
