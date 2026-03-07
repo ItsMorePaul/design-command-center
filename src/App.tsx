@@ -1356,15 +1356,15 @@ const [showFilters, setShowFilters] = useState(false)
 
   // Gantt chart helper functions
   const getGanttRange = (project: Project) => {
-    if (!project.timeline || project.timeline.length === 0) return null
-
     const dates: Date[] = []
-    project.timeline.forEach(t => {
-      const start = parseLocalDate(t.startDate)
-      const end = parseLocalDate(t.endDate)
-      if (start) dates.push(start)
-      if (end) dates.push(end)
-    })
+    if (project.timeline) {
+      project.timeline.forEach(t => {
+        const start = parseLocalDate(t.startDate)
+        const end = parseLocalDate(t.endDate)
+        if (start) dates.push(start)
+        if (end) dates.push(end)
+      })
+    }
 
     // Add project start and end dates to the range
     if (project.startDate) {
@@ -1837,12 +1837,6 @@ const [showFilters, setShowFilters] = useState(false)
                   return groups.map(group => (
                     <div key={group.name} className="list-bl-section">
                       <div className="list-bl-header">{group.name}</div>
-                      <div className="list-header">
-                        <span>Project Name</span>
-                        <span>Designer(s)</span>
-                        <span>Status</span>
-                        <span>Due Date</span>
-                      </div>
                       {group.projects.map(project => {
                         const isOverdue = (() => {
                           if (!project.endDate || project.status === 'done') return false
@@ -1896,7 +1890,7 @@ const [showFilters, setShowFilters] = useState(false)
                             </span>
                             <span className="due-date">{formatDate(project.endDate)}</span>
                           </div>
-                          {(project.timeline && project.timeline.length > 0) && (() => {
+                          {((project.timeline && project.timeline.length > 0) || (project.startDate && project.endDate)) && (() => {
                               const ganttRange = getGanttRange(project)
                               if (!ganttRange) return null
 
@@ -1934,20 +1928,35 @@ const [showFilters, setShowFilters] = useState(false)
                                           <span className="gantt-today-label">Today</span>
                                         </div>
                                       )}
-                                      {project.timeline.map((range, idx) => (
-                                        <div key={range.id} className="gantt-track">
-                                          <span className="gantt-track-label" title={range.name}>{range.name}</span>
+                                      {project.timeline && project.timeline.length > 0 ? (
+                                        project.timeline.map((range, idx) => (
+                                          <div key={range.id} className="gantt-track">
+                                            <span className="gantt-track-label" title={range.name}>{range.name}</span>
+                                            <div className="gantt-track-bars">
+                                              <div
+                                                className={`gantt-bar bar-${(idx % 5) + 1}`}
+                                                style={getGanttBarStyle(range, ganttRange)}
+                                                title={`${range.name}: ${formatMonthDay(range.startDate)} → ${formatMonthDay(range.endDate)}`}
+                                              >
+                                                <span className="gantt-label">{formatMonthDay(range.startDate)} <span className="gantt-arrow">→</span> {formatMonthDay(range.endDate)}</span>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        ))
+                                      ) : project.startDate && project.endDate ? (
+                                        <div className="gantt-track">
+                                          <span className="gantt-track-label" title="Duration">Duration</span>
                                           <div className="gantt-track-bars">
                                             <div
-                                              className={`gantt-bar bar-${(idx % 5) + 1}`}
-                                              style={getGanttBarStyle(range, ganttRange)}
-                                              title={`${range.name}: ${formatMonthDay(range.startDate)} → ${formatMonthDay(range.endDate)}`}
+                                              className="gantt-bar bar-duration"
+                                              style={getGanttBarStyle({ id: 'duration', name: 'Duration', startDate: project.startDate, endDate: project.endDate }, ganttRange)}
+                                              title={`Duration: ${formatMonthDay(project.startDate)} → ${formatMonthDay(project.endDate)}`}
                                             >
-                                              <span className="gantt-label">{formatMonthDay(range.startDate)} <span className="gantt-arrow">→</span> {formatMonthDay(range.endDate)}</span>
+                                              <span className="gantt-label">{formatMonthDay(project.startDate)} <span className="gantt-arrow">→</span> {formatMonthDay(project.endDate)}</span>
                                             </div>
                                           </div>
                                         </div>
-                                      ))}
+                                      ) : null}
                                     </div>
                                   </div>
                                 </div>

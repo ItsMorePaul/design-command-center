@@ -311,16 +311,6 @@
   letter-spacing: -0.01em;
 }
 
-.list-header {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr;
-  padding: 1rem 1.5rem;
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--color-text-dim);
-}
 
 .project-row {
   display: flex;
@@ -1256,16 +1246,10 @@
     overflow-x: hidden;
   }
 
-  .list-header,
   .project-row .project-info {
     grid-template-columns: 1.5fr 1fr 1fr 1fr;
     min-width: 0;
     gap: 0.4rem;
-  }
-
-  .list-header {
-    font-size: 0.62rem;
-    padding: 0.75rem 0.75rem;
   }
 
   .project-row .project-info {
@@ -1645,6 +1629,7 @@
 .gantt-bar.bar-3 { background: linear-gradient(90deg, var(--color-gantt-3) 0%, rgba(236, 72, 153, 0.8) 100%); }
 .gantt-bar.bar-4 { background: linear-gradient(90deg, var(--color-gantt-4) 0%, rgba(20, 184, 166, 0.8) 100%); }
 .gantt-bar.bar-5 { background: linear-gradient(90deg, var(--color-gantt-5) 0%, rgba(245, 158, 11, 0.8) 100%); }
+.gantt-bar.bar-duration { background: linear-gradient(90deg, #9ca3af 0%, rgba(156, 163, 175, 0.7) 100%); }
 
 .gantt-label {
   display: block;
