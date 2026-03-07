@@ -20,6 +20,7 @@
   backdrop-filter: blur(10px);
   z-index: 0;
   position: relative;
+  transition: width 0.2s ease, min-width 0.2s ease, padding 0.2s ease;
 }
 
 .logo {
@@ -118,6 +119,65 @@
 .version-num {
   font-weight: 600;
   opacity: 0.6;
+}
+
+/* Nav Collapse Toggle */
+.nav-collapse-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.6rem 1rem;
+  margin-bottom: 0.5rem;
+  border-radius: var(--radius-md);
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.nav-collapse-toggle:hover {
+  background: var(--color-hover-subtle);
+  color: var(--color-text);
+}
+
+/* Collapsed Sidebar */
+.sidebar-collapsed {
+  width: 60px;
+  min-width: 60px;
+  padding: 1.5rem 0.5rem;
+  align-items: center;
+}
+
+.sidebar-collapsed .logo-text {
+  display: none;
+}
+
+.sidebar-collapsed .logo {
+  padding: 0.75rem;
+  justify-content: center;
+}
+
+.sidebar-collapsed .nav-label,
+.sidebar-collapsed .nav-badge-beta {
+  display: none;
+}
+
+.sidebar-collapsed .nav-item {
+  justify-content: center;
+  padding: 0.8rem;
+}
+
+.sidebar-collapsed .nav-collapse-toggle {
+  justify-content: center;
+  padding: 0.6rem;
+}
+
+.sidebar-collapsed .version-info {
+  display: none;
 }
 
 .version-time {
@@ -1100,7 +1160,7 @@
     position: relative;
   }
 
-  .nav-item span:not(.nav-icon) {
+  .nav-item .nav-label {
     font-size: 0.65rem;
   }
 
@@ -1221,7 +1281,7 @@
     gap: 0.5rem;
   }
   
-  .nav-item span:not(.nav-icon) {
+  .nav-item .nav-label {
     display: none;
   }
   

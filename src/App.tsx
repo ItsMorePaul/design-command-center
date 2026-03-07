@@ -16,7 +16,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Bell, Gauge, ChevronDown, ChevronRight, Settings, GripVertical, Folder, StickyNote, RefreshCw, User, CheckSquare, Sun, Moon } from 'lucide-react'
+import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Gauge, ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, Settings, GripVertical, Folder, StickyNote, RefreshCw, User, CheckSquare, Sun, Moon } from 'lucide-react'
 import { Tooltip } from './Tooltip'
 import './App.css'
 import initialData from './data.json'
@@ -247,13 +247,6 @@ function parseNoteContent(content: string | undefined | null): { summary: string
   }
 }
 
-interface Notification {
-  id: string
-  message: string
-  time: string
-  read: boolean
-}
-
 interface CalendarEvent {
   type: 'project' | 'timeoff' | 'holiday'
   name: string
@@ -307,12 +300,6 @@ interface CapacityData {
 
 // Use data from data.json for default brand options
 const defaultBrandOptions = initialData.brandOptions.sort()
-
-const mockNotifications: Notification[] = [
-  { id: '1', message: 'Fariah submitted "Mobile App Redesign" for review', time: '10 min ago', read: false },
-  { id: '2', message: 'Dewey commented on Q1 Brand Refresh', time: '1 hour ago', read: false },
-  { id: '3', message: 'New asset uploaded to Design System v3', time: '2 hours ago', read: true },
-]
 
 // Load data from API
 const loadDataFromAPI = async () => {
@@ -465,7 +452,7 @@ function App() {
     const saved = localStorage.getItem('dcc-theme')
     return (saved === 'dark') ? 'dark' : 'light'
   })
-  const [notifications] = useState(mockNotifications)
+  const [navCollapsed, setNavCollapsed] = useState(() => localStorage.getItem('dcc-nav-collapsed') === 'true')
   const [team, setTeam] = useState<TeamMember[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [brandOptions, setBrandOptions] = useState<string[]>(defaultBrandOptions)
@@ -538,6 +525,14 @@ function App() {
   }, [theme])
 
   const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light')
+
+  const toggleNavCollapsed = () => {
+    setNavCollapsed(prev => {
+      const next = !prev
+      localStorage.setItem('dcc-nav-collapsed', String(next))
+      return next
+    })
+  }
 
   useEffect(() => {
   try { localStorage.setItem('dcc_projectSortBy', localStorage.getItem('dcc_projectSortBy') || 'name') } catch {}
@@ -1263,7 +1258,6 @@ const [showFilters, setShowFilters] = useState(false)
     )
   }
 
-  const unreadCount = notifications.filter(n => !n.read).length
 
   const getStatusColor = (status: Project['status']) => {
     switch (status) {
@@ -1586,7 +1580,7 @@ const [showFilters, setShowFilters] = useState(false)
   return (
     <div className="app">
       {/* Sidebar */}
-      <aside className="sidebar">
+      <aside className={`sidebar ${navCollapsed ? 'sidebar-collapsed' : ''}`}>
         <div className="logo">
           <LayoutGrid size={22} className="logo-icon" />
           <span className="logo-text">WandiHub</span>
@@ -1599,7 +1593,7 @@ const [showFilters, setShowFilters] = useState(false)
             aria-label="Projects"
           >
             <span className="nav-icon"><FileText size={18} /></span>
-            <span>Projects</span>
+            <span className="nav-label">Projects</span>
           </button>
           <button
             className={`nav-item ${activeTab === 'team' ? 'active' : ''}`}
@@ -1607,7 +1601,7 @@ const [showFilters, setShowFilters] = useState(false)
             aria-label="Team"
           >
             <span className="nav-icon"><Users size={18} /></span>
-            <span>Team</span>
+            <span className="nav-label">Team</span>
           </button>
           <button
             className={`nav-item ${activeTab === 'capacity' ? 'active' : ''}`}
@@ -1615,7 +1609,7 @@ const [showFilters, setShowFilters] = useState(false)
             aria-label="Capacity"
           >
             <span className="nav-icon"><Gauge size={18} /></span>
-            <span>Capacity</span>
+            <span className="nav-label">Capacity</span>
           </button>
           <button
             className={`nav-item ${activeTab === 'calendar' ? 'active' : ''}`}
@@ -1623,7 +1617,7 @@ const [showFilters, setShowFilters] = useState(false)
             aria-label="Calendar"
           >
             <span className="nav-icon"><Calendar size={18} /></span>
-            <span>Calendar</span>
+            <span className="nav-label">Calendar</span>
           </button>
           <button
             className={`nav-item ${activeTab === 'notes' ? 'active' : ''}`}
@@ -1631,12 +1625,16 @@ const [showFilters, setShowFilters] = useState(false)
             aria-label="Notes"
           >
             <span className="nav-icon"><StickyNote size={18} /></span>
-            <span>Notes</span>
+            <span className="nav-label">Notes</span>
             <span className="nav-badge-beta">beta</span>
           </button>
         </nav>
 
         <div className="sidebar-footer">
+          <button className="nav-collapse-toggle" onClick={toggleNavCollapsed} aria-label={navCollapsed ? 'Expand navigation' : 'Collapse navigation'}>
+            {navCollapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
+            <span className="nav-label">Collapse</span>
+          </button>
           <div className="version-info">
             <div className="version-row">
               <span className="version-label">Site</span>
@@ -1667,15 +1665,11 @@ const [showFilters, setShowFilters] = useState(false)
           </div>
           
           <div className="header-actions">
+            <button className="icon-btn" aria-label="Search" onClick={() => setShowSearch(true)}><Search size={18} /></button>
+            <button className="icon-btn" aria-label="Settings" onClick={() => setActiveTab('settings')}><Settings size={18} /></button>
             <button className="theme-toggle" aria-label="Toggle theme" onClick={toggleTheme}>
               {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
             </button>
-            <button className="icon-btn" aria-label="Notifications">
-              <Bell size={18} />
-              {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
-            </button>
-            <button className="icon-btn" aria-label="Search" onClick={() => setShowSearch(true)}><Search size={18} /></button>
-            <button className="icon-btn" aria-label="Settings" onClick={() => setActiveTab('settings')}><Settings size={18} /></button>
             {activeTab === 'projects' && (
               <button className="primary-btn" onClick={handleAddProject}>+ New Project</button>
             )}
