@@ -90,10 +90,20 @@ const searchProjects = async (query: string, allFn: (sql: string, params?: any[]
     let score = 0;
     const matches: string[] = [];
 
-    const customLinks = proj.customLinks ? JSON.parse(proj.customLinks) : [];
-    const designers = proj.designers ? JSON.parse(proj.designers) : [];
+    // Handle customLinks - may be string, array, or object
+    let customLinks: any[] = [];
+    if (proj.customLinks) {
+      if (typeof proj.customLinks === 'string') {
+        try { customLinks = JSON.parse(proj.customLinks); } catch { customLinks = []; }
+      } else if (Array.isArray(proj.customLinks)) {
+        customLinks = proj.customLinks;
+      }
+    }
+    const designers = proj.designers ? (typeof proj.designers === 'string' ? JSON.parse(proj.designers) : proj.designers) : [];
     const businessLines = proj.businessLine ?
-      (() => { try { return JSON.parse(proj.businessLine); } catch { return [proj.businessLine]; } })() : [];
+      (typeof proj.businessLine === 'string' ? 
+        (() => { try { return JSON.parse(proj.businessLine); } catch { return [proj.businessLine]; } })() : 
+        (Array.isArray(proj.businessLine) ? proj.businessLine : [proj.businessLine])) : [];
 
     // Check name (highest weight: 1.0)
     const nameMatch = getMatchType(proj.name, query, allowContains);
@@ -226,7 +236,15 @@ const searchBusinessLines = async (query: string, allFn: (sql: string, params?: 
     let score = 0;
     const matches: string[] = [];
 
-    const customLinks = bl.customLinks ? JSON.parse(bl.customLinks) : [];
+    // Handle customLinks - may be string, array, or object
+    let customLinks: any[] = [];
+    if (bl.customLinks) {
+      if (typeof bl.customLinks === 'string') {
+        try { customLinks = JSON.parse(bl.customLinks); } catch { customLinks = []; }
+      } else if (Array.isArray(bl.customLinks)) {
+        customLinks = bl.customLinks;
+      }
+    }
 
     // Check name (highest weight: 1.0)
     const nameMatch = getMatchType(bl.name, query, allowContains);
