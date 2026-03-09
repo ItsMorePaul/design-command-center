@@ -727,6 +727,7 @@ const [showFilters, setShowFilters] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<{ projects: Project[], team: TeamMember[], businessLines: BusinessLine[], notes: Note[] }>({ projects: [], team: [], businessLines: [], notes: [] })
   const [searchFilters] = useState<{ projects: boolean, team: boolean, businessLines: boolean }>({ projects: true, team: true, businessLines: true })
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Authentication
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -1214,24 +1215,34 @@ const [showFilters, setShowFilters] = useState(false)
   }
 
 // Search
-  const handleSearch = async (query: string) => {
+  const handleSearch = (query: string) => {
     setSearchQuery(query)
+    
+    // Clear any pending debounce timer
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current)
+    }
+    
     if (query.trim().length < 2) {
       setSearchResults({ projects: [], team: [], businessLines: [], notes: [] })
       return
     }
-    try {
-      const params = new URLSearchParams()
-      params.set('q', query)
-      if (!searchFilters.projects) params.set('projects', 'false')
-      if (!searchFilters.team) params.set('team', 'false')
-      if (!searchFilters.businessLines) params.set('businessLines', 'false')
-      const res = await fetch(`/api/search?${params.toString()}`)
-      const data = await res.json()
-      setSearchResults(data)
-    } catch (e) {
-      console.error('Search error:', e)
-    }
+    
+    // Debounce the API call - wait 300ms after last keystroke
+    searchDebounceRef.current = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams()
+        params.set('q', query)
+        if (!searchFilters.projects) params.set('projects', 'false')
+        if (!searchFilters.team) params.set('team', 'false')
+        if (!searchFilters.businessLines) params.set('businessLines', 'false')
+        const res = await fetch(`/api/search?${params.toString()}`)
+        const data = await res.json()
+        setSearchResults(data)
+      } catch (e) {
+        console.error('Search error:', e)
+      }
+    }, 300)
   }
 
   const filteredResults = {
@@ -1241,12 +1252,39 @@ const [showFilters, setShowFilters] = useState(false)
     notes: searchResults.notes || []
   }
 
-  // Re-search when filters change (to update backend query)
+  // Re-search when filters change (to update backend query) - immediate, not debounced
   useEffect(() => {
     if (searchQuery.length >= 2) {
-      handleSearch(searchQuery)
+      // Clear any pending debounce and execute immediately
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current)
+      }
+      // Immediate search when filters change
+      ;(async () => {
+        try {
+          const params = new URLSearchParams()
+          params.set('q', searchQuery)
+          if (!searchFilters.projects) params.set('projects', 'false')
+          if (!searchFilters.team) params.set('team', 'false')
+          if (!searchFilters.businessLines) params.set('businessLines', 'false')
+          const res = await fetch(`/api/search?${params.toString()}`)
+          const data = await res.json()
+          setSearchResults(data)
+        } catch (e) {
+          console.error('Search error:', e)
+        }
+      })()
     }
-  }, [searchFilters.projects, searchFilters.team, searchFilters.businessLines])
+  }, [searchFilters.projects, searchFilters.team, searchFilters.businessLines, searchQuery])
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current)
+      }
+    }
+  }, [])
 
   // Business Line CRUD
   const saveBusinessLine = async (line: BusinessLine, originalName?: string) => {
