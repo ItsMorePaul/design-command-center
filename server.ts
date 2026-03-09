@@ -321,10 +321,14 @@ app.get('/api/health', async (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
-// All API routes below require authentication (except auth endpoints)
+// All API routes below require authentication for write operations
 app.use('/api', (req, res, next) => {
-  // Skip auth for login/logout/me endpoints
-  if (req.path.startsWith('/auth/login') || req.path.startsWith('/auth/logout') || req.path.startsWith('/auth/me')) {
+  // Skip auth for login/logout/me and read-only endpoints
+  const skipAuthPaths = ['/auth/login', '/auth/logout', '/auth/me', '/health', '/search', '/data', '/projects', '/team', '/business-lines', '/brandOptions', '/capacity', '/calendar', '/priorities', '/notes', '/versions']
+  const isReadOnly = req.method === 'GET'
+  const shouldSkip = skipAuthPaths.some(p => req.path.startsWith(p)) || isReadOnly
+  
+  if (shouldSkip) {
     return next()
   }
   requireAuth(req, res, next)
@@ -1457,7 +1461,7 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 // Format: YYYY.MM.DD.hhmm (e.g., 2026.02.26.2059) → displays as "2026.02.26 2059"
 
-const SITE_VERSION = '2026.03.09.1343'
+const SITE_VERSION = '2026.03.09.1350'
 const SITE_TIME = '1710'
 
 const VERSION_KEY = 'dcc_versions'
