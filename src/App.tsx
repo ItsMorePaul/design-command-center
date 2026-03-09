@@ -66,6 +66,12 @@ const getDjFiscalLabel = (monthNumber: number, year: number) => {
 
 const DAY_MS = 1000 * 60 * 60 * 24
 
+// Nickname mappings for team members
+const NICKNAME_MAP: Record<string, string> = {
+  'Andy Nelson': 'Andrew Nelson',
+  'Andrew Nelson': 'Andy Nelson',
+}
+
 // Parse date safely in local time (avoids UTC/date-shift bugs)
 const parseLocalDate = (dateStr: string): Date | null => {
   if (!dateStr) return null
@@ -267,6 +273,86 @@ function parseNoteContent(content: string | undefined | null): { summary: string
   }
 }
 
+// Highlight projects and people in text with clickable + buttons to add links
+function highlightTextWithLinks(
+  text: string,
+  projects: Project[],
+  team: TeamMember[],
+  linkedProjectIds: string[],
+  linkedTeamIds: string[],
+  onAddProject: (id: string) => void,
+  onAddPerson: (id: string) => void
+): React.ReactNode {
+  if (!text) return null
+  
+  const cleanText = text.replace(/\u200B/g, '').trim()
+  if (!cleanText) return null
+
+  // Build regex patterns for all projects and team members not yet linked
+  const unlinkedProjects = projects.filter(p => !linkedProjectIds.includes(p.id))
+  const unlinkedPeople = team.filter(m => !linkedTeamIds.includes(m.id))
+  
+  // Create regex that matches project names or person names (case insensitive)
+  const projectNames = unlinkedProjects.map(p => p.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  // Include nicknames in person names for matching
+  const personNames: string[] = []
+  unlinkedPeople.forEach(m => {
+    personNames.push(m.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    if (NICKNAME_MAP[m.name]) {
+      personNames.push(NICKNAME_MAP[m.name].replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    }
+  })
+  
+  // Combine all names to search for
+  const allNames = [...projectNames, ...personNames]
+  if (allNames.length === 0) return cleanText
+  
+  // Sort by length descending to match longer names first
+  allNames.sort((a, b) => b.length - a.length)
+  const pattern = new RegExp(`(${allNames.join('|')})`, 'gi')
+  
+  const parts = cleanText.split(pattern)
+  
+  return parts.map((part, i) => {
+    const lowerPart = part.toLowerCase()
+    
+    // Check if this part matches an unlinked project
+    const matchedProject = unlinkedProjects.find(p => p.name.toLowerCase() === lowerPart)
+    if (matchedProject) {
+      return (
+        <span key={i} className="highlighted-project" style={{ backgroundColor: '#dbeafe', padding: '1px 4px', borderRadius: '3px', cursor: 'pointer', margin: '0 2px' }}>
+          {part}
+          <button 
+            onClick={() => onAddProject(matchedProject.id)}
+            style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', marginLeft: '2px', fontWeight: 'bold' }}
+            title="Add project link"
+          >+</button>
+        </span>
+      )
+    }
+    
+    // Check if this part matches an unlinked person (including nicknames)
+    const matchedPerson = unlinkedPeople.find(m => 
+      m.name.toLowerCase() === lowerPart || 
+      NICKNAME_MAP[m.name]?.toLowerCase() === lowerPart
+    )
+    if (matchedPerson) {
+      return (
+        <span key={i} className="highlighted-person" style={{ backgroundColor: '#fce7f3', padding: '1px 4px', borderRadius: '3px', cursor: 'pointer', margin: '0 2px' }}>
+          {part}
+          <button 
+            onClick={() => onAddPerson(matchedPerson.id)}
+            style={{ background: 'none', border: 'none', color: '#db2777', cursor: 'pointer', marginLeft: '2px', fontWeight: 'bold' }}
+            title="Add person link"
+          >+</button>
+        </span>
+      )
+    }
+    
+    return part
+  })
+}
+
 interface CalendarEvent {
   type: 'project' | 'timeoff' | 'holiday'
   name: string
@@ -318,13 +404,23 @@ interface CapacityData {
   assignments: CapacityAssignment[]
 }
 
+// Auth fetch helper - adds session ID to all requests
+const authFetch = async (url: string, options: RequestInit = {}) => {
+  const sessionId = localStorage.getItem('dcc-session-id')
+  const headers = {
+    ...options.headers,
+    ...(sessionId ? { 'x-session-id': sessionId } : {}),
+  }
+  return fetch(url, { ...options, headers })
+}
+
 // Use data from data.json for default brand options
 const defaultBrandOptions = initialData.brandOptions.sort()
 
 // Load data from API
 const loadDataFromAPI = async () => {
   try {
-    const response = await fetch('/api/data')
+    const response = await authFetch('/api/data')
     const data = await response.json()
     return data
   } catch (error) {
@@ -632,6 +728,163 @@ const [showFilters, setShowFilters] = useState(false)
   const [searchResults, setSearchResults] = useState<{ projects: Project[], team: TeamMember[], businessLines: BusinessLine[], notes: Note[] }>({ projects: [], team: [], businessLines: [], notes: [] })
   const [searchFilters] = useState<{ projects: boolean, team: boolean, businessLines: boolean }>({ projects: true, team: true, businessLines: true })
 
+  // Authentication
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [currentUser, setCurrentUser] = useState<{ id: number; email: string; role: string } | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [loginError, setLoginError] = useState('')
+  const [loginForm, setLoginForm] = useState({ email: '', password: '' })
+  
+  // User management (admin only)
+  const [users, setUsers] = useState<{ id: number; email: string; role: string; created_at: string }[]>([])
+  const [showUserModal, setShowUserModal] = useState(false)
+  const [userFormData, setUserFormData] = useState({ email: '', password: '', role: 'user' })
+
+  // Get session ID from localStorage
+  const getSessionId = () => localStorage.getItem('dcc-session-id')
+  const setSessionId = (id: string) => {
+    localStorage.setItem('dcc-session-id', id)
+  }
+  const clearSessionId = () => {
+    localStorage.removeItem('dcc-session-id')
+  }
+
+  // Check auth on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      const sessionId = getSessionId()
+      if (!sessionId) {
+        setIsLoading(false)
+        return
+      }
+      try {
+        const res = await fetch('/api/auth/me', {
+          headers: { 'x-session-id': sessionId }
+        })
+        if (res.ok) {
+          const user = await res.json()
+          setCurrentUser(user)
+          setIsAuthenticated(true)
+          setActiveTab('projects') // Redirect to default page on auth check
+        }
+      } catch (err) {
+        console.error('Auth check failed:', err)
+      }
+      setIsLoading(false)
+    }
+    checkAuth()
+  }, [])
+
+  // Redirect to default tab when authenticated
+  useEffect(() => {
+    if (isAuthenticated && !activeTab) {
+      setActiveTab('projects')
+    }
+  }, [isAuthenticated])
+
+  // Handle login
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoginError('')
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(loginForm)
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        setLoginError(err.error || 'Login failed')
+        return
+      }
+      const data = await res.json()
+      setSessionId(data.sessionId)
+      setCurrentUser(data.user)
+      setIsAuthenticated(true)
+      setActiveTab('projects') // Redirect to default page after login
+      setLoginForm({ email: '', password: '' })
+      window.location.reload() // Force full page refresh after login
+    } catch (err) {
+      setLoginError('Login failed. Please try again.')
+    }
+  }
+
+  // Handle logout
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { 'x-session-id': getSessionId() || '' }
+      })
+    } catch (err) {
+      console.error('Logout error:', err)
+    }
+    clearSessionId()
+    setCurrentUser(null)
+    setIsAuthenticated(false)
+  }
+
+  // Fetch users (admin only)
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch('/api/users', {
+        headers: { 'x-session-id': getSessionId() || '' }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setUsers(data)
+      }
+    } catch (err) {
+      console.error('Error fetching users:', err)
+    }
+  }
+
+  // Create user
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      const res = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-session-id': getSessionId() || ''
+        },
+        body: JSON.stringify({ ...userFormData, password: 'DJ_wand1hub!' })
+      })
+      if (res.ok) {
+        setShowUserModal(false)
+        setUserFormData({ email: '', password: '', role: 'user' })
+        fetchUsers()
+      } else {
+        const err = await res.json()
+        alert(err.error || 'Failed to create user')
+      }
+    } catch (err) {
+      alert('Failed to create user')
+    }
+  }
+
+  // Delete user
+  const handleDeleteUser = async (userId: number) => {
+    if (!confirm('Are you sure you want to delete this user?')) return
+    try {
+      const res = await fetch(`/api/users/${userId}`, {
+        method: 'DELETE',
+        headers: { 'x-session-id': getSessionId() || '' }
+      })
+      if (res.ok) {
+        fetchUsers()
+      } else {
+        const err = await res.json()
+        alert(err.error || 'Failed to delete user')
+      }
+    } catch (err) {
+      alert('Failed to delete user')
+    }
+  }
+
+  const isAdmin = currentUser?.role === 'admin'
+
   // Business Lines (Settings)
   const [businessLines, setBusinessLines] = useState<BusinessLine[]>([])
   const [showBusinessLineModal, setShowBusinessLineModal] = useState(false)
@@ -643,7 +896,7 @@ const [showFilters, setShowFilters] = useState(false)
   // Notes state
   const [notes, setNotes] = useState<Note[]>([])
   const [notesSyncing, setNotesSyncing] = useState(false)
-  const [notesFilter, setNotesFilter] = useState<{ project: string | null; person: string | null; search: string }>({ project: null, person: null, search: '' })
+  const [notesFilter, setNotesFilter] = useState<{ project: string | null; person: string | null; search: string }>({ project: null, person: '5', search: '' })
   const [selectedNote, setSelectedNote] = useState<Note | null>(null)
   const [noteDetailOpen, setNoteDetailOpen] = useState(false)
   const [editingNote, setEditingNote] = useState<Note | null>(null) // note being edited in modal
@@ -657,12 +910,35 @@ const [showFilters, setShowFilters] = useState(false)
   const [hideNotePin, setHideNotePin] = useState('')
   const [noteToHide, setNoteToHide] = useState<Note | null>(null)
 
+  // Handler to add project/person links from Note Detail Modal
+  const addNoteLink = async (noteId: string, linkType: 'project' | 'person', targetId: string) => {
+    const sessionId = localStorage.getItem('dcc-session-id')
+    try {
+      const res = await fetch(`/api/notes/${noteId}/links`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(sessionId ? { 'x-session-id': sessionId } : {})
+        },
+        body: JSON.stringify({ 
+          [linkType === 'project' ? 'projectId' : 'personId']: targetId 
+        })
+      })
+      if (res.ok) {
+        const updated = await res.json()
+        setNotes(notes.map(n => n.id === noteId ? { ...n, ...updated } : n))
+        setSelectedNote(selectedNote?.id === noteId ? { ...selectedNote, ...updated } : selectedNote)
+      }
+    } catch (err) {
+      console.error('Error adding link:', err)
+    }
+  }
 
   // Load versions from server on mount
   useEffect(() => {
     const loadVersions = async () => {
       try {
-        const res = await fetch('/api/versions')
+        const res = await authFetch('/api/versions')
         const data = await res.json()
         setSiteVersion({ version: data.site_version || '', time: data.site_time || '' })
         setDbVersion({ version: data.db_version || '', time: data.db_time || '' })
@@ -686,11 +962,11 @@ const [showFilters, setShowFilters] = useState(false)
           }
         }
         // Load business lines
-        const blRes = await fetch('/api/business-lines')
+        const blRes = await authFetch('/api/business-lines')
         const blData = await blRes.json()
         setBusinessLines(blData)
         // Load priorities
-        const prRes = await fetch('/api/priorities')
+        const prRes = await authFetch('/api/priorities')
         const prData: { business_line_id: string; project_id: string; rank: number }[] = await prRes.json()
         const prMap: Record<string, string[]> = {}
         for (const row of prData) {
@@ -719,7 +995,7 @@ const [showFilters, setShowFilters] = useState(false)
     if (activeTab === 'calendar' && !calendarData) {
       const loadCalendar = async () => {
         try {
-          const response = await fetch('/api/calendar')
+          const response = await authFetch('/api/calendar')
           const data = await response.json()
           setCalendarData(data)
         } catch (err) {
@@ -758,7 +1034,7 @@ const [showFilters, setShowFilters] = useState(false)
     if (activeTab === 'capacity') {
       const loadCapacity = async () => {
         try {
-          const res = await fetch('/api/capacity')
+          const res = await authFetch('/api/capacity')
           const data = await res.json()
           setCapacityData(data)
           const initialHours = (data.team || []).reduce((acc: Record<string, number>, m: CapacityMember) => {
@@ -785,7 +1061,7 @@ const [showFilters, setShowFilters] = useState(false)
     if (activeTab === 'notes' && notes.length === 0) {
       const loadNotes = async () => {
         try {
-          const res = await fetch('/api/notes')
+          const res = await authFetch('/api/notes')
           const data = await res.json()
           setNotes(data)
         } catch (err) {
@@ -799,11 +1075,11 @@ const [showFilters, setShowFilters] = useState(false)
   const syncNotes = async () => {
     setNotesSyncing(true)
     try {
-      const res = await fetch('/api/notes/sync', { method: 'POST' })
+      const res = await authFetch('/api/notes/sync', { method: 'POST' })
       const data = await res.json()
       if (data.success) {
         // Reload notes after sync
-        const notesRes = await fetch('/api/notes')
+        const notesRes = await authFetch('/api/notes')
         const notesData = await notesRes.json()
         setNotes(notesData)
       }
@@ -818,7 +1094,7 @@ const [showFilters, setShowFilters] = useState(false)
   const refreshCalendar = async () => {
     if (calendarData) {
       try {
-        const response = await fetch('/api/calendar')
+        const response = await authFetch('/api/calendar')
         const data = await response.json()
         setCalendarData(data)
       } catch (err) {
@@ -829,7 +1105,7 @@ const [showFilters, setShowFilters] = useState(false)
 
   const refreshCapacity = async () => {
     try {
-      const res = await fetch('/api/capacity')
+      const res = await authFetch('/api/capacity')
       const data = await res.json()
       setCapacityData(data)
       const initialHours = (data.team || []).reduce((acc: Record<string, number>, m: CapacityMember) => {
@@ -847,7 +1123,7 @@ const [showFilters, setShowFilters] = useState(false)
       alert('Select both a project and a designer')
       return
     }
-    await fetch('/api/capacity/assignments', {
+    await authFetch('/api/capacity/assignments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(assignmentForm)
@@ -856,7 +1132,7 @@ const [showFilters, setShowFilters] = useState(false)
   }
 
   const saveAssignmentAllocation = async (assignment: CapacityAssignment, allocationPercent: number) => {
-    await fetch('/api/capacity/assignments', {
+    await authFetch('/api/capacity/assignments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -901,7 +1177,7 @@ const [showFilters, setShowFilters] = useState(false)
 
   // API helper functions
   const saveTeamMember = async (member: TeamMember) => {
-    await fetch('/api/team', {
+    await authFetch('/api/team', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(member)
@@ -914,7 +1190,7 @@ const [showFilters, setShowFilters] = useState(false)
 
   const saveProject = async (project: Project): Promise<boolean> => {
     try {
-      const res = await fetch('/api/projects', {
+      const res = await authFetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(project)
@@ -974,17 +1250,17 @@ const [showFilters, setShowFilters] = useState(false)
 
   // Business Line CRUD
   const saveBusinessLine = async (line: BusinessLine, originalName?: string) => {
-    await fetch('/api/business-lines', {
+    await authFetch('/api/business-lines', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...line, originalName })
     })
     // Refresh business lines
-    const res = await fetch('/api/business-lines')
+    const res = await authFetch('/api/business-lines')
     const data = await res.json()
     setBusinessLines(data)
     // Also refresh team and projects to reflect name changes
-    const dataRes = await fetch('/api/data')
+    const dataRes = await  authFetch('/api/data')
     const apiData = await dataRes.json()
     setTeam(apiData.team || [])
     setProjects(apiData.projects || [])
@@ -997,7 +1273,7 @@ const [showFilters, setShowFilters] = useState(false)
   // Refresh projects list from server
   const refreshProjects = async () => {
     try {
-      const res = await fetch('/api/projects')
+      const res = await authFetch('/api/projects')
       const data = await res.json()
       setProjects(data)
     } catch (err) {
@@ -1169,7 +1445,7 @@ const [showFilters, setShowFilters] = useState(false)
 
   const savePriorities = async (blId: string, orderedIds: string[]) => {
     setPriorities(prev => ({ ...prev, [blId]: orderedIds }))
-    await fetch('/api/priorities', {
+    await authFetch('/api/priorities', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ business_line_id: blId, project_ids: orderedIds }),
@@ -1599,6 +1875,53 @@ const [showFilters, setShowFilters] = useState(false)
     }
     hapticMedium()
     setShowModal(false)
+  }
+
+  // Show loading while checking auth
+  if (isLoading) {
+    return (
+      <div className="login-page">
+        <div className="login-spinner">Loading...</div>
+      </div>
+    )
+  }
+
+  // Show login page if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <div className="login-page">
+        <div className="login-container">
+          <div className="login-logo">
+            <LayoutGrid size={48} />
+          </div>
+          <h1>WandiHub</h1>
+          <p className="login-subtitle">Design Command Center</p>
+          
+          <form className="login-form" onSubmit={handleLogin}>
+            {loginError && <div className="login-error">{loginError}</div>}
+            <div className="form-field">
+              <input
+                type="email"
+                placeholder="Email"
+                value={loginForm.email}
+                onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
+                required
+              />
+            </div>
+            <div className="form-field">
+              <input
+                type="password"
+                placeholder="Password"
+                value={loginForm.password}
+                onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                required
+              />
+            </div>
+            <button type="submit" className="login-btn">Sign In</button>
+          </form>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -3047,10 +3370,41 @@ const [showFilters, setShowFilters] = useState(false)
               (() => {
                 const filtered = notes.filter(note => {
                   if (notesFilter.project && !note.linkedProjectIds.includes(notesFilter.project)) return false
-                  if (notesFilter.person && !note.linkedTeamIds.includes(notesFilter.person)) return false
+                  if (notesFilter.person) {
+                    // Check if the selected person is linked OR if their nickname matches someone linked
+                    const person = team.find(m => m.id === notesFilter.person)
+                    const personName = person?.name || ''
+                    const nickname = NICKNAME_MAP[personName] || ''
+                    const linkedNames = note.linkedTeamIds.map(id => {
+                      const m = team.find(tm => tm.id === id)
+                      return m?.name || ''
+                    })
+                    const hasMatch = linkedNames.includes(personName) || linkedNames.includes(nickname)
+                    if (!hasMatch) return false
+                  }
                   if (notesFilter.search) {
                     const q = notesFilter.search.toLowerCase()
+                    // Expand search to include nicknames
+                    const allPersonNames = team.flatMap(m => {
+                      const names = [m.name.toLowerCase()]
+                      if (NICKNAME_MAP[m.name]) names.push(NICKNAME_MAP[m.name].toLowerCase())
+                      return names
+                    })
                     const searchable = `${note.title} ${note.projects_raw || ''} ${note.people_raw || ''} ${note.content_preview || ''}`.toLowerCase()
+                    // Check if search term matches a person name (or their nickname)
+                    const matchesPerson = allPersonNames.some(pn => q.includes(pn) || pn.includes(q))
+                    // If searching for a person, check both direct match and nickname match
+                    if (matchesPerson) {
+                      const matchedMember = team.find(m => 
+                        allPersonNames.some(pn => pn.includes(m.name.toLowerCase()))
+                      )
+                      if (matchedMember && !note.linkedTeamIds.includes(matchedMember.id)) {
+                        // Person found but not linked - don't filter out (show with highlight)
+                        // Actually, let's filter it IN so user can see it needs linking
+                      } else if (!matchedMember) {
+                        // No team member match - use default behavior
+                      }
+                    }
                     if (!searchable.includes(q)) return false
                   }
                   return true
@@ -3135,14 +3489,16 @@ const [showFilters, setShowFilters] = useState(false)
                     {selectedNote.linkedProjectIds.map(pid => {
                       const proj = projects.find(p => p.id === pid)
                       return proj ? (
-                        <button key={pid} className="note-tag project-tag clickable"
-                          onClick={() => {
-                            setSelectedNote(null)
-                            setProjectFilters({ businessLines: [], designers: [], statuses: [], project: proj.name })
-                            setActiveTab('projects')
-                          }}>
-                          {proj.name}
-                        </button>
+                        <span key={pid} className="note-tag-wrapper">
+                          <button className="note-tag project-tag clickable"
+                            onClick={() => {
+                              setSelectedNote(null)
+                              setProjectFilters({ businessLines: [], designers: [], statuses: [], project: proj.name })
+                              setActiveTab('projects')
+                            }}>
+                            {proj.name}
+                          </button>
+                        </span>
                       ) : null
                     })}
                   </div>
@@ -3156,7 +3512,9 @@ const [showFilters, setShowFilters] = useState(false)
                     {selectedNote.linkedTeamIds.map(tid => {
                       const member = team.find(m => m.id === tid)
                       return member ? (
-                        <span key={tid} className="note-tag person-tag">{member.name}</span>
+                        <span key={tid} className="note-tag-wrapper">
+                          <span className="note-tag person-tag">{member.name}</span>
+                        </span>
                       ) : null
                     })}
                   </div>
@@ -3166,7 +3524,17 @@ const [showFilters, setShowFilters] = useState(false)
               {selectedNote.content_preview && (
                 <div className="note-detail-section note-summary-section">
                   <h4>Summary</h4>
-                  <p className="note-detail-content">{selectedNote.content_preview.replace(/\u200B/g, '')}</p>
+                  <p className="note-detail-content">
+                    {highlightTextWithLinks(
+                      selectedNote.content_preview,
+                      projects,
+                      team,
+                      selectedNote.linkedProjectIds,
+                      selectedNote.linkedTeamIds,
+                      (pid) => addNoteLink(selectedNote.id, 'project', pid),
+                      (tid) => addNoteLink(selectedNote.id, 'person', tid)
+                    )}
+                  </p>
                 </div>
               )}
 
@@ -3182,7 +3550,17 @@ const [showFilters, setShowFilters] = useState(false)
                       .map(s => s.trim())
                       .filter(s => s.length > 10)
                       .map((step, i) => (
-                        <li key={i}>{step.replace(/\.$/, '')}</li>
+                        <li key={i}>
+                          {highlightTextWithLinks(
+                            step.replace(/\.$/, ''),
+                            projects,
+                            team,
+                            selectedNote.linkedProjectIds,
+                            selectedNote.linkedTeamIds,
+                            (pid) => addNoteLink(selectedNote.id, 'project', pid),
+                            (tid) => addNoteLink(selectedNote.id, 'person', tid)
+                          )}
+                        </li>
                       ))}
                   </ul>
                 </div>
@@ -3200,7 +3578,17 @@ const [showFilters, setShowFilters] = useState(false)
                   {noteDetailOpen && (
                     <ul className="note-details-list">
                       {selectedNote.details.split('|').filter(d => d.trim()).map((detail, i) => (
-                        <li key={i}>{detail.trim()}</li>
+                        <li key={i}>
+                          {highlightTextWithLinks(
+                            detail.trim(),
+                            projects,
+                            team,
+                            selectedNote.linkedProjectIds,
+                            selectedNote.linkedTeamIds,
+                            (pid) => addNoteLink(selectedNote.id, 'project', pid),
+                            (tid) => addNoteLink(selectedNote.id, 'person', tid)
+                          )}
+                        </li>
                       ))}
                     </ul>
                   )}
@@ -3319,29 +3707,32 @@ const [showFilters, setShowFilters] = useState(false)
                   {team.length === 0 && <span className="note-edit-empty">No team members available</span>}
                 </div>
               </div>
-
-              <div className="note-edit-field">
-                <label htmlFor="note-content">Content Preview</label>
-                <textarea
-                  id="note-content"
-                  value={editingNote.content_preview || ''}
-                  onChange={e => setEditingNote({ ...editingNote, content_preview: e.target.value })}
-                  placeholder="Note content preview..."
-                  rows={5}
-                />
-              </div>
             </div>
             <div className="note-edit-footer">
+              <button 
+                className="danger-btn-text" 
+                onClick={() => {
+                  setNoteToHide(editingNote)
+                  setHideNotePin('')
+                  setShowHideNotePinModal(true)
+                }}
+              >
+                Hide Note
+              </button>
+              <div style={{ flex: 1 }} />
               <button className="secondary-btn" onClick={() => setEditingNote(null)}>Cancel</button>
               <button className="primary-btn" onClick={async () => {
+                const sessionId = localStorage.getItem('dcc-session-id')
                 try {
                   const res = await fetch(`/api/notes/${editingNote.id}`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                      'Content-Type': 'application/json',
+                      ...(sessionId ? { 'x-session-id': sessionId } : {})
+                    },
                     body: JSON.stringify({
                       title: editingNote.title,
                       date: editingNote.date,
-                      content_preview: editingNote.content_preview,
                       linkedProjectIds: editingNote.linkedProjectIds,
                       linkedTeamIds: editingNote.linkedTeamIds
                     })
@@ -3359,17 +3750,6 @@ const [showFilters, setShowFilters] = useState(false)
                   alert('Error saving note')
                 }
               }}>Save Changes</button>
-              <button 
-                className="danger-btn" 
-                onClick={() => {
-                  setNoteToHide(editingNote)
-                  setHideNotePin('')
-                  setShowHideNotePinModal(true)
-                }}
-                style={{ marginLeft: '8px' }}
-              >
-                Hide Note
-              </button>
             </div>
           </div>
         </div>
@@ -3475,7 +3855,7 @@ const [showFilters, setShowFilters] = useState(false)
                               if (res.ok) {
                                 setHiddenNotes(hiddenNotes.filter(n => n.id !== note.id))
                                 // Reload notes to include the restored one
-                                const notesRes = await fetch('/api/notes')
+                                const notesRes = await authFetch('/api/notes')
                                 const notesData = await notesRes.json()
                                 setNotes(notesData)
                               }
@@ -3510,6 +3890,61 @@ const [showFilters, setShowFilters] = useState(false)
             ) : (
               <p className="settings-empty">Click "Unlock" to view hidden notes.</p>
             )}
+          </div>
+
+          {/* User Management Section (Admin Only) */}
+          {isAdmin && (
+            <div className="settings-section" style={{ marginTop: '32px' }}>
+              <div className="settings-header">
+                <h2>User Accounts</h2>
+                <button className="primary-btn" onClick={() => {
+                  setUserFormData({ email: '', password: '', role: 'user' })
+                  setShowUserModal(true)
+                  fetchUsers()
+                }}>
+                  + Add User
+                </button>
+              </div>
+              
+              {users.length === 0 ? (
+                <p className="settings-empty">No user accounts. Add one to get started.</p>
+              ) : (
+                <div className="users-list">
+                  {users.map(user => (
+                    <div key={user.id} className="user-card">
+                      <div className="user-info">
+                        <h3>{user.email}</h3>
+                        <span className="user-role">{user.role}</span>
+                      </div>
+                      <div className="user-actions">
+                        <button 
+                          className="action-btn delete" 
+                          onClick={() => handleDeleteUser(user.id)}
+                          disabled={user.id === currentUser?.id}
+                          title={user.id === currentUser?.id ? "Cannot delete your own account" : "Delete user"}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Account Info Section */}
+          <div className="settings-section" style={{ marginTop: '32px' }}>
+            <div className="settings-header">
+              <h2>Account</h2>
+            </div>
+            <div className="account-info">
+              <p><strong>Email:</strong> {currentUser?.email}</p>
+              <p><strong>Role:</strong> {currentUser?.role}</p>
+              <button className="secondary-btn" onClick={handleLogout} style={{ marginTop: '12px' }}>
+                Sign Out
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -4376,12 +4811,65 @@ const [showFilters, setShowFilters] = useState(false)
         </div>
       )}
 
+      {/* User Modal */}
+      {showUserModal && (
+        <div className="modal-overlay" onClick={() => setShowUserModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Add User</h2>
+            </div>
+
+            <div className="modal-body">
+              <div className="form-group">
+                <label>Email</label>
+                <input
+                  type="email"
+                  value={userFormData.email}
+                  onChange={e => setUserFormData({ ...userFormData, email: e.target.value })}
+                  placeholder="user@example.com"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Role</label>
+                <select
+                  value={userFormData.role}
+                  onChange={e => setUserFormData({ ...userFormData, role: e.target.value })}
+                >
+                  <option value="user">User</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Default Password</label>
+                <input
+                  type="text"
+                  value="DJ_wand1hub!"
+                  disabled
+                  className="disabled-input"
+                />
+                <small style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
+                  User will need to change password on first login
+                </small>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button className="secondary-btn" onClick={() => setShowUserModal(false)}>Cancel</button>
+              <button className="primary-btn" onClick={handleCreateUser}>
+                Add User
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Hide Note PIN Modal */}
       {showHideNotePinModal && (
         <div className="modal-overlay" onClick={() => setShowHideNotePinModal(false)}>
           <div className="modal confirm-modal" onClick={e => e.stopPropagation()}>
             <h2>Hide Note</h2>
-            <p className="confirm-message">Enter PIN:</p>
             <div className="pin-input-container">
               <input
                 type="password"
@@ -4393,11 +4881,15 @@ const [showFilters, setShowFilters] = useState(false)
                 autoFocus
                 onKeyDown={async (e) => {
                   if (e.key === 'Enter' && hideNotePin === '8432') {
+                    const sessionId = localStorage.getItem('dcc-session-id')
                     if (noteToHide) {
                       try {
                         const res = await fetch(`/api/notes/${noteToHide.id}/hide`, {
                           method: 'PUT',
-                          headers: { 'Content-Type': 'application/json' },
+                          headers: { 
+                            'Content-Type': 'application/json',
+                            ...(sessionId ? { 'x-session-id': sessionId } : {})
+                          },
                           body: JSON.stringify({ pin: hideNotePin })
                         })
                         if (res.ok) {
@@ -4420,21 +4912,26 @@ const [showFilters, setShowFilters] = useState(false)
               />
             </div>
             <div className="modal-actions">
-              <button className="secondary-btn" style={{ textAlign: 'center' }} onClick={() => { setShowHideNotePinModal(false); setNoteToHide(null); setHideNotePin(''); }}>
+              <button className="secondary-btn" style={{ textAlign: 'center', minWidth: '100px' }} onClick={() => { setShowHideNotePinModal(false); setNoteToHide(null); setHideNotePin(''); }}>
                 Cancel
               </button>
               <button 
                 className="danger-btn" 
+                style={{ minWidth: '100px' }}
                 onClick={async () => {
                   if (hideNotePin !== '8432') {
                     alert('Invalid PIN')
                     return
                   }
+                  const sessionId = localStorage.getItem('dcc-session-id')
                   if (noteToHide) {
                     try {
                       const res = await fetch(`/api/notes/${noteToHide.id}/hide`, {
                         method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 
+                          'Content-Type': 'application/json',
+                          ...(sessionId ? { 'x-session-id': sessionId } : {})
+                        },
                         body: JSON.stringify({ pin: hideNotePin })
                       })
                       if (res.ok) {
@@ -4479,7 +4976,7 @@ const [showFilters, setShowFilters] = useState(false)
                 onKeyDown={async (e) => {
                   if (e.key === 'Enter' && hiddenNotesPin === '8432') {
                     try {
-                      const res = await fetch('/api/notes?includeHidden=true')
+                      const res = await  authFetch('/api/notes?includeHidden=true')
                       const allNotes = await res.json()
                       const hidden = allNotes.filter((n: Note) => n.hidden === 1)
                       setHiddenNotes(hidden)
@@ -4505,7 +5002,7 @@ const [showFilters, setShowFilters] = useState(false)
                     return
                   }
                   try {
-                    const res = await fetch('/api/notes?includeHidden=true')
+                    const res = await  authFetch('/api/notes?includeHidden=true')
                     const allNotes = await res.json()
                     const hidden = allNotes.filter((n: Note) => n.hidden === 1)
                     setHiddenNotes(hidden)

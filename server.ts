@@ -4,6 +4,7 @@ import sqlite3 from 'sqlite3';
 import path from 'path';
 import { searchProjects, searchTeam, searchBusinessLines, searchNotes } from './search';
 import { homedir } from 'os';
+import bcrypt from 'bcrypt';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -69,6 +70,192 @@ const get = (sql, params = []) => new Promise((resolve, reject) => {
   });
 });
 
+// ============================================
+// AUTHENTICATION & USERS
+// ============================================
+
+// In-memory session store (for simplicity - use Redis in production)
+const sessions: Map<string, { userId: number; email: string; role: string }> = new Map();
+
+// Create users table and seed admin
+db.run(`CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  role TEXT DEFAULT 'user' CHECK(role IN ('admin', 'user')),
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)`, async (err) => {
+  if (err) {
+    console.error('Error creating users table:', err);
+    return;
+  }
+  
+  // Seed admin user if not exists (after table is created)
+  try {
+    const existingAdmin = await get('SELECT id FROM users WHERE email = ?', ['paul.more@dowjones.com']);
+    if (!existingAdmin) {
+      const hashedPassword = await bcrypt.hash('W43verwan08!26', 10);
+      await run(
+        'INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)',
+        ['paul.more@dowjones.com', hashedPassword, 'admin']
+      );
+      console.log('Admin user seeded: paul.more@dowjones.com');
+    }
+  } catch (err) {
+    console.error('Error seeding admin user:', err);
+  }
+});
+
+// Auth middleware
+const requireAuth = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const sessionId = req.headers['x-session-id'] as string;
+  if (!sessionId || !sessions.has(sessionId)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  (req as any).session = sessions.get(sessionId);
+  next();
+};
+
+// Auth middleware - admin only
+const requireAdmin = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const sessionId = req.headers['x-session-id'] as string;
+  if (!sessionId || !sessions.has(sessionId)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const session = sessions.get(sessionId);
+  if (session?.role !== 'admin') {
+    return res.status(403).json({ error: 'Forbidden: Admin only' });
+  }
+  (req as any).session = session;
+  next();
+};
+
+// Generate session ID
+const generateSessionId = () => {
+  return Math.random().toString(36).substring(2) + Date.now().toString(36);
+};
+
+// Login endpoint
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password required' });
+    }
+
+    const user = await get('SELECT * FROM users WHERE email = ?', [email]) as any;
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const validPassword = await bcrypt.compare(password, user.password_hash);
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const sessionId = generateSessionId();
+    sessions.set(sessionId, { userId: user.id, email: user.email, role: user.role });
+
+    res.json({
+      sessionId,
+      user: { id: user.id, email: user.email, role: user.role }
+    });
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Logout endpoint
+app.post('/api/auth/logout', (req, res) => {
+  const sessionId = req.headers['x-session-id'] as string;
+  if (sessionId) {
+    sessions.delete(sessionId);
+  }
+  res.json({ success: true });
+});
+
+// Get current user
+app.get('/api/auth/me', requireAuth, (req, res) => {
+  const session = (req as any).session;
+  res.json({ id: session.userId, email: session.email, role: session.role });
+});
+
+// Get all users (admin only)
+app.get('/api/users', requireAdmin, async (_req, res) => {
+  try {
+    const users = await all('SELECT id, email, role, created_at FROM users ORDER BY created_at DESC');
+    res.json(users);
+  } catch (err) {
+    console.error('Error fetching users:', err);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+// Create user (admin only)
+app.post('/api/users', requireAdmin, async (req, res) => {
+  try {
+    const { email, password, role = 'user' } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password required' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const result = await run(
+      'INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)',
+      [email, hashedPassword, role]
+    );
+
+    res.json({ id: (result as any).lastID, email, role });
+  } catch (err: any) {
+    if (err.message.includes('UNIQUE constraint failed')) {
+      return res.status(400).json({ error: 'Email already exists' });
+    }
+    console.error('Error creating user:', err);
+    res.status(500).json({ error: 'Failed to create user' });
+  }
+});
+
+// Delete user (admin only)
+app.delete('/api/users/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    // Don't allow deleting yourself
+    const session = (req as any).session;
+    if (parseInt(id) === session.userId) {
+      return res.status(400).json({ error: 'Cannot delete your own account' });
+    }
+
+    await run('DELETE FROM users WHERE id = ?', [id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error deleting user:', err);
+    res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+
+// Update user password (self)
+app.put('/api/users/password', requireAuth, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const session = (req as any).session;
+
+    const user = await get('SELECT password_hash FROM users WHERE id = ?', [session.userId]) as any;
+    const validPassword = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await run('UPDATE users SET password_hash = ? WHERE id = ?', [hashedPassword, session.userId]);
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error updating password:', err);
+    res.status(500).json({ error: 'Failed to update password' });
+  }
+});
+
 interface TeamIdentity {
   id: string
   name: string
@@ -132,6 +319,15 @@ const reconcileProjectDesignerAssignments = async () => {
 // ============ HEALTH ============
 app.get('/api/health', async (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
+})
+
+// All API routes below require authentication (except auth endpoints)
+app.use('/api', (req, res, next) => {
+  // Skip auth for login/logout/me endpoints
+  if (req.path.startsWith('/auth/login') || req.path.startsWith('/auth/logout') || req.path.startsWith('/auth/me')) {
+    return next()
+  }
+  requireAuth(req, res, next)
 })
 
 // ============ PROJECTS ============
@@ -1261,7 +1457,7 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 // Format: YYYY.MM.DD.hhmm (e.g., 2026.02.26.2059) → displays as "2026.02.26 2059"
 
-const SITE_VERSION = '2026.03.08.1710'
+const SITE_VERSION = '2026.03.09.1339'
 const SITE_TIME = '1710'
 
 const VERSION_KEY = 'dcc_versions'
