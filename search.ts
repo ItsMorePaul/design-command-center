@@ -270,7 +270,7 @@ const searchBusinessLines = async (query: string, allFn: (sql: string, params?: 
 
 // Search notes with relevance scoring
 const searchNotes = async (query: string, allFn: (sql: string, params?: any[]) => Promise<any[]>): Promise<SearchResult[]> => {
-  const allNotes = await allFn('SELECT * FROM notes');
+  const allNotes = await allFn('SELECT * FROM notes WHERE hidden = 0 OR hidden IS NULL');
   const results: SearchResult[] = [];
   const allowContains = query.length >= 3;
 

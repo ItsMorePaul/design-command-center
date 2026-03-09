@@ -58,6 +58,15 @@ else
     echo "✓ Fetched $(echo "$BRAND_OPTIONS" | jq 'length') brand options"
 fi
 
+# Fetch notes
+NOTES=$(curl -sf "$RAILWAY_URL/api/notes")
+if [ $? -ne 0 ] || [ -z "$NOTES" ]; then
+    echo "WARNING: Failed to fetch notes"
+    NOTES="[]"
+else
+    echo "✓ Fetched $(echo "$NOTES" | jq 'length') notes"
+fi
+
 # Check if local server is running, start if not
 if ! curl -sf "$LOCAL_SERVER/api/health" &>/dev/null; then
     echo ""
@@ -87,7 +96,7 @@ echo ""
 echo "Seeding local database..."
 RESULT=$(curl -sf -X POST "$LOCAL_SERVER/api/seed" \
   -H "Content-Type: application/json" \
-  -d "{\"projects\":$PROJECTS,\"team\":$TEAM,\"assignments\":$ASSIGNMENTS,\"priorities\":$PRIORITIES,\"businessLines\":$BUSINESS_LINES,\"brandOptions\":$BRAND_OPTIONS}")
+  -d "{\"projects\":$PROJECTS,\"team\":$TEAM,\"assignments\":$ASSIGNMENTS,\"priorities\":$PRIORITIES,\"businessLines\":$BUSINESS_LINES,\"brandOptions\":$BRAND_OPTIONS,\"notes\":$NOTES}")
 
 if [ $? -ne 0 ]; then
     echo "ERROR: Failed to seed local DB."
@@ -103,6 +112,7 @@ echo "  - Assignments: $(echo "$ASSIGNMENTS" | jq 'length')"
 echo "  - Priorities: $(echo "$PRIORITIES" | jq 'length')"
 echo "  - Business Lines: $(echo "$BUSINESS_LINES" | jq 'length')"
 echo "  - Brand Options: $(echo "$BRAND_OPTIONS" | jq 'length')"
+echo "  - Notes: $(echo "$NOTES" | jq 'length')"
 echo ""
 echo "Running verification..."
 "$DCC_DIR/scripts/verify-railway-sync.sh"

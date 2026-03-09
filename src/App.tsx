@@ -16,7 +16,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Gauge, ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, Settings, GripVertical, Folder, StickyNote, RefreshCw, User, CheckSquare, Sun, Moon } from 'lucide-react'
+import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Gauge, ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, Settings, GripVertical, Folder, StickyNote, RefreshCw, User, CheckSquare, Sun, Moon, Edit2 } from 'lucide-react'
 import { Tooltip } from './Tooltip'
 import './App.css'
 import initialData from './data.json'
@@ -76,6 +76,17 @@ const parseLocalDate = (dateStr: string): Date | null => {
     return new Date(y, m - 1, d, 12, 0, 0, 0)
   }
 
+  // Compact date (YYYYMMDD)
+  if (/^\d{8}$/.test(dateStr)) {
+    const y = parseInt(dateStr.slice(0, 4))
+    const m = parseInt(dateStr.slice(4, 6))
+    const d = parseInt(dateStr.slice(6, 8))
+    if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      return new Date(y, m - 1, d, 12, 0, 0, 0)
+    }
+    return null
+  }
+
   // Text date (e.g. "Mar 15") -> assume current year
   const parsed = new Date(`${dateStr} ${new Date().getFullYear()} 12:00:00`)
   if (isNaN(parsed.getTime())) return null
@@ -88,6 +99,13 @@ const formatShortDate = (dateStr: string): string => {
   const d = parseLocalDate(dateStr)
   if (!d) return dateStr
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+// Format a YYYY-MM-DD date as "March 3, 2026" (full month name)
+const formatFullDate = (dateStr: string): string => {
+  const d = parseLocalDate(dateStr)
+  if (!d) return dateStr
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
 }
 
 // Find the closest time off date to today
@@ -227,6 +245,8 @@ interface Note {
   next_steps?: string
   details?: string
   attachments?: string
+  hidden?: number
+  hidden_at?: string
 }
 
 // Parse Gemini note content_preview to extract structured sections
@@ -317,11 +337,9 @@ const loadDataFromAPI = async () => {
 function SortablePriorityItem({
   project,
   rank,
-  onEdit,
 }: {
   project: Project
   rank: number
-  onEdit: (p: Project) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: project.id })
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }
@@ -353,7 +371,6 @@ function SortablePriorityItem({
         <span className="priority-status-dot" style={{ background: statusColors[project.status] || '#94a3b8' }} />
         {statusLabel[project.status] || project.status}
       </span>
-      <button type="button" className="action-btn" onClick={() => onEdit(project)}><Pencil size={14} /></button>
     </div>
   )
 }
@@ -361,10 +378,8 @@ function SortablePriorityItem({
 // Sortable done item — draggable out of the Done zone
 function SortableDoneItem({
   project,
-  onEdit,
 }: {
   project: Project
-  onEdit: (p: Project) => void
 }) {
   const sortableId = `done:${project.id}`
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sortableId })
@@ -394,7 +409,6 @@ function SortableDoneItem({
         <span className="priority-status-dot" style={{ background: statusColors[project.status] }} />
         {statusLabel[project.status]}
       </span>
-      <button type="button" className="action-btn" onClick={() => onEdit(project)}><Pencil size={14} /></button>
     </div>
   )
 }
@@ -632,6 +646,16 @@ const [showFilters, setShowFilters] = useState(false)
   const [notesFilter, setNotesFilter] = useState<{ project: string | null; person: string | null; search: string }>({ project: null, person: null, search: '' })
   const [selectedNote, setSelectedNote] = useState<Note | null>(null)
   const [noteDetailOpen, setNoteDetailOpen] = useState(false)
+  const [editingNote, setEditingNote] = useState<Note | null>(null) // note being edited in modal
+  // Hidden notes state for Settings
+  const [hiddenNotes, setHiddenNotes] = useState<Note[]>([])
+  const [hiddenNotesUnlocked, setHiddenNotesUnlocked] = useState(false)
+  const [hiddenNotesPin, setHiddenNotesPin] = useState('')
+  const [showHiddenNotesPinModal, setShowHiddenNotesPinModal] = useState(false)
+  // PIN modal for hiding notes
+  const [showHideNotePinModal, setShowHideNotePinModal] = useState(false)
+  const [hideNotePin, setHideNotePin] = useState('')
+  const [noteToHide, setNoteToHide] = useState<Note | null>(null)
 
 
   // Load versions from server on mount
@@ -2148,7 +2172,7 @@ const [showFilters, setShowFilters] = useState(false)
                                       rankOffset = 1
                                     }
                                     const p = ranked[i]
-                                    items.push(<SortablePriorityItem key={p.id} project={p} rank={i + 1 + rankOffset} onEdit={handleEditProject} />)
+                                    items.push(<SortablePriorityItem key={p.id} project={p} rank={i + 1 + rankOffset} />)
                                   }
                                   // Show placeholder at end if drop index is beyond last item
                                   if (activeDragProject && dropPlaceholderIndex === ranked.length) {
@@ -2173,7 +2197,7 @@ const [showFilters, setShowFilters] = useState(false)
                           <SortableContext items={doneItemIds} strategy={verticalListSortingStrategy}>
                             <DoneDropZone id={doneZoneId}>
                               {doneSorted.map(p => (
-                                <SortableDoneItem key={p.id} project={p} onEdit={handleEditProject} />
+                                <SortableDoneItem key={p.id} project={p} />
                               ))}
                             </DoneDropZone>
                           </SortableContext>
@@ -3043,9 +3067,7 @@ const [showFilters, setShowFilters] = useState(false)
                       <h3 className="note-card-title">{note.title || 'Untitled Note'}</h3>
                       {note.date && (
                         <span className="note-card-date">
-                          {note.date.length === 8
-                            ? `${note.date.slice(0,4)}-${note.date.slice(4,6)}-${note.date.slice(6,8)}`
-                            : note.date}
+                          {formatFullDate(note.date)}
                         </span>
                       )}
                     </div>
@@ -3062,7 +3084,11 @@ const [showFilters, setShowFilters] = useState(false)
                           <FileText size={12} />
                           {note.linkedProjectIds.map(pid => {
                             const proj = projects.find(p => p.id === pid)
-                            return proj ? <span key={pid} className="note-tag project-tag">{proj.name}</span> : null
+                            return proj ? (
+                              <span key={pid} className="note-tag project-tag">
+                                {proj.name}
+                              </span>
+                            ) : null
                           })}
                         </div>
                       )}
@@ -3071,13 +3097,12 @@ const [showFilters, setShowFilters] = useState(false)
                           <User size={12} />
                           {note.linkedTeamIds.map(tid => {
                             const member = team.find(m => m.id === tid)
-                            return member ? <span key={tid} className="note-tag person-tag">{member.name}</span> : null
+                            return member ? (
+                              <span key={tid} className="note-tag person-tag">
+                                {member.name}
+                              </span>
+                            ) : null
                           })}
-                        </div>
-                      )}
-                      {note.projects_raw && !note.linkedProjectIds.length && (
-                        <div className="note-card-tags">
-                          <span className="note-tag raw-tag">{note.projects_raw}</span>
                         </div>
                       )}
                     </div>
@@ -3095,7 +3120,12 @@ const [showFilters, setShowFilters] = useState(false)
           <div className="modal note-detail-modal" onClick={e => e.stopPropagation()}>
             <div className="note-detail-header">
               <h2>{selectedNote.title || 'Untitled Note'}</h2>
-              <button className="note-close-btn" onClick={() => setSelectedNote(null)}>&times;</button>
+              <div className="note-detail-actions">
+                <button className="note-edit-btn" onClick={() => { setEditingNote(selectedNote); setSelectedNote(null); }}>
+                  <Edit2 size={14} /> Edit
+                </button>
+                <button className="note-close-btn" onClick={() => setSelectedNote(null)}>&times;</button>
+              </div>
             </div>
             <div className="note-detail-body">
               {selectedNote.linkedProjectIds.length > 0 && (
@@ -3129,17 +3159,6 @@ const [showFilters, setShowFilters] = useState(false)
                         <span key={tid} className="note-tag person-tag">{member.name}</span>
                       ) : null
                     })}
-                  </div>
-                </div>
-              )}
-
-              {selectedNote.projects_raw && (
-                <div className="note-detail-section">
-                  <h4>Topics</h4>
-                  <div className="note-detail-tags">
-                    {selectedNote.projects_raw.split(',').map((p, i) => (
-                      <span key={i} className="note-tag raw-tag">{p.trim()}</span>
-                    ))}
                   </div>
                 </div>
               )}
@@ -3219,6 +3238,143 @@ const [showFilters, setShowFilters] = useState(false)
         </div>
       )}
 
+      {/* Note Edit Modal */}
+      {editingNote && (
+        <div className="modal-overlay" onClick={() => setEditingNote(null)}>
+          <div className="modal note-edit-modal" onClick={e => e.stopPropagation()}>
+            <div className="note-edit-header">
+              <h2>Edit Note</h2>
+              <button className="note-close-btn" onClick={() => setEditingNote(null)}>&times;</button>
+            </div>
+            <div className="note-edit-body">
+              <div className="note-edit-field">
+                <label htmlFor="note-title">Title</label>
+                <input
+                  id="note-title"
+                  type="text"
+                  value={editingNote.title}
+                  onChange={e => setEditingNote({ ...editingNote, title: e.target.value })}
+                  placeholder="Note title"
+                />
+              </div>
+              
+              <div className="note-edit-field">
+                <label htmlFor="note-date">Date</label>
+                <input
+                  id="note-date"
+                  type="date"
+                  value={editingNote.date ? editingNote.date.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3') : ''}
+                  onChange={e => {
+                    const isoDate = e.target.value // YYYY-MM-DD
+                    const compactDate = isoDate.replace(/-/g, '') // YYYYMMDD
+                    setEditingNote({ ...editingNote, date: compactDate })
+                  }}
+                />
+              </div>
+
+              <div className="note-edit-field">
+                <label>Projects</label>
+                <div className="note-edit-tags">
+                  {projects.map(proj => {
+                    const isLinked = editingNote.linkedProjectIds.includes(proj.id)
+                    return (
+                      <button
+                        key={proj.id}
+                        className={`note-edit-tag-btn ${isLinked ? 'selected' : ''}`}
+                        onClick={() => {
+                          const newIds = isLinked
+                            ? editingNote.linkedProjectIds.filter(id => id !== proj.id)
+                            : [...editingNote.linkedProjectIds, proj.id]
+                          setEditingNote({ ...editingNote, linkedProjectIds: newIds })
+                        }}
+                      >
+                        <FileText size={12} /> {proj.name}
+                      </button>
+                    )
+                  })}
+                  {projects.length === 0 && <span className="note-edit-empty">No projects available</span>}
+                </div>
+              </div>
+
+              <div className="note-edit-field">
+                <label>People</label>
+                <div className="note-edit-tags">
+                  {team.map(member => {
+                    const isLinked = editingNote.linkedTeamIds.includes(member.id)
+                    return (
+                      <button
+                        key={member.id}
+                        className={`note-edit-tag-btn ${isLinked ? 'selected' : ''}`}
+                        onClick={() => {
+                          const newIds = isLinked
+                            ? editingNote.linkedTeamIds.filter(id => id !== member.id)
+                            : [...editingNote.linkedTeamIds, member.id]
+                          setEditingNote({ ...editingNote, linkedTeamIds: newIds })
+                        }}
+                      >
+                        <User size={12} /> {member.name}
+                      </button>
+                    )
+                  })}
+                  {team.length === 0 && <span className="note-edit-empty">No team members available</span>}
+                </div>
+              </div>
+
+              <div className="note-edit-field">
+                <label htmlFor="note-content">Content Preview</label>
+                <textarea
+                  id="note-content"
+                  value={editingNote.content_preview || ''}
+                  onChange={e => setEditingNote({ ...editingNote, content_preview: e.target.value })}
+                  placeholder="Note content preview..."
+                  rows={5}
+                />
+              </div>
+            </div>
+            <div className="note-edit-footer">
+              <button className="secondary-btn" onClick={() => setEditingNote(null)}>Cancel</button>
+              <button className="primary-btn" onClick={async () => {
+                try {
+                  const res = await fetch(`/api/notes/${editingNote.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      title: editingNote.title,
+                      date: editingNote.date,
+                      content_preview: editingNote.content_preview,
+                      linkedProjectIds: editingNote.linkedProjectIds,
+                      linkedTeamIds: editingNote.linkedTeamIds
+                    })
+                  })
+                  if (res.ok) {
+                    const updatedNote = await res.json()
+                    setNotes(notes.map(n => n.id === updatedNote.id ? { ...n, ...updatedNote } : n))
+                    setEditingNote(null)
+                  } else {
+                    const err = await res.json()
+                    alert(`Error saving note: ${err.error}`)
+                  }
+                } catch (err) {
+                  console.error('Error saving note:', err)
+                  alert('Error saving note')
+                }
+              }}>Save Changes</button>
+              <button 
+                className="danger-btn" 
+                onClick={() => {
+                  setNoteToHide(editingNote)
+                  setHideNotePin('')
+                  setShowHideNotePinModal(true)
+                }}
+                style={{ marginLeft: '8px' }}
+              >
+                Hide Note
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Settings View */}
       {activeTab === 'settings' && (
         <div className="settings-page">
@@ -3276,6 +3432,83 @@ const [showFilters, setShowFilters] = useState(false)
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+
+          {/* Hidden Notes Section */}
+          <div className="settings-section" style={{ marginTop: '32px' }}>
+            <div className="settings-header">
+              <h2>Hidden Notes</h2>
+              {!hiddenNotesUnlocked && (
+                <button className="secondary-btn" onClick={() => setShowHiddenNotesPinModal(true)}>
+                  Unlock
+                </button>
+              )}
+              {hiddenNotesUnlocked && (
+                <button className="secondary-btn" onClick={() => setHiddenNotesUnlocked(false)}>
+                  Lock
+                </button>
+              )}
+            </div>
+            
+            {hiddenNotesUnlocked ? (
+              hiddenNotes.length === 0 ? (
+                <p className="settings-empty">No hidden notes.</p>
+              ) : (
+                <div className="hidden-notes-list">
+                  {hiddenNotes.map(note => (
+                    <div key={note.id} className="hidden-note-card">
+                      <div className="hidden-note-info">
+                        <h3>{note.title || 'Untitled Note'}</h3>
+                        {note.hidden_at && (
+                          <span className="hidden-note-date">
+                            Hidden: {new Date(note.hidden_at).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                      <div className="hidden-note-actions">
+                        <button 
+                          className="action-btn" 
+                          onClick={async () => {
+                            try {
+                              const res = await fetch(`/api/notes/${note.id}/restore`, { method: 'PUT' })
+                              if (res.ok) {
+                                setHiddenNotes(hiddenNotes.filter(n => n.id !== note.id))
+                                // Reload notes to include the restored one
+                                const notesRes = await fetch('/api/notes')
+                                const notesData = await notesRes.json()
+                                setNotes(notesData)
+                              }
+                            } catch (err) {
+                              console.error('Error restoring note:', err)
+                            }
+                          }}
+                        >
+                          <RefreshCw size={14} /> Restore
+                        </button>
+                        <button 
+                          className="action-btn delete" 
+                          onClick={() => openConfirmModal('Delete note?', `This will permanently delete "${note.title || 'Untitled Note'}".`, async () => {
+                            try {
+                              const res = await fetch(`/api/notes/${note.id}`, { method: 'DELETE' })
+                              if (res.ok) {
+                                setHiddenNotes(hiddenNotes.filter(n => n.id !== note.id))
+                              }
+                            } catch (err) {
+                              console.error('Error deleting note:', err)
+                            }
+                            closeConfirmModal()
+                          })}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
+            ) : (
+              <p className="settings-empty">Click "Unlock" to view hidden notes.</p>
             )}
           </div>
         </div>
@@ -4039,7 +4272,6 @@ const [showFilters, setShowFilters] = useState(false)
                               {note.date && (
                                 <span>{note.date.length === 8 ? `${note.date.slice(0,4)}-${note.date.slice(4,6)}-${note.date.slice(6,8)}` : note.date}</span>
                               )}
-                              {note.projects_raw && <span> · {note.projects_raw}</span>}
                             </div>
                           </div>
                         </div>
@@ -4138,6 +4370,154 @@ const [showFilters, setShowFilters] = useState(false)
                 setShowBusinessLineModal(false)
               }}>
                 {editingBusinessLine ? 'Save Changes' : 'Add Business Line'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Hide Note PIN Modal */}
+      {showHideNotePinModal && (
+        <div className="modal-overlay" onClick={() => setShowHideNotePinModal(false)}>
+          <div className="modal confirm-modal" onClick={e => e.stopPropagation()}>
+            <h2>Hide Note</h2>
+            <p className="confirm-message">Enter PIN:</p>
+            <div className="pin-input-container">
+              <input
+                type="password"
+                className="pin-input"
+                placeholder="Enter PIN"
+                value={hideNotePin}
+                onChange={e => setHideNotePin(e.target.value)}
+                maxLength={4}
+                autoFocus
+                onKeyDown={async (e) => {
+                  if (e.key === 'Enter' && hideNotePin === '8432') {
+                    if (noteToHide) {
+                      try {
+                        const res = await fetch(`/api/notes/${noteToHide.id}/hide`, {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ pin: hideNotePin })
+                        })
+                        if (res.ok) {
+                          setNotes(notes.filter(n => n.id !== noteToHide.id))
+                          setShowHideNotePinModal(false)
+                          setEditingNote(null)
+                          setNoteToHide(null)
+                          setHideNotePin('')
+                        } else {
+                          const err = await res.json()
+                          alert(`Error: ${err.error}`)
+                        }
+                      } catch (err) {
+                        console.error('Error hiding note:', err)
+                        alert('Error hiding note')
+                      }
+                    }
+                  }
+                }}
+              />
+            </div>
+            <div className="modal-actions">
+              <button className="secondary-btn" style={{ textAlign: 'center' }} onClick={() => { setShowHideNotePinModal(false); setNoteToHide(null); setHideNotePin(''); }}>
+                Cancel
+              </button>
+              <button 
+                className="danger-btn" 
+                onClick={async () => {
+                  if (hideNotePin !== '8432') {
+                    alert('Invalid PIN')
+                    return
+                  }
+                  if (noteToHide) {
+                    try {
+                      const res = await fetch(`/api/notes/${noteToHide.id}/hide`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ pin: hideNotePin })
+                      })
+                      if (res.ok) {
+                        setNotes(notes.filter(n => n.id !== noteToHide.id))
+                        setShowHideNotePinModal(false)
+                        setEditingNote(null)
+                        setNoteToHide(null)
+                        setHideNotePin('')
+                      } else {
+                        const err = await res.json()
+                        alert(`Error: ${err.error}`)
+                      }
+                    } catch (err) {
+                      console.error('Error hiding note:', err)
+                      alert('Error hiding note')
+                    }
+                  }
+                }}
+              >
+                Hide Note
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Hidden Notes Unlock PIN Modal */}
+      {showHiddenNotesPinModal && (
+        <div className="modal-overlay" onClick={() => { setShowHiddenNotesPinModal(false); setHiddenNotesPin(''); }}>
+          <div className="modal confirm-modal" onClick={e => e.stopPropagation()}>
+            <h2>Unlock Hidden Notes</h2>
+            <p className="confirm-message">Enter PIN:</p>
+            <div className="pin-input-container">
+              <input
+                type="password"
+                className="pin-input"
+                placeholder="Enter PIN"
+                value={hiddenNotesPin}
+                onChange={e => setHiddenNotesPin(e.target.value)}
+                maxLength={4}
+                autoFocus
+                onKeyDown={async (e) => {
+                  if (e.key === 'Enter' && hiddenNotesPin === '8432') {
+                    try {
+                      const res = await fetch('/api/notes?includeHidden=true')
+                      const allNotes = await res.json()
+                      const hidden = allNotes.filter((n: Note) => n.hidden === 1)
+                      setHiddenNotes(hidden)
+                      setHiddenNotesUnlocked(true)
+                      setShowHiddenNotesPinModal(false)
+                      setHiddenNotesPin('')
+                    } catch (err) {
+                      console.error('Error loading hidden notes:', err)
+                    }
+                  }
+                }}
+              />
+            </div>
+            <div className="modal-actions">
+              <button className="secondary-btn" style={{ textAlign: 'center' }} onClick={() => { setShowHiddenNotesPinModal(false); setHiddenNotesPin(''); }}>
+                Cancel
+              </button>
+              <button 
+                className="primary-btn" 
+                onClick={async () => {
+                  if (hiddenNotesPin !== '8432') {
+                    alert('Invalid PIN')
+                    return
+                  }
+                  try {
+                    const res = await fetch('/api/notes?includeHidden=true')
+                    const allNotes = await res.json()
+                    const hidden = allNotes.filter((n: Note) => n.hidden === 1)
+                    setHiddenNotes(hidden)
+                    setHiddenNotesUnlocked(true)
+                    setShowHiddenNotesPinModal(false)
+                    setHiddenNotesPin('')
+                  } catch (err) {
+                    console.error('Error loading hidden notes:', err)
+                  }
+                }}
+              >
+                Unlock
               </button>
             </div>
           </div>

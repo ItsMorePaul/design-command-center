@@ -35,7 +35,7 @@ interface CalendarMonth {
 }
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 let db;
 try {
@@ -522,7 +522,7 @@ app.get('/api/notes/by-project/:projectId', async (req, res) => {
     const notes = await all(
       `SELECT n.* FROM notes n
        JOIN note_project_links npl ON n.id = npl.note_id
-       WHERE npl.project_id = ?
+       WHERE npl.project_id = ? AND (n.hidden = 0 OR n.hidden IS NULL)
        ORDER BY n.date DESC`,
       [req.params.projectId]
     )
@@ -536,7 +536,7 @@ app.get('/api/notes/by-person/:teamId', async (req, res) => {
     const notes = await all(
       `SELECT n.* FROM notes n
        JOIN note_people_links npl ON n.id = npl.note_id
-       WHERE npl.team_id = ?
+       WHERE npl.team_id = ? AND (n.hidden = 0 OR n.hidden IS NULL)
        ORDER BY n.date DESC`,
       [req.params.teamId]
     )
@@ -547,7 +547,10 @@ app.get('/api/notes/by-person/:teamId', async (req, res) => {
 // List all notes
 app.get('/api/notes', async (req, res) => {
   try {
-    const notes = await all('SELECT * FROM notes ORDER BY date DESC, created_at DESC')
+    // Filter out hidden notes by default, unless includeHidden=true
+    const includeHidden = req.query.includeHidden === 'true'
+    const hiddenFilter = includeHidden ? '' : 'WHERE hidden = 0 OR hidden IS NULL'
+    const notes = await all(`SELECT * FROM notes ${hiddenFilter} ORDER BY date DESC, created_at DESC`)
     const projectLinks = await all('SELECT * FROM note_project_links')
     const peopleLinks = await all('SELECT * FROM note_people_links')
 
@@ -563,11 +566,21 @@ app.get('/api/notes', async (req, res) => {
       peopleMap[link.note_id].push(link.team_id)
     }
 
-    res.json((notes as any[]).map(n => ({
-      ...n,
-      linkedProjectIds: projectMap[n.id] || [],
-      linkedTeamIds: peopleMap[n.id] || []
-    })))
+    res.json((notes as any[]).map(n => {
+      // Use link tables if available, otherwise fall back to stored column values
+      const linkedProjectIds = projectMap[n.id]?.length > 0 
+        ? projectMap[n.id] 
+        : (n.linkedProjectIds ? JSON.parse(n.linkedProjectIds) : [])
+      const linkedTeamIds = peopleMap[n.id]?.length > 0 
+        ? peopleMap[n.id] 
+        : (n.linkedTeamIds ? JSON.parse(n.linkedTeamIds) : [])
+      
+      return {
+        ...n,
+        linkedProjectIds,
+        linkedTeamIds
+      }
+    }))
   } catch (e: any) { res.status(500).json({ error: e.message }) }
 })
 
@@ -582,6 +595,195 @@ app.get('/api/notes/:id', async (req, res) => {
 
     res.json({
       ...note,
+      linkedProjectIds: (projectLinks as any[]).map(l => l.project_id),
+      linkedTeamIds: (peopleLinks as any[]).map(l => l.team_id)
+    })
+  } catch (e: any) { res.status(500).json({ error: e.message }) }
+})
+
+// Add project/person links to a note
+// Body: { projectIds: string[], personIds: string[] }
+app.post('/api/notes/:id/links', async (req, res) => {
+  try {
+    const noteId = req.params.id
+    const { projectIds = [], personIds = [] } = req.body
+
+    // Verify note exists
+    const note = await get('SELECT id FROM notes WHERE id = ?', [noteId])
+    if (!note) return res.status(404).json({ error: 'Note not found' })
+
+    // Add project links
+    for (const projectId of projectIds) {
+      await run(
+        'INSERT OR IGNORE INTO note_project_links (note_id, project_id) VALUES (?, ?)',
+        [noteId, projectId]
+      )
+    }
+
+    // Add person links
+    for (const personId of personIds) {
+      await run(
+        'INSERT OR IGNORE INTO note_people_links (note_id, team_id) VALUES (?, ?)',
+        [noteId, personId]
+      )
+    }
+
+    // Return updated links
+    const projectLinks = await all('SELECT project_id FROM note_project_links WHERE note_id = ?', [noteId])
+    const peopleLinks = await all('SELECT team_id FROM note_people_links WHERE note_id = ?', [noteId])
+
+    res.json({
+      linkedProjectIds: (projectLinks as any[]).map(l => l.project_id),
+      linkedTeamIds: (peopleLinks as any[]).map(l => l.team_id)
+    })
+  } catch (e: any) { res.status(500).json({ error: e.message }) }
+})
+
+// Remove project/person links from a note
+// Body: { projectIds: string[], personIds: string[] }
+app.delete('/api/notes/:id/links', async (req, res) => {
+  try {
+    const noteId = req.params.id
+    const { projectIds = [], personIds = [] } = req.body
+
+    // Remove project links
+    for (const projectId of projectIds) {
+      await run(
+        'DELETE FROM note_project_links WHERE note_id = ? AND project_id = ?',
+        [noteId, projectId]
+      )
+    }
+
+    // Remove person links
+    for (const personId of personIds) {
+      await run(
+        'DELETE FROM note_people_links WHERE note_id = ? AND team_id = ?',
+        [noteId, personId]
+      )
+    }
+
+    // Return updated links
+    const projectLinks = await all('SELECT project_id FROM note_project_links WHERE note_id = ?', [noteId])
+    const peopleLinks = await all('SELECT team_id FROM note_people_links WHERE note_id = ?', [noteId])
+
+    res.json({
+      linkedProjectIds: (projectLinks as any[]).map(l => l.project_id),
+      linkedTeamIds: (peopleLinks as any[]).map(l => l.team_id)
+    })
+  } catch (e: any) { res.status(500).json({ error: e.message }) }
+})
+
+// Hide a note (requires PIN in body)
+app.put('/api/notes/:id/hide', async (req, res) => {
+  try {
+    const { pin } = req.body
+    if (pin !== '8432') {
+      return res.status(401).json({ error: 'Invalid PIN' })
+    }
+
+    const noteId = req.params.id
+    const note = await get('SELECT id FROM notes WHERE id = ?', [noteId])
+    if (!note) {
+      return res.status(404).json({ error: 'Note not found' })
+    }
+
+    await run(
+      'UPDATE notes SET hidden = 1, hidden_at = datetime("now") WHERE id = ?',
+      [noteId]
+    )
+
+    const updatedNote = await get('SELECT * FROM notes WHERE id = ?', [noteId])
+    res.json(updatedNote)
+  } catch (e: any) { res.status(500).json({ error: e.message }) }
+})
+
+// Restore a hidden note
+app.put('/api/notes/:id/restore', async (req, res) => {
+  try {
+    const noteId = req.params.id
+    const note = await get('SELECT id FROM notes WHERE id = ?', [noteId])
+    if (!note) {
+      return res.status(404).json({ error: 'Note not found' })
+    }
+
+    await run(
+      'UPDATE notes SET hidden = 0, hidden_at = NULL WHERE id = ?',
+      [noteId]
+    )
+
+    const updatedNote = await get('SELECT * FROM notes WHERE id = ?', [noteId])
+    res.json(updatedNote)
+  } catch (e: any) { res.status(500).json({ error: e.message }) }
+})
+
+// Delete a note (works for hidden notes too)
+app.delete('/api/notes/:id', async (req, res) => {
+  try {
+    const noteId = req.params.id
+    const note = await get('SELECT id FROM notes WHERE id = ?', [noteId])
+    if (!note) {
+      return res.status(404).json({ error: 'Note not found' })
+    }
+
+    // Delete links first
+    await run('DELETE FROM note_project_links WHERE note_id = ?', [noteId])
+    await run('DELETE FROM note_people_links WHERE note_id = ?', [noteId])
+    await run('DELETE FROM notes WHERE id = ?', [noteId])
+
+    res.json({ success: true })
+  } catch (e: any) { res.status(500).json({ error: e.message }) }
+})
+
+// Update a note
+// Body: { title?: string, date?: string, content_preview?: string, projects_raw?: string, people_raw?: string, linkedProjectIds?: string[], linkedTeamIds?: string[] }
+app.put('/api/notes/:id', async (req, res) => {
+  try {
+    const noteId = req.params.id
+    const { title, date, content_preview, projects_raw, people_raw, linkedProjectIds, linkedTeamIds } = req.body
+
+    // Verify note exists
+    const note = await get('SELECT id FROM notes WHERE id = ?', [noteId])
+    if (!note) return res.status(404).json({ error: 'Note not found' })
+
+    // Build update query dynamically
+    const updates: string[] = []
+    const params: any[] = []
+
+    if (title !== undefined) { updates.push('title = ?'); params.push(title) }
+    if (date !== undefined) { updates.push('date = ?'); params.push(date) }
+    if (content_preview !== undefined) { updates.push('content_preview = ?'); params.push(content_preview) }
+    if (projects_raw !== undefined) { updates.push('projects_raw = ?'); params.push(projects_raw) }
+    if (people_raw !== undefined) { updates.push('people_raw = ?'); params.push(people_raw) }
+
+    if (updates.length > 0) {
+      updates.push("updated_at = datetime('now')")
+      params.push(noteId)
+      await run(`UPDATE notes SET ${updates.join(', ')} WHERE id = ?`, params)
+    }
+
+    // Update project links if provided
+    if (linkedProjectIds !== undefined) {
+      await run('DELETE FROM note_project_links WHERE note_id = ?', [noteId])
+      for (const projectId of linkedProjectIds) {
+        await run('INSERT OR IGNORE INTO note_project_links (note_id, project_id) VALUES (?, ?)', [noteId, projectId])
+      }
+    }
+
+    // Update person links if provided
+    if (linkedTeamIds !== undefined) {
+      await run('DELETE FROM note_people_links WHERE note_id = ?', [noteId])
+      for (const personId of linkedTeamIds) {
+        await run('INSERT OR IGNORE INTO note_people_links (note_id, team_id) VALUES (?, ?)', [noteId, personId])
+      }
+    }
+
+    // Return updated note
+    const updatedNote = await get('SELECT * FROM notes WHERE id = ?', [noteId])
+    const projectLinks = await all('SELECT project_id FROM note_project_links WHERE note_id = ?', [noteId])
+    const peopleLinks = await all('SELECT team_id FROM note_people_links WHERE note_id = ?', [noteId])
+
+    res.json({
+      ...updatedNote,
       linkedProjectIds: (projectLinks as any[]).map(l => l.project_id),
       linkedTeamIds: (peopleLinks as any[]).map(l => l.team_id)
     })
@@ -1022,8 +1224,8 @@ app.post('/api/seed', async (req, res) => {
     if (notes && notes.length > 0) {
       await run('DELETE FROM notes')
       for (const n of notes) {
-        await run(`INSERT INTO notes (id, source_id, source_filename, title, date, content_preview, people_raw, projects_raw, drive_url, source_created_at, next_steps, details, attachments) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [n.id, n.source_id || null, n.source_filename || '', n.title || '', n.date || null, n.content_preview || '', n.people_raw || '[]', n.projects_raw || '[]', n.drive_url || '', n.source_created_at || null, n.next_steps || '', n.details || '', n.attachments || '[]'])
+        await run(`INSERT INTO notes (id, source_id, source_filename, title, date, content_preview, people_raw, projects_raw, drive_url, source_created_at, next_steps, details, attachments, linkedTeamIds, linkedProjectIds) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [n.id, n.source_id || null, n.source_filename || '', n.title || '', n.date || null, n.content_preview || '', n.people_raw || '[]', n.projects_raw || '[]', n.drive_url || '', n.source_created_at || null, n.next_steps || '', n.details || '', n.attachments || '[]', JSON.stringify(n.linkedTeamIds || []), JSON.stringify(n.linkedProjectIds || [])])
       }
     }
     
@@ -1059,8 +1261,8 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 // Format: YYYY.MM.DD.hhmm (e.g., 2026.02.26.2059) → displays as "2026.02.26 2059"
 
-const SITE_VERSION = '2026.03.06.2100'
-const SITE_TIME = '2100'
+const SITE_VERSION = '2026.03.08.1710'
+const SITE_TIME = '1710'
 
 const VERSION_KEY = 'dcc_versions'
 
@@ -1204,8 +1406,14 @@ run(`CREATE TABLE IF NOT EXISTS notes (
   drive_url TEXT,
   source_created_at TEXT,
   created_at TEXT DEFAULT (datetime('now')),
-  updated_at TEXT DEFAULT (datetime('now'))
+  updated_at TEXT DEFAULT (datetime('now')),
+  hidden INTEGER DEFAULT 0,
+  hidden_at TEXT
 )`).catch(e => console.error('notes init error:', e.message))
+
+// Migration: add hidden columns if they don't exist
+run(`ALTER TABLE notes ADD COLUMN hidden INTEGER DEFAULT 0`).catch(() => {})
+run(`ALTER TABLE notes ADD COLUMN hidden_at TEXT`).catch(() => {})
 
 run(`CREATE TABLE IF NOT EXISTS note_project_links (
   note_id TEXT NOT NULL,
