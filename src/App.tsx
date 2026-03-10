@@ -290,21 +290,10 @@ function highlightTextWithLinks(
 
   // Build regex patterns for all projects and team members not yet linked
   const unlinkedProjects = projects.filter(p => !linkedProjectIds.includes(p.id))
-  const unlinkedPeople = team.filter(m => !linkedTeamIds.includes(m.id))
-  
-  // Create regex that matches project names or person names (case insensitive)
+  // Create regex that matches project names (case insensitive)
   const projectNames = unlinkedProjects.map(p => p.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-  // Include nicknames in person names for matching
-  const personNames: string[] = []
-  unlinkedPeople.forEach(m => {
-    personNames.push(m.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-    if (NICKNAME_MAP[m.name]) {
-      personNames.push(NICKNAME_MAP[m.name].replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-    }
-  })
-  
-  // Combine all names to search for
-  const allNames = [...projectNames, ...personNames]
+
+  const allNames = [...projectNames]
   if (allNames.length === 0) return cleanText
   
   // Sort by length descending to match longer names first
@@ -326,24 +315,6 @@ function highlightTextWithLinks(
             onClick={() => onAddProject(matchedProject.id)}
             style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', marginLeft: '2px', fontWeight: 'bold' }}
             title="Add project link"
-          >+</button>
-        </span>
-      )
-    }
-    
-    // Check if this part matches an unlinked person (including nicknames)
-    const matchedPerson = unlinkedPeople.find(m => 
-      m.name.toLowerCase() === lowerPart || 
-      NICKNAME_MAP[m.name]?.toLowerCase() === lowerPart
-    )
-    if (matchedPerson) {
-      return (
-        <span key={i} className="highlighted-person" style={{ backgroundColor: '#fce7f3', padding: '1px 4px', borderRadius: '3px', cursor: 'pointer', margin: '0 2px' }}>
-          {part}
-          <button 
-            onClick={() => onAddPerson(matchedPerson.id)}
-            style={{ background: 'none', border: 'none', color: '#db2777', cursor: 'pointer', marginLeft: '2px', fontWeight: 'bold' }}
-            title="Add person link"
           >+</button>
         </span>
       )

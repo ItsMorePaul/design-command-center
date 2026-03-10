@@ -1077,6 +1077,50 @@ app.put('/api/notes/:id', async (req, res) => {
 
 // Sync notes from gemini-notes.db into DCC
 app.post('/api/notes/sync', async (req, res) => {
+  // Clean raw .md content_preview by stripping header blocks (📝 Notes, date, title, invitees, attachments)
+  function cleanContentPreview(raw: string): string {
+    if (!raw) return ''
+    let text = raw
+    // Remove BOM and zero-width spaces
+    text = text.replace(/^\uFEFF/, '').replace(/\u200B/g, '')
+    // Detect raw .md header pattern: starts with 📝 Notes or a date line
+    const trimmed = text.trim()
+    const hasNoteHeader = /^📝\s*Notes\b/i.test(trimmed)
+    const startsWithDate = /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},?\s+\d{4}/i.test(trimmed)
+    if (!hasNoteHeader && !startsWithDate) return raw // Already a good summary
+    // Find the Attachments line - everything before it is header, content starts after
+    const attachIdx = text.search(/^Attachments?\b/im)
+    if (attachIdx >= 0) {
+      // Skip past "Attachments" line, then skip the repeated meeting title + blank lines
+      let after = text.substring(attachIdx)
+      // Remove the Attachments line itself
+      after = after.replace(/^Attachments?\b[^\n]*\n?/, '')
+      // Skip blank lines before repeated title
+      after = after.replace(/^(\s*\n)+/, '')
+      // Skip the repeated meeting title line (short, no periods)
+      if (/^[^\n.]{1,100}\n/.test(after)) {
+        after = after.replace(/^[^\n]*\n/, '')
+      }
+      // Skip remaining blank lines
+      after = after.replace(/^(\s*\n)+/, '').trim()
+      if (after.length > 20) return after
+    }
+    // Fallback: find the Invited line and skip everything through the next blank-line block
+    const invitedIdx = text.search(/^Invited\b/im)
+    if (invitedIdx >= 0) {
+      let after = text.substring(invitedIdx)
+      // Skip the Invited line
+      after = after.replace(/^Invited\b[^\n]*\n?/, '')
+      // Skip any continuation name lines (no periods, short)
+      while (/^[^\n.]{0,150}\n/.test(after) && !/^(Attachments?|Details?|The |A |In |On |During )/i.test(after.trim())) {
+        after = after.replace(/^[^\n]*\n/, '')
+      }
+      after = after.replace(/^\s*\n/g, '').trim()
+      if (after.length > 20) return after
+    }
+    return raw
+  }
+
   try {
     // Check if Gemini notes DB exists
     if (!fs.existsSync(GEMINI_NOTES_DB)) {
@@ -1134,7 +1178,7 @@ app.post('/api/notes/sync', async (req, res) => {
             `UPDATE notes SET title = ?, date = ?, content_preview = ?, people_raw = ?, projects_raw = ?,
              drive_url = ?, source_filename = ?, source_created_at = ?, next_steps = ?, details = ?, attachments = ?, updated_at = datetime('now')
              WHERE id = ?`,
-            [title, gNote.date || '', gNote.content_preview || '', gNote.people || '',
+            [title, gNote.date || '', cleanContentPreview(gNote.content_preview || ''), gNote.people || '',
              gNote.projects || '', gNote.drive_url || '', gNote.filename || '',
              gNote.created_at || '', gNote.next_steps || '', gNote.details || '', gNote.attachments || '', noteId]
           )
@@ -1149,7 +1193,7 @@ app.post('/api/notes/sync', async (req, res) => {
           `INSERT INTO notes (id, source_id, source_filename, title, date, content_preview, people_raw, projects_raw, drive_url, source_created_at, next_steps, details, attachments, hidden, hidden_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [noteId, gNote.id, gNote.filename || '', title, gNote.date || '',
-           gNote.content_preview || '', gNote.people || '', gNote.projects || '',
+           cleanContentPreview(gNote.content_preview || ''), gNote.people || '', gNote.projects || '',
            gNote.drive_url || '', gNote.created_at || '', gNote.next_steps || '', gNote.details || '', gNote.attachments || '',
            isBlocked ? 1 : 0, isBlocked ? new Date().toISOString() : null]
         )
@@ -1662,8 +1706,8 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 // Format: YYYY.MM.DD.hhmm (e.g., 2026.02.26.2059) → displays as "2026.02.26 2059"
 
-const SITE_VERSION = '2026.03.10.1010'
-const SITE_TIME = '1010'
+const SITE_VERSION = '2026.03.10.1741'
+const SITE_TIME = '1741'
 
 const VERSION_KEY = 'dcc_versions'
 
