@@ -14,8 +14,13 @@ const SEED_SECRET = process.env.DCC_SEED_SECRET || '';
 const GEMINI_NOTES_DB = process.env.GEMINI_NOTES_DB || path.join(homedir(), '.openclaw', 'workspace', 'data', 'gemini-notes.db');
 
 // ============ MAINTENANCE MODE ============
-let maintenanceMode = false
-let maintenanceMessage = 'Upgrading Wandi Hub in a few minutes... Will be back online soon.'
+// State loaded from DB on startup, persists across restarts
+let maintenanceState = {
+  enabled: false,
+  bannerMessage: '',
+  lockoutMessage: 'Wandi Hub is being improved. Back as soon as possible.',
+  countdownTarget: null as string | null, // ISO timestamp when lockout begins
+}
 
 const MAINTENANCE_HTML = (message: string) => `<!DOCTYPE html>
 <html lang="en">
@@ -73,6 +78,37 @@ const MAINTENANCE_HTML = (message: string) => `<!DOCTYPE html>
   </div>
 </body>
 </html>`
+
+// Helper: is the countdown expired (lockout phase)?
+function isInLockout(): boolean {
+  if (!maintenanceState.enabled) return false
+  if (!maintenanceState.countdownTarget) return true // No countdown = immediate lockout
+  return new Date() >= new Date(maintenanceState.countdownTarget)
+}
+
+// Helper: save maintenance state to DB
+async function saveMaintenanceState() {
+  await run(
+    `INSERT OR REPLACE INTO app_versions (key, db_version, db_time) VALUES ('maintenance', ?, ?)`,
+    [JSON.stringify(maintenanceState), new Date().toISOString()]
+  )
+}
+
+// Helper: load maintenance state from DB
+async function loadMaintenanceState() {
+  try {
+    const row = await get(`SELECT db_version FROM app_versions WHERE key = 'maintenance'`) as any
+    if (row?.db_version) {
+      const saved = JSON.parse(row.db_version)
+      maintenanceState = { ...maintenanceState, ...saved }
+      if (maintenanceState.enabled) {
+        console.log(`Maintenance mode restored from DB: ON — countdown: ${maintenanceState.countdownTarget || 'immediate'}`)
+      }
+    }
+  } catch (e) {
+    // No saved state, use defaults
+  }
+}
 
 interface CalendarEvent {
   type: 'project' | 'timeoff'
@@ -380,41 +416,64 @@ const reconcileProjectDesignerAssignments = async () => {
 }
 
 // ============ MAINTENANCE MODE ENDPOINTS ============
-// Toggle maintenance on: POST /api/maintenance { enabled: true, message?: "..." }
-// Toggle maintenance off: POST /api/maintenance { enabled: false }
-// Check status: GET /api/maintenance
 app.get('/api/maintenance', (req, res) => {
-  res.json({ enabled: maintenanceMode, message: maintenanceMessage })
+  res.json({
+    enabled: maintenanceState.enabled,
+    bannerMessage: maintenanceState.bannerMessage,
+    lockoutMessage: maintenanceState.lockoutMessage,
+    countdownTarget: maintenanceState.countdownTarget,
+    isLockout: isInLockout(),
+  })
 })
 
 app.post('/api/maintenance', (req, res) => {
-  // Only allow from localhost or with seed secret
+  // Allow from localhost, seed secret, or authenticated admin
   const isLocalhost = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1'
   const hasSeedToken = SEED_SECRET && req.headers['x-seed-secret'] === SEED_SECRET
-  if (!isLocalhost && !hasSeedToken) {
+  const sessionId = req.headers['x-session-id'] as string
+  const session = sessionId ? sessions.get(sessionId) : null
+  const isAdmin = session?.role === 'admin'
+  if (!isLocalhost && !hasSeedToken && !isAdmin) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
-  maintenanceMode = !!req.body.enabled
-  if (req.body.message) maintenanceMessage = req.body.message
-  console.log(`Maintenance mode: ${maintenanceMode ? 'ON' : 'OFF'}${maintenanceMode ? ' — ' + maintenanceMessage : ''}`)
-  res.json({ enabled: maintenanceMode, message: maintenanceMessage })
+  if (req.body.enabled !== undefined) maintenanceState.enabled = !!req.body.enabled
+  if (req.body.bannerMessage !== undefined) maintenanceState.bannerMessage = req.body.bannerMessage
+  if (req.body.lockoutMessage !== undefined) maintenanceState.lockoutMessage = req.body.lockoutMessage
+  if (req.body.countdownTarget !== undefined) maintenanceState.countdownTarget = req.body.countdownTarget || null
+  // Legacy: accept "message" as bannerMessage for curl compatibility
+  if (req.body.message && !req.body.bannerMessage) maintenanceState.bannerMessage = req.body.message
+  saveMaintenanceState()
+  console.log(`Maintenance mode: ${maintenanceState.enabled ? 'ON' : 'OFF'}${maintenanceState.enabled ? ' — countdown: ' + (maintenanceState.countdownTarget || 'immediate') : ''}`)
+  res.json({
+    enabled: maintenanceState.enabled,
+    bannerMessage: maintenanceState.bannerMessage,
+    lockoutMessage: maintenanceState.lockoutMessage,
+    countdownTarget: maintenanceState.countdownTarget,
+    isLockout: isInLockout(),
+  })
 })
 
-// Maintenance mode middleware — blocks all non-admin requests
+// Maintenance mode middleware — blocks non-admin requests during lockout phase
 app.use((req, res, next) => {
-  if (!maintenanceMode) return next()
-  // Always allow maintenance toggle, health, upload/download-db, and seed-secret requests through
+  if (!maintenanceState.enabled) return next()
+  if (!isInLockout()) return next() // Still in warning/countdown phase — site works
+  // Always allow these through during lockout
   const isMaintenanceEndpoint = req.path === '/api/maintenance'
   const isHealthEndpoint = req.path === '/api/health'
+  const isAuthEndpoint = req.path.startsWith('/api/auth/')
   const isDbEndpoint = (req.path === '/api/upload-db' || req.path === '/api/download-db') && SEED_SECRET && req.headers['x-seed-secret'] === SEED_SECRET
   const isLocalhost = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1'
-  if (isMaintenanceEndpoint || isHealthEndpoint || isDbEndpoint || isLocalhost) return next()
+  // Allow authenticated admin users through
+  const sessionId = req.headers['x-session-id'] as string
+  const session = sessionId ? sessions.get(sessionId) : null
+  const isAdminUser = session?.role === 'admin'
+  if (isMaintenanceEndpoint || isHealthEndpoint || isAuthEndpoint || isDbEndpoint || isLocalhost || isAdminUser) return next()
   // API requests get JSON response
   if (req.path.startsWith('/api/')) {
-    return res.status(503).json({ error: 'maintenance', message: maintenanceMessage })
+    return res.status(503).json({ error: 'maintenance', message: maintenanceState.lockoutMessage })
   }
   // All other requests get the maintenance HTML page
-  res.status(503).send(MAINTENANCE_HTML(maintenanceMessage))
+  res.status(503).send(MAINTENANCE_HTML(maintenanceState.lockoutMessage))
 })
 
 // ============ HEALTH ============
@@ -1805,8 +1864,8 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 // Format: YYYY.MM.DD.hhmm (e.g., 2026.02.26.2059) → displays as "2026.02.26 2059"
 
-const SITE_VERSION = '2026.03.10.1950'
-const SITE_TIME = '1950'
+const SITE_VERSION = '2026.03.10.2115'
+const SITE_TIME = '2115'
 
 const VERSION_KEY = 'dcc_versions'
 
@@ -1858,7 +1917,7 @@ const initVersions = async () => {
 }
 
 // Ensure table exists
-run("CREATE TABLE IF NOT EXISTS app_versions (key TEXT PRIMARY KEY, db_version TEXT, db_time TEXT, updated_at TEXT)").then(() => initVersions())
+run("CREATE TABLE IF NOT EXISTS app_versions (key TEXT PRIMARY KEY, db_version TEXT, db_time TEXT, updated_at TEXT)").then(() => { initVersions(); loadMaintenanceState() })
 run("CREATE TABLE IF NOT EXISTS project_priorities (business_line_id TEXT NOT NULL, project_id TEXT NOT NULL, rank INTEGER NOT NULL, PRIMARY KEY (business_line_id, project_id))")
 
 // Core tables (auto-created on fresh deploy)

@@ -903,6 +903,53 @@ const [showFilters, setShowFilters] = useState(false)
   const [hideNotePin, setHideNotePin] = useState('')
   const [noteToHide, setNoteToHide] = useState<Note | null>(null)
 
+  // Maintenance mode state
+  const [maintenance, setMaintenance] = useState<{
+    enabled: boolean
+    bannerMessage: string
+    lockoutMessage: string
+    countdownTarget: string | null
+    isLockout: boolean
+  }>({ enabled: false, bannerMessage: '', lockoutMessage: '', countdownTarget: null, isLockout: false })
+  const [maintenanceForm, setMaintenanceForm] = useState({ bannerMessage: '', lockoutMessage: '', countdownMinutes: 15 })
+  const [countdownDisplay, setCountdownDisplay] = useState('')
+
+  // Poll maintenance status every 30s
+  useEffect(() => {
+    const fetchMaintenance = async () => {
+      try {
+        const res = await fetch('/api/maintenance')
+        const data = await res.json()
+        setMaintenance(data)
+      } catch (e) { /* ignore */ }
+    }
+    fetchMaintenance()
+    const interval = setInterval(fetchMaintenance, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // Countdown timer — updates every second when countdown is active
+  useEffect(() => {
+    if (!maintenance.enabled || !maintenance.countdownTarget) {
+      setCountdownDisplay('')
+      return
+    }
+    const tick = () => {
+      const remaining = new Date(maintenance.countdownTarget!).getTime() - Date.now()
+      if (remaining <= 0) {
+        setCountdownDisplay('0:00')
+        setMaintenance(prev => ({ ...prev, isLockout: true }))
+        return
+      }
+      const mins = Math.floor(remaining / 60000)
+      const secs = Math.floor((remaining % 60000) / 1000)
+      setCountdownDisplay(`${mins}:${secs.toString().padStart(2, '0')}`)
+    }
+    tick()
+    const interval = setInterval(tick, 1000)
+    return () => clearInterval(interval)
+  }, [maintenance.enabled, maintenance.countdownTarget])
+
   // Load versions from server on mount
   useEffect(() => {
     const loadVersions = async () => {
@@ -1987,8 +2034,37 @@ const [showFilters, setShowFilters] = useState(false)
     )
   }
 
+  // Show lockout screen for non-admin users when maintenance lockout is active
+  if (maintenance.enabled && maintenance.isLockout && currentUser?.role !== 'admin') {
+    return (
+      <div className="maintenance-lockout">
+        <div className="maintenance-lockout-card">
+          <div className="maintenance-lockout-icon">&#128736;</div>
+          <h1>Scheduled Maintenance</h1>
+          <p>{maintenance.lockoutMessage || 'Wandi Hub is being improved. Back as soon as possible.'}</p>
+          <div className="maintenance-lockout-status">
+            <span className="maintenance-pulse" />
+            This page auto-refreshes every 30 seconds
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const showMaintenanceBanner = maintenance.enabled && !maintenance.isLockout && !!maintenance.bannerMessage
+
   return (
-    <div className="app">
+    <>
+      {/* Maintenance Banner — fixed above everything */}
+      {showMaintenanceBanner && (
+        <div className="maintenance-banner">
+          <span className="maintenance-banner-text">
+            {maintenance.bannerMessage}
+            {countdownDisplay && <span className="maintenance-banner-countdown"> &mdash; {countdownDisplay}</span>}
+          </span>
+        </div>
+      )}
+    <div className={`app${showMaintenanceBanner ? ' has-maintenance-banner' : ''}`}>
       {/* Sidebar */}
       <aside className={`sidebar ${navCollapsed ? 'sidebar-collapsed' : ''}`}>
         <div className="logo">
@@ -3975,6 +4051,120 @@ const [showFilters, setShowFilters] = useState(false)
             </div>
           )}
 
+          {/* Maintenance Mode Section (Admin Only) */}
+          {isAdmin && (
+            <div className="settings-section" style={{ marginTop: '32px' }}>
+              <div className="settings-header">
+                <h2>Maintenance Mode</h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '0.85rem', color: maintenance.enabled ? '#ef4444' : '#6b7280' }}>
+                    {maintenance.enabled ? (maintenance.isLockout ? 'LOCKED OUT' : 'COUNTDOWN') : 'OFF'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="maintenance-controls">
+                {!maintenance.enabled ? (
+                  <>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
+                      <div className="float-field has-value">
+                        <input
+                          type="text"
+                          value={maintenanceForm.bannerMessage}
+                          onChange={e => setMaintenanceForm(prev => ({ ...prev, bannerMessage: e.target.value }))}
+                          placeholder=" "
+                        />
+                        <label>Banner Message (shown during countdown)</label>
+                      </div>
+                      <div className="float-field has-value">
+                        <input
+                          type="text"
+                          value={maintenanceForm.lockoutMessage}
+                          onChange={e => setMaintenanceForm(prev => ({ ...prev, lockoutMessage: e.target.value }))}
+                          placeholder=" "
+                        />
+                        <label>Lockout Message (shown after countdown ends)</label>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <div className="float-field has-value" style={{ width: '120px' }}>
+                          <input
+                            type="number"
+                            min="1"
+                            max="120"
+                            value={maintenanceForm.countdownMinutes}
+                            onChange={e => setMaintenanceForm(prev => ({ ...prev, countdownMinutes: parseInt(e.target.value) || 15 }))}
+                            placeholder=" "
+                          />
+                          <label>Minutes</label>
+                        </div>
+                        <span style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>until lockout</span>
+                      </div>
+                    </div>
+                    <button
+                      className="primary-btn"
+                      style={{ background: '#ef4444' }}
+                      onClick={async () => {
+                        const target = new Date(Date.now() + maintenanceForm.countdownMinutes * 60000).toISOString()
+                        const body = {
+                          enabled: true,
+                          bannerMessage: maintenanceForm.bannerMessage || `Maintenance starting in ${maintenanceForm.countdownMinutes} minutes — please save your work.`,
+                          lockoutMessage: maintenanceForm.lockoutMessage || 'Wandi Hub is being improved. Back as soon as possible.',
+                          countdownTarget: target,
+                        }
+                        const res = await authFetch('/api/maintenance', {
+                          method: 'POST',
+                          body: JSON.stringify(body),
+                        })
+                        if (res.ok) {
+                          const data = await res.json()
+                          setMaintenance(data)
+                        }
+                      }}
+                    >
+                      Enable Maintenance Mode
+                    </button>
+                  </>
+                ) : (
+                  <div>
+                    <div style={{ padding: '16px', background: 'var(--color-bg-hover)', borderRadius: '8px', marginBottom: '16px' }}>
+                      <p style={{ marginBottom: '8px' }}><strong>Banner:</strong> {maintenance.bannerMessage || '(none)'}</p>
+                      <p style={{ marginBottom: '8px' }}><strong>Lockout:</strong> {maintenance.lockoutMessage}</p>
+                      {maintenance.countdownTarget && (
+                        <p style={{ marginBottom: '0' }}>
+                          <strong>Countdown:</strong>{' '}
+                          {countdownDisplay === '0:00' ? (
+                            <span style={{ color: '#ef4444', fontWeight: 600 }}>LOCKOUT ACTIVE</span>
+                          ) : (
+                            <span style={{ fontWeight: 600 }}>{countdownDisplay} remaining</span>
+                          )}
+                        </p>
+                      )}
+                      {!maintenance.countdownTarget && (
+                        <p style={{ marginBottom: '0', color: '#ef4444', fontWeight: 600 }}>LOCKOUT ACTIVE (immediate)</p>
+                      )}
+                    </div>
+                    <button
+                      className="primary-btn"
+                      style={{ background: '#22c55e' }}
+                      onClick={async () => {
+                        const res = await authFetch('/api/maintenance', {
+                          method: 'POST',
+                          body: JSON.stringify({ enabled: false }),
+                        })
+                        if (res.ok) {
+                          const data = await res.json()
+                          setMaintenance(data)
+                        }
+                      }}
+                    >
+                      Disable Maintenance — Go Live
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Account Info Section */}
           <div className="settings-section" style={{ marginTop: '32px' }}>
             <div className="settings-header">
@@ -5083,6 +5273,7 @@ const [showFilters, setShowFilters] = useState(false)
       )}
 
     </div>
+    </>
   )
 }
 

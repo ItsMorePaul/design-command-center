@@ -5595,3 +5595,98 @@ select:focus {
   outline: none;
   border-color: var(--color-primary);
 }
+
+/* ============ MAINTENANCE MODE ============ */
+
+/* Floating banner — fixed at top of viewport */
+.maintenance-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+  color: #1a1a2e;
+  text-align: center;
+  padding: 10px 16px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.maintenance-banner-countdown {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+/* Push app content down when banner is showing */
+.app.has-maintenance-banner {
+  margin-top: 42px;
+}
+
+/* Lockout screen (non-admin) */
+.maintenance-lockout {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #e0e0e0;
+}
+
+.maintenance-lockout-card {
+  text-align: center;
+  padding: 3rem 2.5rem;
+  max-width: 480px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+
+.maintenance-lockout-icon {
+  font-size: 3.5rem;
+  margin-bottom: 1rem;
+}
+
+.maintenance-lockout-card h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: #fff;
+}
+
+.maintenance-lockout-card p {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: #b0b8c8;
+  margin-bottom: 1.5rem;
+}
+
+.maintenance-lockout-status {
+  font-size: 0.85rem;
+  color: #7a8599;
+}
+
+.maintenance-pulse {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background: #53c98d;
+  border-radius: 50%;
+  animation: maintenance-pulse 2s ease-in-out infinite;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+@keyframes maintenance-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.8); }
+}
+
+/* Settings panel controls */
+.maintenance-controls {
+  margin-top: 12px;
+}

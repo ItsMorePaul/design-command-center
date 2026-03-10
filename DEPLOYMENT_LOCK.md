@@ -38,6 +38,15 @@ DCC_DEPLOY_OK=1 ./scripts/deploy.sh --data
 
 ### Pull from Railway (Railway → Local)
 
+**Step 1: Turn maintenance ON** (prevents designers from saving data during pull):
+```bash
+source ~/.openclaw/.env
+curl -X POST https://design-command-center-production.up.railway.app/api/maintenance \
+  -H "Content-Type: application/json" -H "X-Seed-Secret: $DCC_SEED_SECRET" \
+  -d '{"enabled": true}'
+```
+
+**Step 2: Pull:**
 ```bash
 ./scripts/pull-from-railway.sh
 ```
@@ -51,6 +60,13 @@ DCC_DEPLOY_OK=1 ./scripts/deploy.sh --data
 6. Restarts API server (:3001) and Vite dev server (:5173)
 7. Site is ready at http://localhost:5173
 
+**Step 3:** When done, deploy clears maintenance automatically (server restart). Or turn off manually:
+```bash
+curl -X POST https://design-command-center-production.up.railway.app/api/maintenance \
+  -H "Content-Type: application/json" -H "X-Seed-Secret: $DCC_SEED_SECRET" \
+  -d '{"enabled": false}'
+```
+
 **CRITICAL:** Never modify `data/shared.db` while the API server is running. The server holds the DB in memory and will overwrite the file on any write. Always use pull/deploy scripts which handle server lifecycle.
 
 ### Authentication
@@ -62,9 +78,11 @@ Both endpoints use `X-Seed-Secret` header (from `DCC_SEED_SECRET` env var in `~/
 
 | Command | Purpose |
 |---------|---------|
-| `DCC_DEPLOY_OK=1 ./scripts/deploy.sh` | Push code + DB to Railway |
-| `DCC_DEPLOY_OK=1 ./scripts/deploy.sh --data` | Push DB only (no code) |
+| `curl -X POST .../api/maintenance -d '{"enabled":true}'` | Turn maintenance ON (block designers) |
 | `./scripts/pull-from-railway.sh` | Download Railway DB to local |
+| `DCC_DEPLOY_OK=1 ./scripts/deploy.sh` | Push code + DB to Railway (clears maintenance) |
+| `DCC_DEPLOY_OK=1 ./scripts/deploy.sh --data` | Push DB only (no code) |
+| `curl -X POST .../api/maintenance -d '{"enabled":false}'` | Turn maintenance OFF manually |
 
 ---
 
