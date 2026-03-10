@@ -81,16 +81,30 @@ You work locally, make changes, verify everything.
 
 Wilson will execute:
 ```bash
-./scripts/dcc-push-to-railway.sh
+# Full deploy (code + ALL data):
+DCC_DEPLOY_OK=1 ./scripts/deploy.sh
+
+# Data-only (re-seed Railway without code push):
+DCC_DEPLOY_OK=1 ./scripts/deploy.sh --data
 ```
 
 **What happens:**
-1. Verify `DCC_DEPLOY_OK=1` (enforced by pre-push hook)
-2. Create Railway backup (`backups/railway/pre_deploy_*`)
-3. Show deployment preview (counts, differences)
-4. Push code to GitHub (Railway auto-deploys)
-5. Sync data via `/api/seed`
-6. Verify deployment (health checks, data counts)
+1. Verify `DCC_DEPLOY_OK=1` and `DCC_SEED_SECRET` are set
+2. Verify local server is running on port 3001
+3. Back up Railway production data to `backups/railway/pre_deploy_*`
+4. Show deployment preview (all table counts)
+5. Push code to GitHub → Railway auto-deploys (skipped with `--data`)
+6. Wait for Railway rebuild to complete
+7. Export ALL 9 tables from local SQLite
+8. Seed Railway via `POST /api/seed` with `X-Seed-Secret` header
+9. Verify all table counts match local
+
+**Tables synced (all 9):**
+projects, team, project_assignments, project_priorities, business_lines,
+brand_options, notes, note_project_links, note_people_links
+
+**Important:** `data/shared.db` is NOT in git. The DB lives only on disk locally
+and on Railway's filesystem. Data transfer happens exclusively via `/api/seed`.
 
 **Safety:** Railway state is backed up BEFORE push. If something goes wrong:
 ```bash
@@ -109,7 +123,8 @@ Wilson will execute:
 | `./scripts/dcc-data-workflow.sh pull` | Pull Railway data (with backup) | Phase 1 |
 | `./scripts/dcc-data-workflow.sh backup` | Create manual local backup | Phase 2 |
 | `./scripts/dcc-data-workflow.sh restore <path>` | Restore from backup | Recovery |
-| `./scripts/dcc-push-to-railway.sh` | Deploy code + data | Phase 3 (Paul approves) |
+| `DCC_DEPLOY_OK=1 ./scripts/deploy.sh` | Deploy code + ALL data (9 tables) | Phase 3 (Paul approves) |
+| `DCC_DEPLOY_OK=1 ./scripts/deploy.sh --data` | Re-seed data only (no code push) | Data fix without code change |
 
 ---
 
@@ -118,8 +133,10 @@ Wilson will execute:
 | Script | Status | Why |
 |--------|--------|-----|
 | `pull-from-railway.sh` | ⚠️ Legacy | Use `dcc-data-workflow.sh pull` instead (has backups) |
-| `sync-to-railway-safe.sh` | ⚠️ Legacy | Use `dcc-push-to-railway.sh` instead (integrated workflow) |
-| `backup-railway.sh` | ✅ Still used | Called internally by new scripts |
+| `dcc-push-to-railway.sh` | ⚠️ Legacy | Use `deploy.sh` instead (seeds ALL 9 tables, token auth) |
+| `sync-to-railway-safe.sh` | ⚠️ Legacy | Use `deploy.sh` instead (no interactive prompts) |
+| `sync-to-railway.sh` | ⚠️ Legacy | Use `deploy.sh` instead |
+| `backup-railway.sh` | ✅ Still used | Called internally; also used by `deploy.sh` |
 
 ---
 

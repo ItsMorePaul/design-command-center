@@ -2169,6 +2169,13 @@
   border-radius: var(--radius-md);
   padding: 0.75rem;
   padding-top: 0.5rem;
+  min-height: 3rem;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.priority-in-progress-zone.drop-active {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.06);
 }
 
 .priority-zone-label {
@@ -2259,6 +2266,7 @@
 }
 
 .priority-bl-select {
+  width: auto;
   height: 29px;
   padding: 0 12px;
   border-radius: 4px;
