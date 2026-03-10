@@ -683,10 +683,61 @@
   display: flex;
   gap: 0.75rem;
   justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.confirm-actions button {
+  flex: 0 0 auto !important;
+  min-width: 80px;
+  max-width: 150px;
+  width: auto !important;
+}
+
+.confirm-actions .secondary-btn {
+  flex: 0 0 auto !important;
+  width: fit-content !important;
+  min-width: auto !important;
+  max-width: none !important;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background-color: transparent;
+  color: var(--color-text);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.confirm-actions .secondary-btn:hover {
+  background-color: var(--color-bg);
+}
+
+.danger-btn,
+.confirm-actions .danger-btn,
+.modal-actions .danger-btn,
+.primary-btn.danger-btn {
+  flex: 0 !important;
+  width: fit-content !important;
+  min-width: auto !important;
+  padding: 0.75rem 1rem;
+  border-radius: 8px !important;
+  background-color: #dc2626 !important;
+  color: white !important;
+  border: none !important;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.danger-btn:hover,
+.confirm-actions .danger-btn:hover,
+.modal-actions .danger-btn:hover,
+.primary-btn.danger-btn:hover {
+  background-color: #b91c1c !important;
 }
 
 .danger-btn {
   background-color: #dc2626;
+  border-radius: 8px;
+  color: white;
 }
 
 .danger-btn:hover {
@@ -1092,8 +1143,11 @@
 }
 
 .modal-actions .secondary-btn {
-  flex: 1;
-  padding: 0.75rem;
+  flex: 0 0 auto !important;
+  width: fit-content !important;
+  min-width: auto !important;
+  max-width: none !important;
+  padding: 0.75rem 1rem;
   border-radius: 8px;
   border: 1px solid var(--color-border);
   background-color: transparent;
@@ -1108,6 +1162,23 @@
 
 .modal-actions .primary-btn {
   flex: 1;
+}
+
+.modal-actions .danger-btn {
+  flex: 0 0 auto !important;
+  width: fit-content !important;
+  min-width: auto !important;
+  padding: 0.75rem 1rem;
+  border-radius: 8px !important;
+  background-color: #dc2626 !important;
+  color: white !important;
+  border: none !important;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.modal-actions .danger-btn:hover {
+  background-color: #b91c1c;
 }
 
 /* Responsive */
@@ -4391,10 +4462,24 @@ select:focus-visible {
 
   .note-edit-footer .primary-btn,
   .note-edit-footer .secondary-btn {
-    flex: 1;
-    padding: 0.75rem 1rem;
-    font-size: 1rem;
+    flex: 0;
+    width: fit-content;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
     min-height: 44px;
+  }
+  
+  .note-edit-footer .danger-btn-text {
+    flex: 0 !important;
+    width: fit-content !important;
+    min-width: auto !important;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px !important;
+    background-color: #dc2626 !important;
+    color: white !important;
+    border: none !important;
+    cursor: pointer;
+    font-weight: 500;
   }
 }
 
@@ -4486,6 +4571,47 @@ select:focus-visible {
   align-items: center;
 }
 
+/* Notes Filter Row */
+.notes-filter-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--color-bg-secondary);
+  border-radius: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.notes-filter-row .filter-label {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
+  margin-right: 4px;
+}
+
+.notes-filter-row .filter-pill {
+  padding: 6px 12px;
+  border-radius: 16px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.notes-filter-row .filter-pill:hover {
+  border-color: var(--color-text);
+  color: var(--color-text);
+}
+
+.notes-filter-row .filter-pill.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: white;
+}
+
 .secondary-btn {
   display: flex;
   align-items: center;
@@ -4509,6 +4635,9 @@ select:focus-visible {
 .secondary-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  background-color: var(--color-bg-secondary) !important;
+  color: var(--color-text-muted) !important;
+  border-color: var(--color-border) !important;
 }
 
 .spin {
@@ -5136,11 +5265,51 @@ select:focus-visible {
 
 .note-edit-footer {
   display: flex;
-  justify-content: flex-end;
-  gap: 0.75rem;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
   padding: 1rem 1.25rem;
   border-top: 1px solid var(--color-border);
   flex-shrink: 0;
+}
+
+.note-edit-footer .danger-btn-text {
+  background: none !important;
+  border: none !important;
+  color: #dc2626 !important;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: opacity 0.2s;
+}
+
+.note-edit-footer .danger-btn-text:hover {
+  opacity: 1;
+}
+
+.note-edit-footer .button-group {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.note-edit-footer .danger-btn-text:hover {
+  background-color: #b91c1c;
+}
+
+.note-edit-footer .secondary-btn {
+  flex: 0;
+  width: fit-content;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+}
+
+.note-edit-footer .primary-btn {
+  flex: 0;
+  width: fit-content;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
 }
 
 /* Note card tag management */

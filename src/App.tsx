@@ -898,7 +898,7 @@ const [showFilters, setShowFilters] = useState(false)
   // Notes state
   const [notes, setNotes] = useState<Note[]>([])
   const [notesSyncing, setNotesSyncing] = useState(false)
-  const [notesFilter, setNotesFilter] = useState<{ project: string | null; person: string | null; search: string; id: string | null }>({ project: null, person: '5', search: '', id: null })
+  const [notesFilter, setNotesFilter] = useState<{ project: string | null; person: string | null; search: string; id: string | null }>({ project: null, person: null, search: '', id: null })
   const [selectedNote, setSelectedNote] = useState<Note | null>(null)
   const [noteDetailOpen, setNoteDetailOpen] = useState(false)
   const [editingNote, setEditingNote] = useState<Note | null>(null) // note being edited in modal
@@ -911,30 +911,6 @@ const [showFilters, setShowFilters] = useState(false)
   const [showHideNotePinModal, setShowHideNotePinModal] = useState(false)
   const [hideNotePin, setHideNotePin] = useState('')
   const [noteToHide, setNoteToHide] = useState<Note | null>(null)
-
-  // Handler to add project/person links from Note Detail Modal
-  const addNoteLink = async (noteId: string, linkType: 'project' | 'person', targetId: string) => {
-    const sessionId = localStorage.getItem('dcc-session-id')
-    try {
-      const res = await fetch(`/api/notes/${noteId}/links`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          ...(sessionId ? { 'x-session-id': sessionId } : {})
-        },
-        body: JSON.stringify({ 
-          [linkType === 'project' ? 'projectId' : 'personId']: targetId 
-        })
-      })
-      if (res.ok) {
-        const updated = await res.json()
-        setNotes(notes.map(n => n.id === noteId ? { ...n, ...updated } : n))
-        setSelectedNote(selectedNote?.id === noteId ? { ...selectedNote, ...updated } : selectedNote)
-      }
-    } catch (err) {
-      console.error('Error adding link:', err)
-    }
-  }
 
   // Load versions from server on mount
   useEffect(() => {
@@ -1030,6 +1006,13 @@ const [showFilters, setShowFilters] = useState(false)
       })
     }
   }, [activeTab, calendarData])
+
+  // Reset notes filter to all (null) on mount and when team loads
+  useEffect(() => {
+    if (team.length > 0) {
+      setNotesFilter({ project: null, person: null, search: '', id: null })
+    }
+  }, [team.length])
 
   // Load capacity data when capacity tab is active
   useEffect(() => {
@@ -1612,7 +1595,7 @@ const [showFilters, setShowFilters] = useState(false)
     return (
       <div className="loading" role="status" aria-live="polite">
         <div className="loading-shell">
-          <div className="loading-title">WandiHub</div>
+          <div className="loading-title">Wandi Hub</div>
           <div className="loading-subtitle">Loading dashboard…</div>
         </div>
       </div>
@@ -1955,7 +1938,7 @@ const [showFilters, setShowFilters] = useState(false)
           <div className="login-logo">
             <LayoutGrid size={36} />
           </div>
-          <h1>WandiHub</h1>
+          <h1>Wandi Hub</h1>
           <p className="login-subtitle">Design Command Center</p>
 
           <form className="login-form" onSubmit={handleLogin} autoComplete="on">
@@ -1999,7 +1982,7 @@ const [showFilters, setShowFilters] = useState(false)
       <aside className={`sidebar ${navCollapsed ? 'sidebar-collapsed' : ''}`}>
         <div className="logo">
           <LayoutGrid size={22} className="logo-icon" />
-          <span className="logo-text">WandiHub</span>
+          <span className="logo-text">Wandi Hub</span>
         </div>
         
         <nav className="nav">
@@ -3387,7 +3370,7 @@ const [showFilters, setShowFilters] = useState(false)
               </div>
             </div>
             <div className="notes-actions">
-              <button className="secondary-btn" onClick={syncNotes} disabled={notesSyncing}>
+              <button className="secondary-btn" onClick={syncNotes} disabled={true} title="Gemini sync disabled">
                 <RefreshCw size={14} className={notesSyncing ? 'spin' : ''} />
                 {notesSyncing ? 'Syncing...' : 'Sync from Gemini'}
               </button>
@@ -3430,6 +3413,22 @@ const [showFilters, setShowFilters] = useState(false)
               </button>
             )}
           </div>
+
+          {/* Active Note Filter (from search) */}
+          {notesFilter.id && (
+            <div className="notes-filter-row">
+              <span className="filter-label">Showing:</span>
+              <button
+                className="filter-pill active"
+                onClick={() => setNotesFilter({ ...notesFilter, id: null })}
+              >
+                {(() => {
+                  const note = notes.find(n => n.id === notesFilter.id)
+                  return note?.title || 'Note'
+                })()} ×
+              </button>
+            </div>
+          )}
 
           <div className="notes-list">
             {notes.length === 0 ? (
@@ -3603,8 +3602,8 @@ const [showFilters, setShowFilters] = useState(false)
                       team,
                       selectedNote.linkedProjectIds,
                       selectedNote.linkedTeamIds,
-                      (pid) => addNoteLink(selectedNote.id, 'project', pid),
-                      (tid) => addNoteLink(selectedNote.id, 'person', tid)
+                      () => {}, // disabled
+                      () => {}  // disabled
                     )}
                   </p>
                 </div>
@@ -3629,8 +3628,8 @@ const [showFilters, setShowFilters] = useState(false)
                             team,
                             selectedNote.linkedProjectIds,
                             selectedNote.linkedTeamIds,
-                            (pid) => addNoteLink(selectedNote.id, 'project', pid),
-                            (tid) => addNoteLink(selectedNote.id, 'person', tid)
+                            () => {}, // disabled
+                            () => {}  // disabled
                           )}
                         </li>
                       ))}
@@ -3657,8 +3656,8 @@ const [showFilters, setShowFilters] = useState(false)
                             team,
                             selectedNote.linkedProjectIds,
                             selectedNote.linkedTeamIds,
-                            (pid) => addNoteLink(selectedNote.id, 'project', pid),
-                            (tid) => addNoteLink(selectedNote.id, 'person', tid)
+                            () => {}, // disabled
+                            () => {}  // disabled
                           )}
                         </li>
                       ))}
@@ -3791,9 +3790,9 @@ const [showFilters, setShowFilters] = useState(false)
               >
                 Hide Note
               </button>
-              <div style={{ flex: 1 }} />
-              <button className="secondary-btn" onClick={() => setEditingNote(null)}>Cancel</button>
-              <button className="primary-btn" onClick={async () => {
+              <div className="button-group">
+                <button className="secondary-btn" onClick={() => setEditingNote(null)}>Cancel</button>
+                <button className="primary-btn" onClick={async () => {
                 const sessionId = localStorage.getItem('dcc-session-id')
                 try {
                   const res = await fetch(`/api/notes/${editingNote.id}`, {
@@ -3822,6 +3821,7 @@ const [showFilters, setShowFilters] = useState(false)
                   alert('Error saving note')
                 }
               }}>Save Changes</button>
+              </div>
             </div>
           </div>
         </div>
@@ -5005,12 +5005,11 @@ const [showFilters, setShowFilters] = useState(false)
               />
             </div>
             <div className="modal-actions">
-              <button className="secondary-btn" style={{ textAlign: 'center', minWidth: '100px' }} onClick={() => { setShowHideNotePinModal(false); setNoteToHide(null); setHideNotePin(''); }}>
+              <button className="secondary-btn" onClick={() => { setShowHideNotePinModal(false); setNoteToHide(null); setHideNotePin(''); }}>
                 Cancel
               </button>
               <button 
                 className="danger-btn" 
-                style={{ minWidth: '100px' }}
                 onClick={async () => {
                   if (hideNotePin !== '8432') {
                     alert('Invalid PIN')
@@ -5056,7 +5055,6 @@ const [showFilters, setShowFilters] = useState(false)
         <div className="modal-overlay" onClick={() => { setShowHiddenNotesPinModal(false); setHiddenNotesPin(''); }}>
           <div className="modal confirm-modal" onClick={e => e.stopPropagation()}>
             <h2>Unlock Hidden Notes</h2>
-            <p className="confirm-message">Enter PIN:</p>
             <div className="pin-input-container">
               <input
                 type="password"
@@ -5084,7 +5082,7 @@ const [showFilters, setShowFilters] = useState(false)
               />
             </div>
             <div className="modal-actions">
-              <button className="secondary-btn" style={{ textAlign: 'center' }} onClick={() => { setShowHiddenNotesPinModal(false); setHiddenNotesPin(''); }}>
+              <button className="secondary-btn" onClick={() => { setShowHiddenNotesPinModal(false); setHiddenNotesPin(''); }}>
                 Cancel
               </button>
               <button 

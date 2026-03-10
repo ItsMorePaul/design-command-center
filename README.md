@@ -39,6 +39,29 @@ npm run dev
 
 Open http://localhost:5173
 
+### Understanding the Two Servers
+
+| Port | Command | Serves From | Use For |
+|------|---------|-------------|---------|
+| **5173** | `npm run dev` | `src/` (live) | Development — changes hot-reload instantly |
+| **3001** | `npm start` | `dist/` (built) | Production preview — requires build step |
+
+**CRITICAL: Making Changes Visible**
+
+Changes made in `src/` are only visible on:
+- Port 5173 (dev server) — instantly
+- Port 3001 (production server) — **after running `npm run build`**
+
+Workflow to test changes on port 3001:
+```bash
+# Make changes in src/
+# Then:
+npm run build          # Compile src/ → dist/
+npm start              # Restart production server
+```
+
+Or use port 5173 for faster iteration during development.
+
 ## Deployment
 
 Connected to GitHub → Railway auto-deploys on push.
