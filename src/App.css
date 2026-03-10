@@ -1311,37 +1311,31 @@
     -webkit-overflow-scrolling: touch;
   }
   
-  .days-grid {
+  .week-cells {
     min-width: 0;
   }
-  
+
   .day-cell {
-    min-height: 60px;
+    min-height: 28px;
     min-width: 0;
     overflow: hidden;
     padding: 0.15rem;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
   }
-  
+
   .day-cell:active {
     background: var(--color-accent-subtle);
   }
-  
+
   .day-number {
     font-size: 0.7rem;
   }
-  
-  .event-tag {
-    font-size: 0.55rem;
-    padding: 1px 2px;
-  }
-  
-  .event-text {
-    font-size: 0.55rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+
+  .span-event {
+    font-size: 0.5rem;
+    height: 16px;
+    line-height: 16px;
   }
   
   .event-detail {
@@ -2882,21 +2876,27 @@ input:checked + .slider:before {
   padding: 0.5rem;
 }
 
-.days-grid {
+/* Week-row based calendar with spanning events */
+.week-row {
+  position: relative;
+}
+
+.week-cells {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 2px;
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  overflow: hidden;
+}
+
+.week-events {
+  position: relative;
+  margin: 0 0 2px 0;
 }
 
 .day-cell {
-  min-height: 80px;
+  min-height: 32px;
   background: var(--color-bg);
   border: 1px solid var(--color-border-subtle);
-  border-radius: 6px;
+  border-radius: 6px 6px 0 0;
   padding: 0.25rem;
   display: flex;
   flex-direction: column;
@@ -2928,69 +2928,61 @@ input:checked + .slider:before {
   font-size: 0.85rem;
   font-weight: 500;
   color: var(--color-text);
-  margin-bottom: 0.25rem;
 }
 
-.day-events {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  width: 100%;
-  box-sizing: border-box;
-  overflow: hidden;
-  min-width: 0;
-}
-
-.event-tag {
-  font-size: 0.65rem;
-  padding: 2px 4px;
+/* Spanning event bars */
+.span-event {
+  position: absolute;
+  height: 18px;
   border-radius: 3px;
   color: white;
-  white-space: nowrap;
+  font-size: 0.6rem;
+  line-height: 18px;
+  padding: 0 4px;
   overflow: hidden;
+  white-space: nowrap;
   text-overflow: ellipsis;
   cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  max-width: 100%;
-  width: 100%;
+  z-index: 1;
   box-sizing: border-box;
-  min-width: 0;
-  flex-shrink: 1;
 }
 
-.event-text {
+.span-event.multi-day {
+  border-radius: 0;
+}
+
+.span-event.multi-day.span-start {
+  border-radius: 3px 0 0 3px;
+}
+
+.span-event.multi-day.span-end {
+  border-radius: 0 3px 3px 0;
+}
+
+.span-event.multi-day.span-start.span-end {
+  border-radius: 3px;
+}
+
+.span-event:not(.multi-day) {
+  border-radius: 3px;
+}
+
+.span-event-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-  display: block;
 }
 
-.event-tag > * {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.span-event.holiday {
+  background: #6b7280;
 }
 
-.event-detail {
-  font-size: 0.55rem;
-  opacity: 0.85;
-}
-
-.event-tag.timeoff {
+.span-event.timeoff {
   background: #ef4444;
 }
 
-.event-tag.project {
+.span-event.project {
   background: #3b82f6;
-}
-
-.more-events {
-  font-size: 0.6rem;
-  color: var(--color-text-muted);
-  text-align: center;
 }
 
 /* Capacity Page */

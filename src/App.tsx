@@ -29,8 +29,8 @@ const hapticLight = () => isMobile() && haptics.trigger([{ duration: 30, intensi
 const hapticMedium = () => isMobile() && haptics.trigger([{ duration: 50, intensity: 0.6 }])
 const hapticHeavy = () => isMobile() && haptics.trigger([{ duration: 80, intensity: 1.0 }])
 
-// US Holidays (2026)
-const usHolidays2026 = [
+// Default US holidays to seed on first load
+const defaultHolidays = [
   { name: "New Year's Day", date: '2026-01-01' },
   { name: "Martin Luther King Jr. Day", date: '2026-01-19' },
   { name: "Presidents' Day", date: '2026-02-16' },
@@ -594,6 +594,11 @@ function App() {
   const [editingTimeOff, setEditingTimeOff] = useState<{ name: string; startDate: string; endDate: string; id: string } | null>(null)
   const [timeOffFormData, setTimeOffFormData] = useState({ name: '', startDate: '', endDate: '' })
 
+  // Holidays state
+  const [holidays, setHolidays] = useState<{ id: string; name: string; date: string }[]>([])
+  const [holidayForm, setHolidayForm] = useState({ name: '', date: '' })
+  const [showHolidayModal, setShowHolidayModal] = useState(false)
+
   // Calendar day modal state
   const [selectedDay, setSelectedDay] = useState<{ date: string; events: CalendarEvent[]; dayName: string } | null>(null)
   const contentRef = useRef<HTMLDivElement>(null)
@@ -911,7 +916,7 @@ const [showFilters, setShowFilters] = useState(false)
     countdownTarget: string | null
     isLockout: boolean
   }>({ enabled: false, bannerMessage: '', lockoutMessage: '', countdownTarget: null, isLockout: false })
-  const [maintenanceForm, setMaintenanceForm] = useState({ bannerMessage: '', lockoutMessage: '', countdownMinutes: 15 })
+  const [maintenanceForm, setMaintenanceForm] = useState({ bannerMessage: 'Save your work. Wandi Hub maintenance about to begin in 5 minutes.', lockoutMessage: 'Wandi Hub in maintenance mode and will be back soon.', countdownMinutes: 5 })
   const [countdownDisplay, setCountdownDisplay] = useState('')
 
   // Poll maintenance status every 30s
@@ -1021,6 +1026,29 @@ const [showFilters, setShowFilters] = useState(false)
       loadCalendar()
     }
   }, [activeTab, calendarData])
+
+  // Load holidays
+  useEffect(() => {
+    const loadHolidays = async () => {
+      try {
+        const res = await authFetch('/api/holidays')
+        const data = await res.json()
+        if (Array.isArray(data)) {
+          if (data.length === 0) {
+            // Seed default holidays on first load
+            for (const h of defaultHolidays) {
+              await authFetch('/api/holidays', { method: 'POST', body: JSON.stringify(h) })
+            }
+            const res2 = await authFetch('/api/holidays')
+            setHolidays(await res2.json())
+          } else {
+            setHolidays(data)
+          }
+        }
+      } catch (err) { console.error('Error loading holidays:', err) }
+    }
+    if (currentUser) loadHolidays()
+  }, [currentUser])
 
   // Reset scroll position when switching tabs (non-calendar tabs should start at top)
   useEffect(() => {
@@ -2958,76 +2986,156 @@ const [showFilters, setShowFilters] = useState(false)
                       </div>
                     </div>
 
-                  {calendarData.months.map((month: CalendarMonth, idx: number) => (
-                    <div key={idx} className="calendar-month" data-month={`${month.year}-${month.month}`}>
+                  {calendarData.months.map((month: CalendarMonth, mIdx: number) => {
+                    // Build week rows for Google Calendar-style spanning
+                    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+                    const firstDayIdx = month.days[0] ? dayNames.indexOf(month.days[0].dayName) : 0
+
+                    // Build flat array: empty slots + real days
+                    type CellData = { type: 'empty' } | { type: 'day'; day: CalendarDay; dayEvents: CalendarEvent[] }
+                    const cells: CellData[] = []
+                    for (let i = 0; i < firstDayIdx; i++) cells.push({ type: 'empty' })
+                    month.days.forEach(day => {
+                      const isWeekend = day.dayName === 'Sat' || day.dayName === 'Sun'
+                      const weekendAwareEvents = isWeekend
+                        ? day.events.filter((e: CalendarEvent) => e.type === 'timeoff' || e.type === 'holiday')
+                        : day.events
+                      const dayEvents = filterCalendarEvents(weekendAwareEvents)
+                      cells.push({ type: 'day', day, dayEvents })
+                    })
+                    // Pad last week
+                    while (cells.length % 7 !== 0) cells.push({ type: 'empty' })
+
+                    // Split into week rows
+                    const weeks: CellData[][] = []
+                    for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7))
+
+                    // Collect all unique multi-day events in this month for spanning
+                    const eventKey = (e: CalendarEvent) => `${e.type}-${e.name}-${e.startDate}-${e.endDate}-${e.person || ''}-${e.projectName || ''}`
+
+                    return (
+                    <div key={mIdx} className="calendar-month" data-month={`${month.year}-${month.month}`}>
                       <h3 className="month-title">
                         {month.name} <span className="month-fiscal">({getDjFiscalLabel(month.month, month.year)})</span>
                       </h3>
                       <div className="month-grid">
                         <div className="day-headers">
-                          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+                          {dayNames.map(d => (
                             <div key={d} className="day-header">{d}</div>
                           ))}
                         </div>
-                        <div className="days-grid">
-                          {/* First day offset - use API's dayName instead of recalculating */}
-                          {month.days[0] && (() => {
-                            const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-                            const firstDayIdx = dayNames.indexOf(month.days[0].dayName);
-                            const emptyDays = Array(firstDayIdx).fill(null);
-                            return emptyDays.map((_, i) => <div key={`empty-${i}`} className="day-cell empty"></div>);
-                          })()}
-                          {month.days.map((day: CalendarDay, idx: number) => {
-                            const isWeekend = day.dayName === 'Sat' || day.dayName === 'Sun'
-                            // Filter out project/brand events on weekends, keep holidays and time off
-                            const weekendAwareEvents = isWeekend 
-                              ? day.events.filter((e: CalendarEvent) => e.type === 'timeoff' || e.type === 'holiday')
-                              : day.events
-                            const filteredEvents = filterCalendarEvents(weekendAwareEvents)
-                            const isToday = day.date === getTodayStr()
-                            // Check for holidays
-                            const holiday = usHolidays2026.find(h => h.date === day.date)
-                            const dayEvents = [...filteredEvents]
-                            if (holiday) {
-                              dayEvents.unshift({
-                                type: 'holiday',
-                                name: holiday.name,
-                                color: '#6b7280' // gray for holidays
-                              })
+                        {weeks.map((week, wIdx) => {
+                          // Collect spanning events for this week
+                          const spanEvents: { event: CalendarEvent; startCol: number; endCol: number; key: string }[] = []
+                          const seenKeys = new Set<string>()
+
+                          week.forEach((cell, colIdx) => {
+                            if (cell.type !== 'day') return
+                            cell.dayEvents.forEach(ev => {
+                              const k = eventKey(ev)
+                              if (seenKeys.has(k)) return
+                              seenKeys.add(k)
+
+                              // Find how far this event spans in this week
+                              let endCol = colIdx
+                              if (ev.startDate && ev.endDate && ev.startDate !== ev.endDate) {
+                                for (let c = colIdx + 1; c < 7; c++) {
+                                  const nextCell = week[c]
+                                  if (nextCell.type !== 'day') break
+                                  const hasEv = nextCell.dayEvents.some(e2 => eventKey(e2) === k)
+                                  if (hasEv) endCol = c
+                                  else break
+                                }
+                              }
+                              spanEvents.push({ event: ev, startCol: colIdx, endCol, key: k })
+                            })
+                          })
+
+                          // Assign rows to spanning events (greedy: first available row)
+                          const eventRows: { event: CalendarEvent; startCol: number; endCol: number; row: number; key: string }[] = []
+                          const rowOccupied: number[][] = [] // rowOccupied[row] = list of occupied columns
+
+                          // Sort: multi-day first (longer spans first), then single-day
+                          spanEvents.sort((a, b) => (b.endCol - b.startCol) - (a.endCol - a.startCol))
+
+                          spanEvents.forEach(se => {
+                            let row = 0
+                            while (true) {
+                              if (!rowOccupied[row]) rowOccupied[row] = []
+                              const conflict = rowOccupied[row].some(c => c >= se.startCol && c <= se.endCol)
+                              if (!conflict) break
+                              row++
+                              if (row > 5) break // max 6 rows of events
                             }
-                            return (
-                            <div 
-                              key={idx} 
-                              className={`day-cell ${dayEvents.length > 0 ? 'has-events' : ''} ${isToday ? 'today' : ''} ${day.dayName === 'Sat' || day.dayName === 'Sun' ? 'weekend' : ''}`}
-                              onClick={() => dayEvents.length > 0 && setSelectedDay({ date: day.date, events: dayEvents, dayName: day.dayName })}
-                            >
-                              <span className="day-number">{isToday ? '★ ' : ''}{day.day}</span>
-                              <div className="day-events">
-                                {dayEvents.map((event: CalendarEvent, eIdx: number) => (
-                                  <div 
-                                    key={eIdx} 
-                                    className={`event-tag ${event.type === 'timeoff' ? 'timeoff' : event.type === 'holiday' ? 'holiday' : 'project'}`}
-                                    style={{ backgroundColor: event.color }}
-                                    title={`${event.name}${event.person ? ` - ${event.person}` : ''}${event.projectName ? ` (${event.projectName})` : ''}`}
+                            for (let c = se.startCol; c <= se.endCol; c++) {
+                              if (!rowOccupied[row]) rowOccupied[row] = []
+                              rowOccupied[row].push(c)
+                            }
+                            eventRows.push({ ...se, row })
+                          })
+
+                          const maxEventRows = Math.max(0, ...eventRows.map(e => e.row + 1))
+
+                          return (
+                          <div key={wIdx} className="week-row">
+                            <div className="week-cells">
+                              {week.map((cell, colIdx) => {
+                                if (cell.type === 'empty') return <div key={colIdx} className="day-cell empty" />
+                                const isToday = cell.day.date === getTodayStr()
+                                const isWeekend = cell.day.dayName === 'Sat' || cell.day.dayName === 'Sun'
+                                const hasEvents = cell.dayEvents.length > 0
+                                return (
+                                  <div
+                                    key={colIdx}
+                                    className={`day-cell ${hasEvents ? 'has-events' : ''} ${isToday ? 'today' : ''} ${isWeekend ? 'weekend' : ''}`}
+                                    onClick={() => hasEvents && setSelectedDay({ date: cell.day.date, events: cell.dayEvents, dayName: cell.day.dayName })}
                                   >
-                                    <span className="event-text">
-                                      {event.type === 'timeoff' ? '🌴 ' : ''}{event.name}
-                                    </span>
-                                    {event.type === 'project' && event.projectName && (
-                                      <span className="event-detail">{event.projectName}</span>
-                                    )}
-                                    {event.type === 'timeoff' && event.person && (
-                                      <span className="event-detail">{event.person}</span>
-                                    )}
+                                    <span className="day-number">{isToday ? '★ ' : ''}{cell.day.day}</span>
                                   </div>
-                                ))}
-                              </div>
+                                )
+                              })}
                             </div>
-                          )})}
-                        </div>
+                            <div className="week-events" style={{ height: maxEventRows > 0 ? `${maxEventRows * 20}px` : '0px' }}>
+                              {eventRows.map((er, eIdx) => {
+                                const isMultiDay = er.startCol !== er.endCol
+                                const isStart = !er.event.startDate || (() => {
+                                  const cell = week[er.startCol]
+                                  return cell.type === 'day' && cell.day.date === er.event.startDate
+                                })()
+                                const isEnd = !er.event.endDate || (() => {
+                                  const cell = week[er.endCol]
+                                  return cell.type === 'day' && cell.day.date === er.event.endDate
+                                })()
+                                const span = er.endCol - er.startCol + 1
+                                const label = er.event.type === 'timeoff'
+                                  ? `🌴 ${er.event.person || er.event.name}`
+                                  : er.event.type === 'holiday'
+                                  ? er.event.name
+                                  : (er.event.projectName ? `${er.event.name} · ${er.event.projectName}` : er.event.name)
+                                return (
+                                  <div
+                                    key={eIdx}
+                                    className={`span-event ${er.event.type} ${isMultiDay ? 'multi-day' : ''} ${isStart ? 'span-start' : ''} ${isEnd ? 'span-end' : ''}`}
+                                    style={{
+                                      left: `calc(${er.startCol} * (100% / 7) + 1px)`,
+                                      width: `calc(${span} * (100% / 7) - 2px)`,
+                                      top: `${er.row * 20}px`,
+                                      backgroundColor: er.event.color || (er.event.type === 'holiday' ? '#6b7280' : er.event.type === 'timeoff' ? '#ef4444' : '#3b82f6'),
+                                    }}
+                                    title={`${er.event.name}${er.event.person ? ` - ${er.event.person}` : ''}${er.event.projectName ? ` (${er.event.projectName})` : ''}`}
+                                  >
+                                    {(isStart || er.startCol === 0) && <span className="span-event-text">{label}</span>}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                          )
+                        })}
                       </div>
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>
@@ -4051,6 +4159,31 @@ const [showFilters, setShowFilters] = useState(false)
             </div>
           )}
 
+          {/* Holidays Section (All Users) */}
+          <div className="settings-section" style={{ marginTop: '32px' }}>
+            <div className="settings-header">
+              <h2>Holidays</h2>
+              <button className="add-timeline-btn" onClick={() => { setHolidayForm({ name: '', date: '' }); setShowHolidayModal(true) }}>+ Add Holiday</button>
+            </div>
+            <div className="timeline-list">
+              {holidays.map(h => (
+                <div key={h.id} className="timeline-item">
+                  <div className="timeline-info">
+                    <span className="timeline-name">{h.name}</span>
+                    <span className="timeline-dates">{h.date}</span>
+                  </div>
+                  <div className="timeline-actions">
+                    <button type="button" className="action-btn delete" onClick={async () => {
+                      const res = await authFetch(`/api/holidays/${h.id}`, { method: 'DELETE' })
+                      if (res.ok) { setHolidays(await res.json()); setCalendarData(null) }
+                    }}><Trash2 size={14} /></button>
+                  </div>
+                </div>
+              ))}
+              {holidays.length === 0 && <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>No holidays added yet.</p>}
+            </div>
+          </div>
+
           {/* Maintenance Mode Section (Admin Only) */}
           {isAdmin && (
             <div className="settings-section" style={{ marginTop: '32px' }}>
@@ -4107,8 +4240,8 @@ const [showFilters, setShowFilters] = useState(false)
                         const target = new Date(Date.now() + maintenanceForm.countdownMinutes * 60000).toISOString()
                         const body = {
                           enabled: true,
-                          bannerMessage: maintenanceForm.bannerMessage || `Maintenance starting in ${maintenanceForm.countdownMinutes} minutes — please save your work.`,
-                          lockoutMessage: maintenanceForm.lockoutMessage || 'Wandi Hub is being improved. Back as soon as possible.',
+                          bannerMessage: maintenanceForm.bannerMessage || 'Save your work. Wandi Hub maintenance about to begin in 5 minutes.',
+                          lockoutMessage: maintenanceForm.lockoutMessage || 'Wandi Hub in maintenance mode and will be back soon.',
                           countdownTarget: target,
                         }
                         const res = await authFetch('/api/maintenance', {
@@ -4641,6 +4774,45 @@ const [showFilters, setShowFilters] = useState(false)
             <div className="modal-footer">
               <button className="secondary-btn" onClick={() => setShowTimelineModal(false)}>Cancel</button>
               <button className="primary-btn" onClick={handleSaveTimeline}>{editingTimeline ? 'Save Changes' : 'Add Range'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showHolidayModal && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: 360 }}>
+            <div className="modal-header">
+              <h2>Add Holiday</h2>
+            </div>
+            <div className="modal-body">
+              <div className={`float-field${holidayForm.name ? ' has-value' : ''}`} style={{ marginBottom: '0.75rem' }}>
+                <input
+                  type="text"
+                  value={holidayForm.name}
+                  onChange={e => setHolidayForm({ ...holidayForm, name: e.target.value })}
+                  placeholder=" "
+                />
+                <label>Holiday Name</label>
+              </div>
+              <div className={`float-field${holidayForm.date ? ' has-value' : ''}`}>
+                <input
+                  type="date"
+                  value={holidayForm.date}
+                  onChange={e => setHolidayForm({ ...holidayForm, date: e.target.value })}
+                  onClick={e => (e.target as HTMLInputElement).showPicker?.()}
+                  placeholder=" "
+                />
+                <label>Date</label>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="secondary-btn" onClick={() => setShowHolidayModal(false)}>Cancel</button>
+              <button className="primary-btn" onClick={async () => {
+                if (!holidayForm.name || !holidayForm.date) return
+                const res = await authFetch('/api/holidays', { method: 'POST', body: JSON.stringify(holidayForm) })
+                if (res.ok) { setHolidays(await res.json()); setCalendarData(null); setShowHolidayModal(false) }
+              }}>Add Holiday</button>
             </div>
           </div>
         </div>

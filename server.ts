@@ -18,7 +18,7 @@ const GEMINI_NOTES_DB = process.env.GEMINI_NOTES_DB || path.join(homedir(), '.op
 let maintenanceState = {
   enabled: false,
   bannerMessage: '',
-  lockoutMessage: 'Wandi Hub is being improved. Back as soon as possible.',
+  lockoutMessage: 'Wandi Hub in maintenance mode and will be back soon.',
   countdownTarget: null as string | null, // ISO timestamp when lockout begins
 }
 
@@ -111,7 +111,7 @@ async function loadMaintenanceState() {
 }
 
 interface CalendarEvent {
-  type: 'project' | 'timeoff'
+  type: 'project' | 'timeoff' | 'holiday'
   name: string
   color: string
   projectName?: string
@@ -694,6 +694,38 @@ app.delete('/api/team/:id', async (req, res) => {
   } catch (e) { res.status(500).json({error: e.message}); }
 });
 
+// ============ HOLIDAYS ============
+app.get('/api/holidays', async (_req, res) => {
+  try {
+    const holidays = await all('SELECT * FROM holidays ORDER BY date');
+    res.json(holidays);
+  } catch (e) { res.status(500).json({error: e.message}); }
+});
+
+app.post('/api/holidays', async (req, res) => {
+  try {
+    const { id, name, date } = req.body;
+    if (!name || !date) return res.status(400).json({ error: 'name and date required' });
+    const holidayId = id || Date.now().toString();
+    await run(
+      'INSERT OR REPLACE INTO holidays (id, name, date) VALUES (?, ?, ?)',
+      [holidayId, name, date]
+    );
+    updateDbVersion();
+    const holidays = await all('SELECT * FROM holidays ORDER BY date');
+    res.json(holidays);
+  } catch (e) { res.status(500).json({error: e.message}); }
+});
+
+app.delete('/api/holidays/:id', async (req, res) => {
+  try {
+    await run('DELETE FROM holidays WHERE id = ?', [req.params.id]);
+    updateDbVersion();
+    const holidays = await all('SELECT * FROM holidays ORDER BY date');
+    res.json(holidays);
+  } catch (e) { res.status(500).json({error: e.message}); }
+});
+
 // ============ BRAND OPTIONS ============
 app.get('/api/brandOptions', async (req, res) => {
   try {
@@ -772,6 +804,8 @@ app.get('/api/calendar', async (req, res) => {
       ...t,
       timeOff: t.timeOff ? JSON.parse(t.timeOff) : []
     })));
+    const holidays = await all('SELECT * FROM holidays ORDER BY date') as { id: string; name: string; date: string }[];
+    const holidaySet = new Set(holidays.map(h => h.date));
     
     // Parse YYYY-MM-DD as local date (avoids UTC off-by-one)
     const toLocalDate = (dateStr: string): Date | null => {
@@ -884,6 +918,18 @@ app.get('/api/calendar', async (req, res) => {
           }
         });
         
+        // Add holidays from DB
+        const matchingHolidays = holidays.filter(h => h.date === dateStr);
+        matchingHolidays.forEach(h => {
+          events.unshift({
+            type: 'holiday',
+            name: h.name,
+            color: '#6b7280',
+            startDate: h.date,
+            endDate: h.date
+          });
+        });
+
         days.push({
           day: d,
           date: dateStr,
@@ -1864,8 +1910,8 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 // Format: YYYY.MM.DD.hhmm (e.g., 2026.02.26.2059) → displays as "2026.02.26 2059"
 
-const SITE_VERSION = '2026.03.10.2255'
-const SITE_TIME = '2255'
+const SITE_VERSION = '2026.03.10.2310'
+const SITE_TIME = '2310'
 
 const VERSION_KEY = 'dcc_versions'
 
@@ -1919,6 +1965,7 @@ const initVersions = async () => {
 // Ensure table exists
 run("CREATE TABLE IF NOT EXISTS app_versions (key TEXT PRIMARY KEY, db_version TEXT, db_time TEXT, updated_at TEXT)").then(() => { initVersions(); loadMaintenanceState() })
 run("CREATE TABLE IF NOT EXISTS project_priorities (business_line_id TEXT NOT NULL, project_id TEXT NOT NULL, rank INTEGER NOT NULL, PRIMARY KEY (business_line_id, project_id))")
+run("CREATE TABLE IF NOT EXISTS holidays (id TEXT PRIMARY KEY, name TEXT NOT NULL, date TEXT NOT NULL, createdAt TEXT DEFAULT CURRENT_TIMESTAMP)")
 
 // Core tables (auto-created on fresh deploy)
 run(`CREATE TABLE IF NOT EXISTS projects (
