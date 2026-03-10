@@ -4776,18 +4776,22 @@ const [showFilters, setShowFilters] = useState(false)
                             setActiveTab('notes')
                             setShowSearch(false)
                             setSearchQuery('')
-                            setNotesFilter({ project: null, person: null, search: '', id: note.id })
-                            setSelectedNote(note)
-                            // Ensure notes are loaded before filtering
+                            // Ensure notes are loaded first (need full note data with linkedProjectIds/linkedTeamIds)
+                            let loadedNotes = notes
                             if (notes.length === 0) {
                               try {
                                 const res = await authFetch('/api/notes')
                                 const data = await res.json()
                                 setNotes(data)
+                                loadedNotes = data
                               } catch (err) {
                                 console.error('Error loading notes:', err)
                               }
                             }
+                            // Find the matching note from loaded notes (has full data)
+                            const fullNote = loadedNotes.find((n: Note) => n.id === note.id) || note
+                            setNotesFilter({ project: null, person: null, search: '', id: note.id })
+                            setSelectedNote(fullNote)
                           }}
                         >
                           <div className="search-result-main">
