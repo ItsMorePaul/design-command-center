@@ -186,6 +186,25 @@ git push origin <commit-hash>:main --force
 
 ---
 
+### ✅ v260310-optimistic-locking
+**Date:** 2026-03-10
+**Time:** ~10:05 AM PST
+**Git tag:** `v260310-optimistic-locking`
+**Commit:** `e08a0cf`
+**Site version:** `2026.03.10 1005`
+**DB version at save:** `2026.03.10 0856`
+
+**To restore:**
+```bash
+git checkout v260310-optimistic-locking
+```
+
+#### What was built
+
+- **Optimistic locking**: Projects, team members, and business lines check `updatedAt` before saving. If another user modified the record, save is rejected with 409 Conflict and the page refreshes. Prevents silent overwrites from concurrent edits.
+
+---
+
 ### ✅ v260310-deployment-pipeline
 **Date:** 2026-03-10
 **Time:** ~9:30 AM PST
