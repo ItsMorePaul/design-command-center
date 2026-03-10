@@ -23,5 +23,10 @@ dist-ssr
 *.sln
 *.sw?
 
+# Database files (synced via /api/seed, not git)
+data/shared.db
+data/shared.db.*
+data/*.db-journal
+
 # Backup directories
 backups/

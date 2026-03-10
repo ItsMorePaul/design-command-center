@@ -10,6 +10,7 @@ import bcrypt from 'bcrypt';
 const app = express();
 const PORT = process.env.PORT || 3001;
 const DB_PATH = process.env.DB_PATH || path.join(process.cwd(), 'data', 'shared.db');
+const SEED_SECRET = process.env.DCC_SEED_SECRET || '';
 const GEMINI_NOTES_DB = process.env.GEMINI_NOTES_DB || path.join(homedir(), '.openclaw', 'workspace', 'data', 'gemini-notes.db');
 
 interface CalendarEvent {
@@ -329,9 +330,10 @@ app.use('/api', (req, res, next) => {
   const isReadOnly = req.method === 'GET'
   const isLocalhost = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1'
   const isSeedEndpoint = req.path === '/seed'
-  
-  // Allow seed operations from localhost (for sync scripts)
-  const shouldSkip = skipAuthPaths.some(p => req.path.startsWith(p)) || isReadOnly || (isSeedEndpoint && isLocalhost)
+  const hasSeedToken = isSeedEndpoint && SEED_SECRET && req.headers['x-seed-secret'] === SEED_SECRET
+
+  // Allow seed operations from localhost OR with valid seed secret token
+  const shouldSkip = skipAuthPaths.some(p => req.path.startsWith(p)) || isReadOnly || (isSeedEndpoint && isLocalhost) || hasSeedToken
   
   if (shouldSkip) {
     return next()
@@ -1401,7 +1403,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 // Seed endpoint - replaces all data
 app.post('/api/seed', async (req, res) => {
   try {
-    const { projects, team, assignments, priorities, businessLines, brandOptions, notes } = req.body
+    const { projects, team, assignments, priorities, businessLines, brandOptions, notes, noteProjectLinks, notePeopleLinks } = req.body
     
     // Clear and insert projects
     if (projects) {
@@ -1477,17 +1479,35 @@ app.post('/api/seed', async (req, res) => {
       }
     }
     
+    // Clear and insert note_project_links
+    if (noteProjectLinks && noteProjectLinks.length > 0) {
+      await run('DELETE FROM note_project_links')
+      for (const l of noteProjectLinks) {
+        await run('INSERT INTO note_project_links (note_id, project_id) VALUES (?, ?)', [l.note_id, l.project_id])
+      }
+    }
+
+    // Clear and insert note_people_links
+    if (notePeopleLinks && notePeopleLinks.length > 0) {
+      await run('DELETE FROM note_people_links')
+      for (const l of notePeopleLinks) {
+        await run('INSERT INTO note_people_links (note_id, team_id) VALUES (?, ?)', [l.note_id, l.team_id])
+      }
+    }
+
     // Update DB version on seed
     await updateDbVersion()
-    
-    res.json({ success: true, synced: { 
-      projects: projects?.length ?? 0, 
-      team: team?.length ?? 0, 
+
+    res.json({ success: true, synced: {
+      projects: projects?.length ?? 0,
+      team: team?.length ?? 0,
       assignments: assignments?.length ?? 0,
       priorities: priorities?.length ?? 0,
       businessLines: businessLines?.length ?? 0,
       brandOptions: brandOptions?.length ?? 0,
-      notes: notes?.length ?? 0
+      notes: notes?.length ?? 0,
+      noteProjectLinks: noteProjectLinks?.length ?? 0,
+      notePeopleLinks: notePeopleLinks?.length ?? 0
     }})
   } catch (e) { res.status(500).json({error: e.message}); }
 })

@@ -2,7 +2,7 @@
 # Safe sync from local to Railway with explicit confirmation
 # Created: 2026-03-03 (post-incident)
 
-LOCAL_DB="/Users/wilson/.openclaw/workspace/design-command-center/data/shared.db"
+LOCAL_DB="/Users/wilson/.openclaw/workspace/work/design-command-center/data/shared.db"
 RAILWAY_URL="https://design-command-center-production.up.railway.app"
 
 echo "=== DCC Safe Sync to Railway ==="
