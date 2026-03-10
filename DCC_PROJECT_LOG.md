@@ -186,6 +186,36 @@ git push origin <commit-hash>:main --force
 
 ---
 
+### ✅ v260310-deployment-pipeline
+**Date:** 2026-03-10
+**Time:** ~9:30 AM PST
+**Git tag:** `v260310-deployment-pipeline`
+**Commit:** `162be9f`
+**Site version:** `2026.03.10 0930`
+**DB version at save:** `2026.03.10 0856`
+
+**To restore:**
+```bash
+git checkout v260310-deployment-pipeline
+```
+
+#### What was built in this session
+
+- **Whole-file DB sync pipeline**: Replaced table-by-table `/api/seed` with binary SQLite upload/download (`/api/upload-db`, `/api/download-db`). No hardcoded table lists — new tables flow automatically.
+- **Pull script** (`pull-from-railway.sh`): Downloads entire Railway DB, kills servers before replacing file, restarts API + Vite after. Prevents stale-DB-in-memory race condition.
+- **Deploy script** (`deploy.sh`): Uploads entire SQLite file, verifies all table counts match.
+- **Hidden note fingerprints**: `hidden_note_fingerprints` table keyed on `source_filename`. Prevents hidden notes from reappearing after Gemini re-sync with new IDs.
+- **Cleaned 142 garbage notes**: Corrupted records from old `/api/seed` with content fragments as IDs.
+- **Drag-and-drop fix**: Jitter-free InProgressDropZone for empty business lines (Mansion Global).
+- **Business line selector**: `width: auto` override for global `select { width: 100% }`.
+- **Login form autofill**: Browser-friendly `name="username"`, `autoComplete="username"`, delayed reload.
+- **Jason Miller password**: Reset to `dj_wandihub!`.
+- **Users list auto-fetch**: Settings tab now loads user accounts on open (was empty until "+ Add User" clicked).
+- **8 user accounts**: All team members can now log in.
+- **Documentation overhaul**: AGENTS.md, TOOLS.md, DEPLOYMENT_LOCK.md, MEMORY.md all updated. Legacy scripts explicitly marked as causing corruption.
+
+---
+
 ### ✅ v260309-hidden-fingerprints
 **Date:** 2026-03-09
 **Time:** ~10:25 PM PST
