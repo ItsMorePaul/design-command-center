@@ -4772,12 +4772,22 @@ const [showFilters, setShowFilters] = useState(false)
                       </div>
                       {filteredResults.notes.map(note => (
                         <div key={note.id} className="search-result-card"
-                          onClick={() => {
+                          onClick={async () => {
                             setActiveTab('notes')
                             setShowSearch(false)
                             setSearchQuery('')
                             setNotesFilter({ project: null, person: null, search: '', id: note.id })
                             setSelectedNote(note)
+                            // Ensure notes are loaded before filtering
+                            if (notes.length === 0) {
+                              try {
+                                const res = await authFetch('/api/notes')
+                                const data = await res.json()
+                                setNotes(data)
+                              } catch (err) {
+                                console.error('Error loading notes:', err)
+                              }
+                            }
                           }}
                         >
                           <div className="search-result-main">
