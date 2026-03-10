@@ -96,6 +96,48 @@ for TABLE in $TABLES; do
 done
 echo ""
 
+# ── Pre-deploy sanity checks ────────────────────────────────────
+# Expected row count ranges for critical tables. If a count falls
+# outside its range the deploy is blocked. Update these bounds as
+# the dataset grows legitimately.
+# Format: "table_name min max"
+SANITY_CHECKS=(
+  "notes 180 280"
+  "projects 15 50"
+  "team 5 20"
+  "users 2 20"
+  "project_assignments 15 60"
+  "note_people_links 300 700"
+  "note_project_links 300 700"
+)
+
+SANITY_FAIL=false
+echo -e "${BLUE}=== PRE-DEPLOY SANITY CHECK ===${NC}"
+echo ""
+for RULE in "${SANITY_CHECKS[@]}"; do
+  T_NAME=$(echo "$RULE" | awk '{print $1}')
+  T_MIN=$(echo "$RULE" | awk '{print $2}')
+  T_MAX=$(echo "$RULE" | awk '{print $3}')
+  T_COUNT=$(sqlite3 "$LOCAL_DB" "SELECT COUNT(*) FROM \"$T_NAME\";" 2>/dev/null || echo "?")
+  if [[ "$T_COUNT" == "?" ]]; then
+    warn "$T_NAME: table not found (skipping)"
+    continue
+  fi
+  if [[ "$T_COUNT" -lt "$T_MIN" || "$T_COUNT" -gt "$T_MAX" ]]; then
+    err "$T_NAME: $T_COUNT rows — OUTSIDE expected range [$T_MIN-$T_MAX]"
+    SANITY_FAIL=true
+  else
+    log "$T_NAME: $T_COUNT rows — OK (range [$T_MIN-$T_MAX])"
+  fi
+done
+echo ""
+
+if [[ "$SANITY_FAIL" == "true" ]]; then
+  err "SANITY CHECK FAILED — deploy blocked."
+  err "If the counts are legitimately new, update SANITY_CHECKS in scripts/deploy.sh"
+  exit 1
+fi
+
 # ── Backup Railway before any changes ─────────────────────────────
 log "Backing up Railway production data..."
 BACKUP_TS=$(date +%Y%m%d_%H%M%S)
