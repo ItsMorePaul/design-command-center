@@ -329,10 +329,10 @@ app.use('/api', (req, res, next) => {
   const skipAuthPaths = ['/auth/login', '/auth/logout', '/auth/me', '/health', '/search', '/data', '/projects', '/team', '/business-lines', '/brandOptions', '/capacity', '/calendar', '/priorities', '/notes', '/versions']
   const isReadOnly = req.method === 'GET'
   const isLocalhost = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1'
-  const isSeedEndpoint = req.path === '/seed'
+  const isSeedEndpoint = req.path === '/seed' || req.path === '/upload-db'
   const hasSeedToken = isSeedEndpoint && SEED_SECRET && req.headers['x-seed-secret'] === SEED_SECRET
 
-  // Allow seed operations from localhost OR with valid seed secret token
+  // Allow seed/upload operations from localhost OR with valid seed secret token
   const shouldSkip = skipAuthPaths.some(p => req.path.startsWith(p)) || isReadOnly || (isSeedEndpoint && isLocalhost) || hasSeedToken
   
   if (shouldSkip) {
@@ -1400,7 +1400,58 @@ app.post('/api/kb/sync', async (_req, res) => {
 const DIST_PATH = path.join(process.cwd(), 'dist');
 const isProduction = process.env.NODE_ENV === 'production';
 
-// Seed endpoint - replaces all data
+// Upload-db endpoint - replace entire SQLite database with uploaded file
+// This is the foolproof sync: local DB file → Railway, byte-for-byte identical.
+app.post('/api/upload-db', express.raw({ type: 'application/octet-stream', limit: '50mb' }), async (req, res) => {
+  try {
+    const dbBytes = req.body as Buffer
+    if (!dbBytes || dbBytes.length < 100) {
+      return res.status(400).json({ error: 'No database file received or file too small' })
+    }
+
+    // Validate it's a SQLite file (magic bytes: "SQLite format 3\0")
+    const header = dbBytes.subarray(0, 16).toString('ascii')
+    if (!header.startsWith('SQLite format 3')) {
+      return res.status(400).json({ error: 'Not a valid SQLite database file' })
+    }
+
+    // Back up current DB
+    const backupPath = DB_PATH + '.pre-upload-' + Date.now()
+    fs.copyFileSync(DB_PATH, backupPath)
+
+    // Close current DB connection
+    await new Promise<void>((resolve, reject) => {
+      db.close((err) => err ? reject(err) : resolve())
+    })
+
+    // Write the uploaded DB
+    fs.writeFileSync(DB_PATH, dbBytes)
+
+    // Reopen connection
+    db = new sqlite3.Database(DB_PATH)
+
+    // Get table counts for verification
+    const tables = await all("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'") as Array<{name: string}>
+    const counts: Record<string, number> = {}
+    for (const t of tables) {
+      const row = await get(`SELECT COUNT(*) as c FROM "${t.name}"`) as {c: number}
+      counts[t.name] = row.c
+    }
+
+    res.json({
+      success: true,
+      sizeBytes: dbBytes.length,
+      backup: backupPath,
+      tables: counts
+    })
+  } catch (e) {
+    // Try to reopen DB on failure
+    try { db = new sqlite3.Database(DB_PATH) } catch {}
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// Seed endpoint - replaces all data (legacy, table-by-table)
 app.post('/api/seed', async (req, res) => {
   try {
     const { projects, team, assignments, priorities, businessLines, brandOptions, notes, noteProjectLinks, notePeopleLinks } = req.body
@@ -1529,8 +1580,8 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 // Format: YYYY.MM.DD.hhmm (e.g., 2026.02.26.2059) → displays as "2026.02.26 2059"
 
-const SITE_VERSION = '2026.03.09.2135'
-const SITE_TIME = '2135'
+const SITE_VERSION = '2026.03.09.2145'
+const SITE_TIME = '2145'
 
 const VERSION_KEY = 'dcc_versions'
 
