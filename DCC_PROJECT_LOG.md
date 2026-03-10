@@ -186,6 +186,28 @@ git push origin <commit-hash>:main --force
 
 ---
 
+### ✅ v260310-healthcheck-fix
+**Date:** 2026-03-10
+**Time:** ~3:14 PM PST
+**Git tag:** `v260310-healthcheck-fix`
+**Commit:** `f5b1ced`
+**Site version:** `2026.03.10 2210`
+**DB version at save:** `2026.03.10 1339`
+
+**To restore:**
+```bash
+git checkout v260310-healthcheck-fix
+```
+
+#### What was built
+
+- **Healthcheck crash fix**: `/api/health` referenced undefined `maintenanceMode` instead of `maintenanceState.enabled`, throwing `ReferenceError` on every request. This caused Railway deploys to fail healthcheck and roll back. Fixed variable name.
+- **Full maintenance mode** (from prior commits): Two-phase system with amber countdown banner → lockout screen, DB-persisted state, admin bypass, Settings UI panel, and maintenance middleware exempting health/auth/DB endpoints.
+- **Status priority sorting**: Projects sort by status (blocked → review → active → done) as primary sort before user-selected criteria.
+- **Railway deploy verified**: All 12 tables match, health returns 200, maintenance endpoint operational.
+
+---
+
 ### ✅ v260310-notes-cleanup
 **Date:** 2026-03-10
 **Time:** ~10:41 AM PST
