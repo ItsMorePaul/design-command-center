@@ -1760,8 +1760,16 @@ const [showFilters, setShowFilters] = useState(false)
     return a.name.localeCompare(b.name)
   })
 
+  // Status priority: blocked first, then review, active, done last
+  const statusOrder: Record<string, number> = { blocked: 0, review: 1, active: 2, done: 3 }
+  const getStatusOrder = (s: string) => statusOrder[s] ?? 2
+
   // Sort projects by selected criteria
   const sortedProjects = [...projects].sort((a, b) => {
+    // Always push "done" to the end regardless of sort mode
+    const statusDiff = getStatusOrder(a.status) - getStatusOrder(b.status)
+    if (statusDiff !== 0) return statusDiff
+
     switch (projectSortBy) {
       case 'name':
         return a.name.localeCompare(b.name)
@@ -1777,12 +1785,8 @@ const [showFilters, setShowFilters] = useState(false)
         const dateB = b.endDate || 'zzz'
         return dateA.localeCompare(dateB)
       }
-      case 'status': {
-        // Primary: status, Secondary: name
-        const statusCompare = a.status.localeCompare(b.status)
-        if (statusCompare !== 0) return statusCompare
+      case 'status':
         return a.name.localeCompare(b.name)
-      }
       default:
         return 0
     }
