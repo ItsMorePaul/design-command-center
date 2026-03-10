@@ -8,200 +8,97 @@ Technical Enforcement:
 - Pre-push hook blocks all pushes without `DCC_DEPLOY_OK=1`
 - Wilson must NEVER set this env var himself
 
-Violation History: 4+ code deployment violations. Paul is rightfully furious.
-
 ---
 
-## 🆕 NEW WORKFLOW: 3-Phase Bidirectional Sync (March 6, 2026)
+## Deploy & Pull — Whole-File Sync (Updated 2026-03-10)
 
-### The Problem
-Old workflow had dangerous gaps:
-- Pulling from Railway **overwrote** local data (no merge)
-- Pushing to Railway **overwrote** Railway data (no backup verification)
-- No way to preview changes before destructive operations
-- No rollback after local changes were pulled over
+Data flows as a **complete SQLite file** — no table-by-table sync, no hardcoded table lists.
+New tables, columns, or data are included automatically.
 
-### The Solution
-**3-Phase workflow:** Pull → Work → Push
-Each phase has safeguards, backups, and verification.
-
----
-
-## Phase 1: PULL (Railway → Local)
-
-Designers enter data online. You pull it locally to review/merge.
-
-```bash
-cd ~/.openclaw/workspace/work/design-command-center
-
-# Step 1: Check current state
-./scripts/dcc-data-workflow.sh status
-
-# Step 2: Preview what will change
-./scripts/dcc-data-workflow.sh preview
-
-# Step 3: Pull (auto-creates backup)
-./scripts/dcc-data-workflow.sh pull
-```
-
-**What happens:**
-1. Local DB is backed up to `backups/local/`
-2. Railway data is fetched via API
-3. Local SQLite is overwritten with Railway data
-4. Post-pull backup is created
-5. **Undo available:** Run the restore script if needed
-
-**Safety:** Your local state is backed up BEFORE the pull. If something goes wrong:
-```bash
-# Undo the pull
-./backups/local/<timestamp>_pre_pull/restore.sh
-```
-
----
-
-## Phase 2: LOCAL WORK
-
-You work locally, make changes, verify everything.
-
-```bash
-# Make local changes (edit via UI or directly in SQLite)
-# ...
-
-# Create manual backup before big changes
-./scripts/dcc-data-workflow.sh backup
-```
-
-**Important:** Local changes accumulate until you're ready to push.
-
----
-
-## Phase 3: PUSH (Local → Railway)
+### Push to Railway (Local → Railway)
 
 **ONLY when Paul explicitly says "deploy dcc" or "push dcc"**
 
-Wilson will execute:
 ```bash
-# Full deploy (code + ALL data):
+# Full deploy (code + entire DB file):
 DCC_DEPLOY_OK=1 ./scripts/deploy.sh
 
-# Data-only (re-seed Railway without code push):
+# Data-only (upload DB without code push):
 DCC_DEPLOY_OK=1 ./scripts/deploy.sh --data
 ```
 
 **What happens:**
-1. Verify `DCC_DEPLOY_OK=1` and `DCC_SEED_SECRET` are set
-2. Verify local server is running on port 3001
-3. Back up Railway production data to `backups/railway/pre_deploy_*`
-4. Show deployment preview (all table counts)
-5. Push code to GitHub → Railway auto-deploys (skipped with `--data`)
-6. Wait for Railway rebuild to complete
-7. Export ALL 9 tables from local SQLite
-8. Seed Railway via `POST /api/seed` with `X-Seed-Secret` header
-9. Verify all table counts match local
+1. Validates `DCC_DEPLOY_OK=1` and `DCC_SEED_SECRET`
+2. Shows all local table counts
+3. Backs up Railway data to `backups/railway/pre_deploy_*`
+4. Pushes code to GitHub (skipped with `--data`)
+5. Waits for Railway rebuild
+6. Uploads entire `data/shared.db` to Railway via `POST /api/upload-db`
+7. Verifies every table count matches local
 
-**Tables synced (all 9):**
-projects, team, project_assignments, project_priorities, business_lines,
-brand_options, notes, note_project_links, note_people_links
+### Pull from Railway (Railway → Local)
 
-**Important:** `data/shared.db` is NOT in git. The DB lives only on disk locally
-and on Railway's filesystem. Data transfer happens exclusively via `/api/seed`.
-
-**Safety:** Railway state is backed up BEFORE push. If something goes wrong:
 ```bash
-# Restore Railway to pre-deploy state
-./backups/railway/pre_deploy_<timestamp>/restore_railway.sh
+./scripts/pull-from-railway.sh
 ```
+
+**What happens:**
+1. Backs up local DB to `backups/local/pre_pull_*`
+2. Downloads entire SQLite file from Railway via `GET /api/download-db`
+3. Validates SQLite magic bytes and integrity
+4. Replaces local `data/shared.db`
+5. **Restart local server** to pick up new data
+
+### Authentication
+Both endpoints use `X-Seed-Secret` header (from `DCC_SEED_SECRET` env var in `~/.openclaw/.env` and Railway).
 
 ---
 
 ## Command Reference
 
-| Command | Purpose | When to Use |
-|---------|---------|-------------|
-| `./scripts/dcc-data-workflow.sh status` | Show Railway vs Local comparison | Anytime |
-| `./scripts/dcc-data-workflow.sh preview` | Preview changes before pull | Before pulling |
-| `./scripts/dcc-data-workflow.sh pull` | Pull Railway data (with backup) | Phase 1 |
-| `./scripts/dcc-data-workflow.sh backup` | Create manual local backup | Phase 2 |
-| `./scripts/dcc-data-workflow.sh restore <path>` | Restore from backup | Recovery |
-| `DCC_DEPLOY_OK=1 ./scripts/deploy.sh` | Deploy code + ALL data (9 tables) | Phase 3 (Paul approves) |
-| `DCC_DEPLOY_OK=1 ./scripts/deploy.sh --data` | Re-seed data only (no code push) | Data fix without code change |
+| Command | Purpose |
+|---------|---------|
+| `DCC_DEPLOY_OK=1 ./scripts/deploy.sh` | Push code + DB to Railway |
+| `DCC_DEPLOY_OK=1 ./scripts/deploy.sh --data` | Push DB only (no code) |
+| `./scripts/pull-from-railway.sh` | Download Railway DB to local |
 
 ---
 
-## Legacy Scripts (Deprecated)
+## ⚠️ LEGACY SCRIPTS — NEVER USE
 
-| Script | Status | Why |
-|--------|--------|-----|
-| `pull-from-railway.sh` | ⚠️ Legacy | Use `dcc-data-workflow.sh pull` instead (has backups) |
-| `dcc-push-to-railway.sh` | ⚠️ Legacy | Use `deploy.sh` instead (seeds ALL 9 tables, token auth) |
-| `sync-to-railway-safe.sh` | ⚠️ Legacy | Use `deploy.sh` instead (no interactive prompts) |
-| `sync-to-railway.sh` | ⚠️ Legacy | Use `deploy.sh` instead |
-| `backup-railway.sh` | ✅ Still used | Called internally; also used by `deploy.sh` |
+These scripts use table-by-table sync via `/api/seed` and **cause data corruption** (duplicate notes, missing tables, lost hidden flags):
 
----
+| Script | Status |
+|--------|--------|
+| `dcc-data-workflow.sh` | ❌ DEPRECATED — causes corruption |
+| `dcc-push-to-railway.sh` | ❌ DEPRECATED — causes corruption |
+| `sync-to-railway-safe.sh` | ❌ DEPRECATED — causes corruption |
+| `sync-to-railway.sh` | ❌ DEPRECATED — causes corruption |
+| `dcc-sync.sh` | ❌ DEPRECATED — causes corruption |
+| `dcc-verify-sync.sh` | ❌ DEPRECATED — use deploy.sh verification |
+| `verify-railway-sync.sh` | ❌ DEPRECATED — use deploy.sh verification |
 
-## Database Migration Rules
-
-### Rule 1: Local is NOT source of truth
-Railway production DB is the canonical source. Local is a working copy.
-
-### Rule 2: Bidirectional sync requires explicit phases
-- Pull: Railway → Local (设计师工作在线，你拉到本地)
-- Work: Local only (你本地编辑)
-- Push: Local → Railway (你确认后推回去)
-
-### Rule 3: Every destructive operation has backup
-- Pull: Local backed up first
-- Push: Railway backed up first
-
-### Rule 4: Verify after every sync
-Always run verification commands to confirm data integrity.
-
----
-
-## Verification Commands
-
-After ANY operation, verify:
-
-```bash
-# Check Railway health
-curl -s https://design-command-center-production.up.railway.app/api/health | jq
-
-# Check assignment counts
-echo "Railway: $(curl -s $RAILWAY_URL/api/capacity | jq '.assignments | length')"
-echo "Local: $(sqlite3 data/shared.db 'SELECT COUNT(*) FROM project_assignments;')"
-
-# Check Fariah's data (critical)
-curl -s $RAILWAY_URL/api/capacity | jq '.assignments[] | select(.designer_name | contains("Fariah"))'
-
-# Full sync verification
-./scripts/verify-railway-sync.sh
-```
+The `/api/seed` endpoint still exists for backwards compatibility but **must not be used** for deployment.
 
 ---
 
 ## Emergency Recovery
 
-### Scenario: Pulled bad data from Railway
+### Bad data pushed to Railway
 ```bash
-# Restore local to pre-pull state
-./backups/local/<timestamp>_pre_pull/restore.sh
+# Backups are in backups/railway/pre_deploy_<timestamp>/
+# Re-upload a known-good local DB:
+DCC_DEPLOY_OK=1 ./scripts/deploy.sh --data
 ```
 
-### Scenario: Pushed bad data to Railway
+### Bad data pulled to local
 ```bash
-# Restore Railway to pre-deploy state
-./backups/railway/pre_deploy_<timestamp>/restore_railway.sh
-```
-
-### Scenario: Need to rollback code
-```bash
-# Deploy specific commit to Railway
-git push origin <commit-hash>:main --force
-# Note: This rolls back CODE but not DATABASE
+# Backups are in backups/local/pre_pull_<timestamp>/
+cp backups/local/pre_pull_<timestamp>/shared.db data/shared.db
+# Restart local server
 ```
 
 ---
 
-## Created: 2026-03-05 after repeated violations
-## Updated: 2026-03-06 with 3-phase bidirectional workflow
+Created: 2026-03-05 after repeated deployment violations
+Updated: 2026-03-10 — whole-file sync replaces table-by-table
