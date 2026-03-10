@@ -542,6 +542,19 @@ function SortableTimelineItem({
   )
 }
 
+// Droppable "In Progress" zone for priority view (allows dropping done items back)
+function InProgressDropZone({ children, id }: { children?: React.ReactNode; id: string }) {
+  const { setNodeRef, isOver } = useDroppable({ id })
+  return (
+    <div ref={setNodeRef} className={`priority-in-progress-zone${isOver ? ' drop-active' : ''}`}>
+      <div className="priority-zone-label">{isOver ? 'Drop to restore' : 'In Progress'}</div>
+      <div className="priority-list">
+        {children}
+      </div>
+    </div>
+  )
+}
+
 // Droppable "Done" zone for priority view
 function DoneDropZone({ children, id = 'done-drop-zone' }: { children?: React.ReactNode; id?: string }) {
   const { setNodeRef, isOver } = useDroppable({ id })
@@ -2440,7 +2453,8 @@ const [showFilters, setShowFilters] = useState(false)
                 const liveStatuses = ['active', 'blocked', 'review']
 
                 // Helper: render a single business line's priority section
-                const renderBlSection = (blId: string, bl: BusinessLine, doneZoneId: string) => {
+                const renderBlSection = (blId: string, bl: BusinessLine, doneZoneId: string, inProgressZoneId?: string) => {
+                  const ipZoneId = inProgressZoneId || `ip-zone-${blId}`
                   const blProjects = projects.filter(p => {
                     const lines = Array.isArray(p.businessLines) ? p.businessLines : (p.businessLines ? [p.businessLines] : [])
                     return lines.some(l => l === bl.name)
@@ -2478,7 +2492,10 @@ const [showFilters, setShowFilters] = useState(false)
                             // Only show placeholder when dragging from Done to In Progress
                             if (activeStr.startsWith('done:')) {
                               const overStr = e.over ? String(e.over.id) : null
-                              if (overStr && overStr !== doneZoneId && !overStr.startsWith('done:')) {
+                              if (overStr === ipZoneId) {
+                                // Hovering over the empty in-progress zone — show placeholder at position 0
+                                setDropPlaceholderIndex(0)
+                              } else if (overStr && overStr !== doneZoneId && !overStr.startsWith('done:')) {
                                 const overIndex = allRankedIds.indexOf(overStr)
                                 setDropPlaceholderIndex(overIndex !== -1 ? overIndex : allRankedIds.length)
                               } else if (overStr === doneZoneId || overStr?.startsWith('done:')) {
@@ -2502,6 +2519,12 @@ const [showFilters, setShowFilters] = useState(false)
                                 return
                               }
                               const projectId = activeStr.replace('done:', '')
+                              // Dropped on in-progress zone (empty list) or a live item
+                              if (overStr === ipZoneId) {
+                                markProjectUndone(projectId, blId, allRankedIds, 0)
+                                hapticMedium()
+                                return
+                              }
                               // Determine insert position: if dropped on a live item, insert at its index; otherwise append
                               const overIndex = allRankedIds.indexOf(overStr)
                               const insertIndex = overIndex !== -1 ? overIndex : allRankedIds.length
@@ -2524,11 +2547,9 @@ const [showFilters, setShowFilters] = useState(false)
                             hapticLight()
                           }}
                         >
-                          {/* In Progress zone - separate context so items don't visually cross zones */}
+                          {/* In Progress zone - droppable so done items can be dragged back even when empty */}
                           <SortableContext items={allRankedIds} strategy={verticalListSortingStrategy}>
-                            <div className="priority-in-progress-zone">
-                              <div className="priority-zone-label">In Progress</div>
-                              <div className="priority-list">
+                            <InProgressDropZone id={ipZoneId}>
                                 {(() => {
                                   // Insert placeholder when dragging from Done
                                   const items: React.ReactElement[] = []
@@ -2566,8 +2587,7 @@ const [showFilters, setShowFilters] = useState(false)
                                   }
                                   return items
                                 })()}
-                              </div>
-                            </div>
+                            </InProgressDropZone>
                           </SortableContext>
 
                           {/* Done zone - separate context so items don't visually cross zones */}
