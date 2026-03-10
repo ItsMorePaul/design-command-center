@@ -1529,8 +1529,8 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 // Format: YYYY.MM.DD.hhmm (e.g., 2026.02.26.2059) → displays as "2026.02.26 2059"
 
-const SITE_VERSION = '2026.03.09.2128'
-const SITE_TIME = '2128'
+const SITE_VERSION = '2026.03.09.2135'
+const SITE_TIME = '2135'
 
 const VERSION_KEY = 'dcc_versions'
 
@@ -1675,13 +1675,23 @@ run(`CREATE TABLE IF NOT EXISTS notes (
   source_created_at TEXT,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now')),
+  next_steps TEXT DEFAULT '',
+  details TEXT DEFAULT '',
+  attachments TEXT DEFAULT '[]',
+  linkedTeamIds TEXT DEFAULT '[]',
+  linkedProjectIds TEXT DEFAULT '[]',
   hidden INTEGER DEFAULT 0,
   hidden_at TEXT
 )`).catch(e => console.error('notes init error:', e.message))
 
-// Migration: add hidden columns if they don't exist
+// Migrations: add columns if they don't exist (for existing DBs)
 run(`ALTER TABLE notes ADD COLUMN hidden INTEGER DEFAULT 0`).catch(() => {})
 run(`ALTER TABLE notes ADD COLUMN hidden_at TEXT`).catch(() => {})
+run(`ALTER TABLE notes ADD COLUMN next_steps TEXT DEFAULT ''`).catch(() => {})
+run(`ALTER TABLE notes ADD COLUMN details TEXT DEFAULT ''`).catch(() => {})
+run(`ALTER TABLE notes ADD COLUMN attachments TEXT DEFAULT '[]'`).catch(() => {})
+run(`ALTER TABLE notes ADD COLUMN linkedTeamIds TEXT DEFAULT '[]'`).catch(() => {})
+run(`ALTER TABLE notes ADD COLUMN linkedProjectIds TEXT DEFAULT '[]'`).catch(() => {})
 
 run(`CREATE TABLE IF NOT EXISTS note_project_links (
   note_id TEXT NOT NULL,
