@@ -186,6 +186,27 @@ git push origin <commit-hash>:main --force
 
 ---
 
+### ✅ v260310-3features
+**Date:** 2026-03-10
+**Time:** ~4:10 PM PST
+**Git tag:** `v260310-3features`
+**Commit:** `fa3e034`
+**Site version:** `2026.03.10 2310`
+**DB version at save:** `2026.03.10 1556`
+
+**To restore:**
+```bash
+git checkout v260310-3features
+```
+
+#### What was built
+
+- **Maintenance mode defaults**: Banner prefilled "Save your work. Wandi Hub maintenance about to begin in 5 minutes.", lockout "Wandi Hub in maintenance mode and will be back soon.", timer default 5 min
+- **Holidays in Settings**: New `holidays` table + CRUD API (`/api/holidays`). All users can add/remove holidays from Settings. Default US holidays seed on first load. Replaced hardcoded `usHolidays2026` with DB-driven holidays via calendar endpoint
+- **Multi-day calendar spanning**: Week-row layout with positioned spanning event bars — multi-day events render as continuous bars across day columns (Google Calendar month-view style). Row stacking for overlaps, week-boundary splitting, start/end rounding
+
+---
+
 ### ✅ v260310-deploy-hardening
 **Date:** 2026-03-10
 **Time:** ~3:35 PM PST
