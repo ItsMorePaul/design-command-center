@@ -880,6 +880,13 @@ app.delete('/api/notes/:id/links', async (req, res) => {
   } catch (e: any) { res.status(500).json({ error: e.message }) }
 })
 
+// Compute a stable fingerprint for a note (survives re-processing with new IDs)
+function noteFingerprint(sourceFilename: string, driveUrl: string): string | null {
+  // Prefer source_filename (Google Drive filename), fall back to drive_url
+  const raw = (sourceFilename || '').trim().toLowerCase() || (driveUrl || '').trim().toLowerCase()
+  return raw || null
+}
+
 // Hide a note (requires PIN in body)
 app.put('/api/notes/:id/hide', async (req, res) => {
   try {
@@ -889,7 +896,7 @@ app.put('/api/notes/:id/hide', async (req, res) => {
     }
 
     const noteId = req.params.id
-    const note = await get('SELECT id FROM notes WHERE id = ?', [noteId])
+    const note = await get('SELECT * FROM notes WHERE id = ?', [noteId]) as any
     if (!note) {
       return res.status(404).json({ error: 'Note not found' })
     }
@@ -898,6 +905,15 @@ app.put('/api/notes/:id/hide', async (req, res) => {
       'UPDATE notes SET hidden = 1, hidden_at = datetime("now") WHERE id = ?',
       [noteId]
     )
+
+    // Store fingerprint so the same source can never reappear
+    const fp = noteFingerprint(note.source_filename, note.drive_url)
+    if (fp) {
+      await run(
+        'INSERT OR REPLACE INTO hidden_note_fingerprints (fingerprint, original_note_id, hidden_at) VALUES (?, ?, datetime("now"))',
+        [fp, noteId]
+      )
+    }
 
     const updatedNote = await get('SELECT * FROM notes WHERE id = ?', [noteId])
     res.json(updatedNote)
@@ -908,7 +924,7 @@ app.put('/api/notes/:id/hide', async (req, res) => {
 app.put('/api/notes/:id/restore', async (req, res) => {
   try {
     const noteId = req.params.id
-    const note = await get('SELECT id FROM notes WHERE id = ?', [noteId])
+    const note = await get('SELECT * FROM notes WHERE id = ?', [noteId]) as any
     if (!note) {
       return res.status(404).json({ error: 'Note not found' })
     }
@@ -917,6 +933,12 @@ app.put('/api/notes/:id/restore', async (req, res) => {
       'UPDATE notes SET hidden = 0, hidden_at = NULL WHERE id = ?',
       [noteId]
     )
+
+    // Remove fingerprint so the source can appear again
+    const fp = noteFingerprint(note.source_filename, note.drive_url)
+    if (fp) {
+      await run('DELETE FROM hidden_note_fingerprints WHERE fingerprint = ?', [fp])
+    }
 
     const updatedNote = await get('SELECT * FROM notes WHERE id = ?', [noteId])
     res.json(updatedNote)
@@ -1076,24 +1098,32 @@ app.post('/api/notes/sync', async (req, res) => {
         }
       }
 
-      const existing = await get('SELECT id FROM notes WHERE id = ?', [noteId])
+      const existing = await get('SELECT id, hidden FROM notes WHERE id = ?', [noteId]) as any
       if (existing) {
-        await run(
-          `UPDATE notes SET title = ?, date = ?, content_preview = ?, people_raw = ?, projects_raw = ?,
-           drive_url = ?, source_filename = ?, source_created_at = ?, next_steps = ?, details = ?, attachments = ?, updated_at = datetime('now')
-           WHERE id = ?`,
-          [title, gNote.date || '', gNote.content_preview || '', gNote.people || '',
-           gNote.projects || '', gNote.drive_url || '', gNote.filename || '',
-           gNote.created_at || '', gNote.next_steps || '', gNote.details || '', gNote.attachments || '', noteId]
-        )
+        // Never overwrite a hidden note's content — it's hidden for a reason
+        if (!existing.hidden) {
+          await run(
+            `UPDATE notes SET title = ?, date = ?, content_preview = ?, people_raw = ?, projects_raw = ?,
+             drive_url = ?, source_filename = ?, source_created_at = ?, next_steps = ?, details = ?, attachments = ?, updated_at = datetime('now')
+             WHERE id = ?`,
+            [title, gNote.date || '', gNote.content_preview || '', gNote.people || '',
+             gNote.projects || '', gNote.drive_url || '', gNote.filename || '',
+             gNote.created_at || '', gNote.next_steps || '', gNote.details || '', gNote.attachments || '', noteId]
+          )
+        }
         updated++
       } else {
+        // Check if this source was previously hidden (even under a different note ID)
+        const fp = noteFingerprint(gNote.filename || '', gNote.drive_url || '')
+        const isBlocked = fp ? await get('SELECT fingerprint FROM hidden_note_fingerprints WHERE fingerprint = ?', [fp]) : null
+
         await run(
-          `INSERT INTO notes (id, source_id, source_filename, title, date, content_preview, people_raw, projects_raw, drive_url, source_created_at, next_steps, details, attachments)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO notes (id, source_id, source_filename, title, date, content_preview, people_raw, projects_raw, drive_url, source_created_at, next_steps, details, attachments, hidden, hidden_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [noteId, gNote.id, gNote.filename || '', title, gNote.date || '',
            gNote.content_preview || '', gNote.people || '', gNote.projects || '',
-           gNote.drive_url || '', gNote.created_at || '', gNote.next_steps || '', gNote.details || '', gNote.attachments || '']
+           gNote.drive_url || '', gNote.created_at || '', gNote.next_steps || '', gNote.details || '', gNote.attachments || '',
+           isBlocked ? 1 : 0, isBlocked ? new Date().toISOString() : null]
         )
         inserted++
       }
@@ -1580,8 +1610,8 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 // Format: YYYY.MM.DD.hhmm (e.g., 2026.02.26.2059) → displays as "2026.02.26 2059"
 
-const SITE_VERSION = '2026.03.09.2215'
-const SITE_TIME = '2215'
+const SITE_VERSION = '2026.03.09.2225'
+const SITE_TIME = '2225'
 
 const VERSION_KEY = 'dcc_versions'
 
@@ -1738,6 +1768,25 @@ run(`CREATE TABLE IF NOT EXISTS notes (
 // Migrations: add columns if they don't exist (for existing DBs)
 run(`ALTER TABLE notes ADD COLUMN hidden INTEGER DEFAULT 0`).catch(() => {})
 run(`ALTER TABLE notes ADD COLUMN hidden_at TEXT`).catch(() => {})
+
+// Hidden note fingerprints — survives re-sync, re-processing, title/date edits
+// Keyed on normalized source_filename (Google Drive filename = stable identifier)
+run(`CREATE TABLE IF NOT EXISTS hidden_note_fingerprints (
+  fingerprint TEXT PRIMARY KEY,
+  original_note_id TEXT,
+  hidden_at TEXT DEFAULT (datetime('now'))
+)`).catch(e => console.error('hidden_note_fingerprints init error:', e.message))
+
+// Backfill fingerprints for any already-hidden notes
+all(`SELECT id, source_filename, drive_url FROM notes WHERE hidden = 1`).then((hiddenNotes: any[]) => {
+  for (const n of hiddenNotes) {
+    const raw = (n.source_filename || '').trim().toLowerCase() || (n.drive_url || '').trim().toLowerCase()
+    if (raw) {
+      run('INSERT OR IGNORE INTO hidden_note_fingerprints (fingerprint, original_note_id) VALUES (?, ?)', [raw, n.id]).catch(() => {})
+    }
+  }
+}).catch(() => {})
+
 run(`ALTER TABLE notes ADD COLUMN next_steps TEXT DEFAULT ''`).catch(() => {})
 run(`ALTER TABLE notes ADD COLUMN details TEXT DEFAULT ''`).catch(() => {})
 run(`ALTER TABLE notes ADD COLUMN attachments TEXT DEFAULT '[]'`).catch(() => {})
