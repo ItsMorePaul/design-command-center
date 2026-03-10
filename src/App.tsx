@@ -1181,12 +1181,18 @@ const [showFilters, setShowFilters] = useState(false)
   }
 
   // API helper functions
-  const saveTeamMember = async (member: TeamMember) => {
-    await authFetch('/api/team', {
+  const saveTeamMember = async (member: TeamMember): Promise<boolean> => {
+    const res = await authFetch('/api/team', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(member)
     })
+    if (res.status === 409) {
+      alert('This team member was modified by another user. The page will refresh with the latest data.')
+      window.location.reload()
+      return false
+    }
+    return res.ok
   }
 
   const deleteTeamMember = async (id: string) => {
@@ -1200,6 +1206,11 @@ const [showFilters, setShowFilters] = useState(false)
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(project)
       })
+      if (res.status === 409) {
+        alert('This project was modified by another user. The page will refresh with the latest data.')
+        window.location.reload()
+        return false
+      }
       if (!res.ok) {
         const err = await res.text()
         console.error('Save project failed:', res.status, err)
@@ -1314,11 +1325,16 @@ const [showFilters, setShowFilters] = useState(false)
 
   // Business Line CRUD
   const saveBusinessLine = async (line: BusinessLine, originalName?: string) => {
-    await authFetch('/api/business-lines', {
+    const saveRes = await authFetch('/api/business-lines', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...line, originalName })
     })
+    if (saveRes.status === 409) {
+      alert('This business line was modified by another user. The page will refresh with the latest data.')
+      window.location.reload()
+      return
+    }
     // Refresh business lines
     const res = await authFetch('/api/business-lines')
     const data = await res.json()

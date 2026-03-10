@@ -358,8 +358,17 @@ app.get('/api/projects', async (req, res) => {
 
 app.post('/api/projects', async (req, res) => {
   try {
-    const { id, name, status, dueDate, assignee, url, description, businessLines, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinks, designers, startDate, endDate, timeline } = req.body;
+    const { id, name, status, dueDate, assignee, url, description, businessLines, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinks, designers, startDate, endDate, timeline, updatedAt: clientUpdatedAt } = req.body;
     const projectId = id || Date.now().toString();
+
+    // Optimistic locking: reject if another user modified this record
+    if (id && clientUpdatedAt) {
+      const existing = await get('SELECT updatedAt FROM projects WHERE id = ?', [id]) as any
+      if (existing && existing.updatedAt && existing.updatedAt !== clientUpdatedAt) {
+        return res.status(409).json({ error: 'This project was modified by another user. Please refresh and try again.' })
+      }
+    }
+
     const timelineJson = JSON.stringify(timeline || []);
     const customLinksJson = JSON.stringify(customLinks || []);
     const designersJson = JSON.stringify(designers || []);
@@ -374,7 +383,8 @@ app.post('/api/projects', async (req, res) => {
 
     // Update DB version
     await updateDbVersion()
-    res.json({id: projectId, ...req.body});
+    const saved = await get('SELECT * FROM projects WHERE id = ?', [projectId])
+    res.json(saved);
   } catch (e) { res.status(500).json({error: e.message}); }
 });
 
@@ -419,8 +429,16 @@ app.get('/api/business-lines', async (req, res) => {
 
 app.post('/api/business-lines', async (req, res) => {
   try {
-    const { id, name, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinks, originalName } = req.body;
+    const { id, name, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinks, originalName, updatedAt: clientUpdatedAt } = req.body;
     const lineId = id || Date.now().toString();
+
+    // Optimistic locking
+    if (id && clientUpdatedAt) {
+      const existing = await get('SELECT updatedAt FROM business_lines WHERE id = ?', [id]) as any
+      if (existing && existing.updatedAt && existing.updatedAt !== clientUpdatedAt) {
+        return res.status(409).json({ error: 'This business line was modified by another user. Please refresh and try again.' })
+      }
+    }
     const customLinksJson = JSON.stringify(customLinks || []);
     
     // Check if this is a rename (name changed but same id)
@@ -486,8 +504,17 @@ app.get('/api/team', async (req, res) => {
 
 app.post('/api/team', async (req, res) => {
   try {
-    const { id, name, role, brands, status, slack, email, avatar, timeOff, weekly_hours, excluded } = req.body;
+    const { id, name, role, brands, status, slack, email, avatar, timeOff, weekly_hours, excluded, updatedAt: clientUpdatedAt } = req.body;
     const memberId = id || Date.now().toString();
+
+    // Optimistic locking: reject if another user modified this record
+    if (id && clientUpdatedAt) {
+      const existing = await get('SELECT updatedAt FROM team WHERE id = ?', [id]) as any
+      if (existing && existing.updatedAt && existing.updatedAt !== clientUpdatedAt) {
+        return res.status(409).json({ error: 'This team member was modified by another user. Please refresh and try again.' })
+      }
+    }
+
     const brandsJson = JSON.stringify(brands || []);
     const timeOffJson = JSON.stringify(timeOff || []);
     await run(
@@ -496,7 +523,8 @@ app.post('/api/team', async (req, res) => {
       [memberId, name, role, brandsJson, status || 'offline', slack, email, avatar, timeOffJson, weekly_hours ?? 35, excluded ? 1 : 0]
     );
     await updateDbVersion()
-    res.json({id: memberId, ...req.body});
+    const saved = await get('SELECT * FROM team WHERE id = ?', [memberId])
+    res.json(saved);
   } catch (e) { res.status(500).json({error: e.message}); }
 });
 
@@ -1634,8 +1662,8 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 // Format: YYYY.MM.DD.hhmm (e.g., 2026.02.26.2059) → displays as "2026.02.26 2059"
 
-const SITE_VERSION = '2026.03.10.0950'
-const SITE_TIME = '0950'
+const SITE_VERSION = '2026.03.10.1005'
+const SITE_TIME = '1005'
 
 const VERSION_KEY = 'dcc_versions'
 
