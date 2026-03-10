@@ -13,6 +13,67 @@ const DB_PATH = process.env.DB_PATH || path.join(process.cwd(), 'data', 'shared.
 const SEED_SECRET = process.env.DCC_SEED_SECRET || '';
 const GEMINI_NOTES_DB = process.env.GEMINI_NOTES_DB || path.join(homedir(), '.openclaw', 'workspace', 'data', 'gemini-notes.db');
 
+// ============ MAINTENANCE MODE ============
+let maintenanceMode = false
+let maintenanceMessage = 'Upgrading Wandi Hub in a few minutes... Will be back online soon.'
+
+const MAINTENANCE_HTML = (message: string) => `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wandi Hub - Maintenance</title>
+  <meta http-equiv="refresh" content="30">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #e0e0e0;
+    }
+    .card {
+      text-align: center;
+      padding: 3rem 2.5rem;
+      max-width: 480px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 16px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
+    .icon { font-size: 3.5rem; margin-bottom: 1rem; }
+    h1 { font-size: 1.5rem; font-weight: 600; margin-bottom: 0.75rem; color: #fff; }
+    p { font-size: 1rem; line-height: 1.6; color: #b0b8c8; margin-bottom: 1.5rem; }
+    .pulse {
+      display: inline-block;
+      width: 8px; height: 8px;
+      background: #53c98d;
+      border-radius: 50%;
+      animation: pulse 2s ease-in-out infinite;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    .status { font-size: 0.85rem; color: #7a8599; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.8); }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">&#128736;</div>
+    <h1>Scheduled Maintenance</h1>
+    <p>${message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+    <div class="status"><span class="pulse"></span>This page auto-refreshes every 30 seconds</div>
+  </div>
+</body>
+</html>`
+
 interface CalendarEvent {
   type: 'project' | 'timeoff'
   name: string
@@ -318,9 +379,47 @@ const reconcileProjectDesignerAssignments = async () => {
   }
 }
 
+// ============ MAINTENANCE MODE ENDPOINTS ============
+// Toggle maintenance on: POST /api/maintenance { enabled: true, message?: "..." }
+// Toggle maintenance off: POST /api/maintenance { enabled: false }
+// Check status: GET /api/maintenance
+app.get('/api/maintenance', (req, res) => {
+  res.json({ enabled: maintenanceMode, message: maintenanceMessage })
+})
+
+app.post('/api/maintenance', (req, res) => {
+  // Only allow from localhost or with seed secret
+  const isLocalhost = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1'
+  const hasSeedToken = SEED_SECRET && req.headers['x-seed-secret'] === SEED_SECRET
+  if (!isLocalhost && !hasSeedToken) {
+    return res.status(401).json({ error: 'Unauthorized' })
+  }
+  maintenanceMode = !!req.body.enabled
+  if (req.body.message) maintenanceMessage = req.body.message
+  console.log(`Maintenance mode: ${maintenanceMode ? 'ON' : 'OFF'}${maintenanceMode ? ' — ' + maintenanceMessage : ''}`)
+  res.json({ enabled: maintenanceMode, message: maintenanceMessage })
+})
+
+// Maintenance mode middleware — blocks all non-admin requests
+app.use((req, res, next) => {
+  if (!maintenanceMode) return next()
+  // Always allow maintenance toggle, health, upload/download-db, and seed-secret requests through
+  const isMaintenanceEndpoint = req.path === '/api/maintenance'
+  const isHealthEndpoint = req.path === '/api/health'
+  const isDbEndpoint = (req.path === '/api/upload-db' || req.path === '/api/download-db') && SEED_SECRET && req.headers['x-seed-secret'] === SEED_SECRET
+  const isLocalhost = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1'
+  if (isMaintenanceEndpoint || isHealthEndpoint || isDbEndpoint || isLocalhost) return next()
+  // API requests get JSON response
+  if (req.path.startsWith('/api/')) {
+    return res.status(503).json({ error: 'maintenance', message: maintenanceMessage })
+  }
+  // All other requests get the maintenance HTML page
+  res.status(503).send(MAINTENANCE_HTML(maintenanceMessage))
+})
+
 // ============ HEALTH ============
 app.get('/api/health', async (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() })
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), maintenance: maintenanceMode })
 })
 
 // All API routes below require authentication for write operations
@@ -1706,8 +1805,8 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 // Format: YYYY.MM.DD.hhmm (e.g., 2026.02.26.2059) → displays as "2026.02.26 2059"
 
-const SITE_VERSION = '2026.03.10.1840'
-const SITE_TIME = '1840'
+const SITE_VERSION = '2026.03.10.1950'
+const SITE_TIME = '1950'
 
 const VERSION_KEY = 'dcc_versions'
 
