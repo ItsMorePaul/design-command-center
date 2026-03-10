@@ -16,11 +16,14 @@
   --color-border-subtle: #f1f5f9;
   --color-border-hover: #cbd5e1;
   --color-bg-subtle: #f8fafc;
+  --color-surface: #ffffff;
   --color-text-secondary: #475569;
   --color-text-link: #3b82f6;
   --color-success: #10b981;
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
+  --color-error: #dc2626;
+  --color-error-bg: #fef2f2;
   --color-gantt-1: #6366f1;
   --color-gantt-2: #8b5cf6;
   --color-gantt-3: #ec4899;
@@ -80,11 +83,14 @@
   --color-border-subtle: #1e1e28;
   --color-border-hover: #3a3a48;
   --color-bg-subtle: #12121a;
+  --color-surface: #16161f;
   --color-text-secondary: #9ca3af;
   --color-text-link: #60a5fa;
   --color-success: #10b981;
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
+  --color-error: #f87171;
+  --color-error-bg: rgba(239, 68, 68, 0.12);
   --color-gantt-1: #6366f1;
   --color-gantt-2: #8b5cf6;
   --color-gantt-3: #ec4899;
@@ -162,4 +168,17 @@ button, a {
 /* Theme transition */
 body, .sidebar, .header, .content, .modal, .stat-card, .team-card, .project-row {
   transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+/* Screen-reader only (visually hidden but accessible) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }

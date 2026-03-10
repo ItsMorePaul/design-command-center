@@ -727,6 +727,7 @@ const [showFilters, setShowFilters] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<{ projects: Project[], team: TeamMember[], businessLines: BusinessLine[], notes: Note[] }>({ projects: [], team: [], businessLines: [], notes: [] })
   const [searchFilters] = useState<{ projects: boolean, team: boolean, businessLines: boolean }>({ projects: true, team: true, businessLines: true })
+  const [searchLoading, setSearchLoading] = useState(false)
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Authentication
@@ -850,7 +851,7 @@ const [showFilters, setShowFilters] = useState(false)
           'Content-Type': 'application/json',
           'x-session-id': getSessionId() || ''
         },
-        body: JSON.stringify({ ...userFormData, password: 'DJ_wand1hub!' })
+        body: JSON.stringify({ ...userFormData, password: 'dj_wandihub!' })
       })
       if (res.ok) {
         setShowUserModal(false)
@@ -1229,6 +1230,7 @@ const [showFilters, setShowFilters] = useState(false)
     }
     
     // Debounce the API call - wait 300ms after last keystroke
+    setSearchLoading(true)
     searchDebounceRef.current = setTimeout(async () => {
       try {
         const params = new URLSearchParams()
@@ -1236,11 +1238,13 @@ const [showFilters, setShowFilters] = useState(false)
         if (!searchFilters.projects) params.set('projects', 'false')
         if (!searchFilters.team) params.set('team', 'false')
         if (!searchFilters.businessLines) params.set('businessLines', 'false')
-        const res = await fetch(`/api/search?${params.toString()}`)
+        const res = await authFetch(`/api/search?${params.toString()}`)
         const data = await res.json()
         setSearchResults(data)
       } catch (e) {
         console.error('Search error:', e)
+      } finally {
+        setSearchLoading(false)
       }
     }, 300)
   }
@@ -1253,21 +1257,22 @@ const [showFilters, setShowFilters] = useState(false)
   }
 
   // Re-search when filters change (to update backend query) - immediate, not debounced
+  const searchQueryRef = useRef(searchQuery)
+  searchQueryRef.current = searchQuery
   useEffect(() => {
-    if (searchQuery.length >= 2) {
-      // Clear any pending debounce and execute immediately
+    const q = searchQueryRef.current
+    if (q.length >= 2) {
       if (searchDebounceRef.current) {
         clearTimeout(searchDebounceRef.current)
       }
-      // Immediate search when filters change
       ;(async () => {
         try {
           const params = new URLSearchParams()
-          params.set('q', searchQuery)
+          params.set('q', q)
           if (!searchFilters.projects) params.set('projects', 'false')
           if (!searchFilters.team) params.set('team', 'false')
           if (!searchFilters.businessLines) params.set('businessLines', 'false')
-          const res = await fetch(`/api/search?${params.toString()}`)
+          const res = await authFetch(`/api/search?${params.toString()}`)
           const data = await res.json()
           setSearchResults(data)
         } catch (e) {
@@ -1275,7 +1280,8 @@ const [showFilters, setShowFilters] = useState(false)
         }
       })()
     }
-  }, [searchFilters.projects, searchFilters.team, searchFilters.businessLines, searchQuery])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchFilters.projects, searchFilters.team, searchFilters.businessLines])
 
   // Cleanup debounce timer on unmount
   useEffect(() => {
@@ -1285,6 +1291,23 @@ const [showFilters, setShowFilters] = useState(false)
       }
     }
   }, [])
+
+  // Keyboard shortcut: Cmd/Ctrl+K to open search, Escape to close
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setShowSearch(prev => !prev)
+      }
+      if (e.key === 'Escape' && showSearch) {
+        setShowSearch(false)
+        setSearchQuery('')
+        setSearchResults({ projects: [], team: [], businessLines: [], notes: [] })
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [showSearch])
 
   // Business Line CRUD
   const saveBusinessLine = async (line: BusinessLine, originalName?: string) => {
@@ -1930,16 +1953,20 @@ const [showFilters, setShowFilters] = useState(false)
       <div className="login-page">
         <div className="login-container">
           <div className="login-logo">
-            <LayoutGrid size={48} />
+            <LayoutGrid size={36} />
           </div>
           <h1>WandiHub</h1>
           <p className="login-subtitle">Design Command Center</p>
-          
-          <form className="login-form" onSubmit={handleLogin}>
+
+          <form className="login-form" onSubmit={handleLogin} autoComplete="on">
             {loginError && <div className="login-error">{loginError}</div>}
             <div className="form-field">
+              <label htmlFor="login-email" className="sr-only">Email</label>
               <input
+                id="login-email"
+                name="email"
                 type="email"
+                autoComplete="email"
                 placeholder="Email"
                 value={loginForm.email}
                 onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
@@ -1947,8 +1974,12 @@ const [showFilters, setShowFilters] = useState(false)
               />
             </div>
             <div className="form-field">
+              <label htmlFor="login-password" className="sr-only">Password</label>
               <input
+                id="login-password"
+                name="password"
                 type="password"
+                autoComplete="current-password"
                 placeholder="Password"
                 value={loginForm.password}
                 onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
@@ -2050,7 +2081,9 @@ const [showFilters, setShowFilters] = useState(false)
           </div>
           
           <div className="header-actions">
-            <button className="icon-btn" aria-label="Search" onClick={() => setShowSearch(true)}><Search size={18} /></button>
+            <button className="icon-btn" aria-label="Search" onClick={() => setShowSearch(true)}>
+              <Search size={18} />
+            </button>
             <button className="icon-btn" aria-label="Settings" onClick={() => setActiveTab('settings')}><Settings size={18} /></button>
             <button className="theme-toggle" aria-label="Toggle theme" onClick={toggleTheme}>
               {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
@@ -4597,14 +4630,19 @@ const [showFilters, setShowFilters] = useState(false)
             <div className="search-results-v2">
               {searchQuery.length < 2 ? (
                 <div className="search-empty-state">
-                  <Search size={48} className="search-empty-icon" />
-                  <p>Start typing to search across projects, team, business lines, and notes</p>
-                  <span className="search-empty-hint">Try "Barron's", "Jason", or "IBD"</span>
+                  <Search size={40} className="search-empty-icon" />
+                  <p>Search projects, team, brands, and notes</p>
+                  <span className="search-empty-hint">Type at least 2 characters to start</span>
+                </div>
+              ) : searchLoading ? (
+                <div className="search-empty-state">
+                  <div className="search-loading-indicator" />
+                  <p>Searching...</p>
                 </div>
               ) : filteredResults.projects.length === 0 && filteredResults.team.length === 0 && filteredResults.businessLines.length === 0 && filteredResults.notes.length === 0 ? (
                 <div className="search-empty-state">
-                  <p className="search-no-results">No results found for "{searchQuery}"</p>
-                  <span className="search-empty-hint">Try a different search term</span>
+                  <p className="search-no-results">No results for "{searchQuery}"</p>
+                  <span className="search-empty-hint">Try a different term or check spelling</span>
                 </div>
               ) : (
                 <>
@@ -4883,7 +4921,7 @@ const [showFilters, setShowFilters] = useState(false)
                 <label>Default Password</label>
                 <input
                   type="text"
-                  value="DJ_wand1hub!"
+                  value="dj_wandihub!"
                   disabled
                   className="disabled-input"
                 />

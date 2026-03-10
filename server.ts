@@ -143,7 +143,7 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ error: 'Email and password required' });
     }
 
-    const user = await get('SELECT * FROM users WHERE email = ?', [email]) as any;
+    const user = await get('SELECT * FROM users WHERE LOWER(email) = LOWER(?)', [email]) as any;
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
