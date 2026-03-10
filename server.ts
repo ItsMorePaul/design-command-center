@@ -934,17 +934,6 @@ app.delete('/api/notes/:id', async (req, res) => {
   } catch (e: any) { res.status(500).json({ error: e.message }) }
 })
 
-// Update a note
-// Body: { title?: string, date?: string, content_preview?: string, projects_raw?: string, people_raw?: string, linkedProjectIds?: string[], linkedTeamIds?: string[] }
-app.put('/api/notes/:id', async (req, res) => {
-  try {
-    const noteId = req.params.id
-    const { title, date, content_preview, projects_raw, people_raw, linkedProjectIds, linkedTeamIds } = req.body
-
-    // Verify note exists
-    const note = await get('SELECT id FROM notes WHERE id = ?', [noteId])
-    if (!note) return res.status(404).json({ error: 'Note not found' })
-
 // Create a new note (for bulk import from other DCC instances)
 app.post('/api/notes', async (req, res) => {
   try {
@@ -972,6 +961,17 @@ app.post('/api/notes', async (req, res) => {
     res.status(201).json(newNote)
   } catch (e: any) { res.status(500).json({ error: e.message }) }
 })
+
+// Update a note
+// Body: { title?: string, date?: string, content_preview?: string, projects_raw?: string, people_raw?: string, linkedProjectIds?: string[], linkedTeamIds?: string[] }
+app.put('/api/notes/:id', async (req, res) => {
+  try {
+    const noteId = req.params.id
+    const { title, date, content_preview, projects_raw, people_raw, linkedProjectIds, linkedTeamIds } = req.body
+
+    // Verify note exists
+    const note = await get('SELECT id FROM notes WHERE id = ?', [noteId])
+    if (!note) return res.status(404).json({ error: 'Note not found' })
 
     // Build update query dynamically
     const updates: string[] = []
@@ -1502,8 +1502,8 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 // Format: YYYY.MM.DD.hhmm (e.g., 2026.02.26.2059) → displays as "2026.02.26 2059"
 
-const SITE_VERSION = '2026.03.09.1805'
-const SITE_TIME = '1805'
+const SITE_VERSION = '2026.03.09.1815'
+const SITE_TIME = '1815'
 
 const VERSION_KEY = 'dcc_versions'
 
