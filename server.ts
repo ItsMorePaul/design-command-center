@@ -326,7 +326,11 @@ app.use('/api', (req, res, next) => {
   // Skip auth for login/logout/me and read-only endpoints
   const skipAuthPaths = ['/auth/login', '/auth/logout', '/auth/me', '/health', '/search', '/data', '/projects', '/team', '/business-lines', '/brandOptions', '/capacity', '/calendar', '/priorities', '/notes', '/versions']
   const isReadOnly = req.method === 'GET'
-  const shouldSkip = skipAuthPaths.some(p => req.path.startsWith(p)) || isReadOnly
+  const isLocalhost = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1'
+  const isSeedEndpoint = req.path === '/seed'
+  
+  // Allow seed operations from localhost (for sync scripts)
+  const shouldSkip = skipAuthPaths.some(p => req.path.startsWith(p)) || isReadOnly || (isSeedEndpoint && isLocalhost)
   
   if (shouldSkip) {
     return next()
@@ -1403,11 +1407,10 @@ app.post('/api/seed', async (req, res) => {
     if (projects) {
       await run('DELETE FROM projects')
       for (const p of projects) {
-        // Handle designers field - may be array or already stringified
-        // Handle JSON fields - may be array/object or already stringified
-        const timelineValue = Array.isArray(p.timeline) ? JSON.stringify(p.timeline) : (p.timeline || '[]')
-        const customLinksValue = Array.isArray(p.customLinks) ? JSON.stringify(p.customLinks) : (p.customLinks || '[]')
-        const designersValue = Array.isArray(p.designers) ? JSON.stringify(p.designers) : (p.designers || '[]')
+        // Handle JSON fields - may be array (from API), string (from SQLite export), or undefined
+        const timelineValue = typeof p.timeline === 'string' ? p.timeline : JSON.stringify(p.timeline || [])
+        const customLinksValue = typeof p.customLinks === 'string' ? p.customLinks : JSON.stringify(p.customLinks || [])
+        const designersValue = typeof p.designers === 'string' ? p.designers : JSON.stringify(p.designers || [])
         await run(`INSERT INTO projects (id, name, status, dueDate, assignee, url, description, businessLine, deckLink, prdLink, briefLink, startDate, endDate, timeline, deckName, prdName, briefName, figmaLink, customLinks, designers) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [p.id, p.name, p.status || 'active', p.dueDate || null, p.assignee || null, p.url || '', p.description || '', p.businessLine || null, p.deckLink || '', p.prdLink || '', p.briefLink || '', p.startDate || null, p.endDate || null, timelineValue, p.deckName || '', p.prdName || '', p.briefName || '', p.figmaLink || '', customLinksValue, designersValue])
       }
@@ -1417,8 +1420,11 @@ app.post('/api/seed', async (req, res) => {
     if (team) {
       await run('DELETE FROM team')
       for (const t of team) {
-        await run(`INSERT INTO team (id, name, role, brands, status, slack, email, avatar, timeOff, weekly_hours) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [t.id, t.name, t.role || '', JSON.stringify(t.brands || []), t.status || 'offline', t.slack || '', t.email || '', t.avatar || '', JSON.stringify(t.timeOff || []), t.weekly_hours ?? 35])
+        // Handle JSON fields - may already be string (from API) or array (from SQLite export)
+        const brandsValue = typeof t.brands === 'string' ? t.brands : JSON.stringify(t.brands || [])
+        const timeOffValue = typeof t.timeOff === 'string' ? t.timeOff : JSON.stringify(t.timeOff || [])
+        await run(`INSERT INTO team (id, name, role, brands, status, slack, email, avatar, timeOff, weekly_hours, excluded, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+          [t.id, t.name, t.role || '', brandsValue, t.status || 'offline', t.slack || '', t.email || '', t.avatar || '', timeOffValue, t.weekly_hours ?? 35, t.excluded ? 1 : 0])
       }
     }
     
@@ -1444,8 +1450,9 @@ app.post('/api/seed', async (req, res) => {
     if (businessLines && businessLines.length > 0) {
       await run('DELETE FROM business_lines')
       for (const bl of businessLines) {
+        const customLinksValue = typeof bl.customLinks === 'string' ? bl.customLinks : JSON.stringify(bl.customLinks || [])
         await run(`INSERT INTO business_lines (id, name, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinks) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [bl.id, bl.name, bl.deckName || '', bl.deckLink || '', bl.prdName || '', bl.prdLink || '', bl.briefName || '', bl.briefLink || '', bl.figmaLink || '', JSON.stringify(bl.customLinks || [])])
+          [bl.id, bl.name, bl.deckName || '', bl.deckLink || '', bl.prdName || '', bl.prdLink || '', bl.briefName || '', bl.briefLink || '', bl.figmaLink || '', customLinksValue])
       }
     }
     
