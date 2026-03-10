@@ -186,6 +186,29 @@ git push origin <commit-hash>:main --force
 
 ---
 
+### ✅ v260309-hidden-fingerprints
+**Date:** 2026-03-09
+**Time:** ~10:25 PM PST
+**Git tag:** `v260309-hidden-fingerprints`
+**Commit:** `d2b99fb`
+**Site version:** `2026.03.09 2225`
+**DB version at save:** `2026.03.09 2159`
+
+**To restore:**
+```bash
+git checkout v260309-hidden-fingerprints
+```
+
+#### What was built in this session
+
+- **Hidden note fingerprints**: Notes hidden via PIN now store a `source_filename` fingerprint in `hidden_note_fingerprints` table. During Gemini sync, new notes are checked against fingerprints — previously hidden sources are auto-hidden regardless of new Gemini DB ID. Hidden notes are never overwritten on sync update.
+- **Drag-and-drop fix**: Projects can now be dragged from Done back to In Progress even when In Progress is empty (single-project business lines like Mansion Global). Jitter-free implementation using `useDroppable` with `min-height` zone instead of dynamic placeholders.
+- **Business line selector**: Added `width: auto` to `.priority-bl-select` to override global `select { width: 100% }`.
+- **Jason Miller login**: Reset password for `jason.miller@dowjones.com`.
+- **Deployment pipeline**: New `deploy.sh` script uploads entire SQLite file via `/api/upload-db` — no hardcoded table lists, future-proof.
+
+---
+
 ### ✅ v260226-modal-polish
 **Date:** 2026-02-26  
 **Time:** ~6:05 PM PST  
