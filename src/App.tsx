@@ -854,6 +854,13 @@ const [showFilters, setShowFilters] = useState(false)
     }
   }
 
+  // Fetch users when settings tab opens (admin only)
+  useEffect(() => {
+    if (activeTab === 'settings' && currentUser?.role === 'admin') {
+      fetchUsers()
+    }
+  }, [activeTab, currentUser])
+
   // Create user
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault()
