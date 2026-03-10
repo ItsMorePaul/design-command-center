@@ -277,11 +277,11 @@ function parseNoteContent(content: string | undefined | null): { summary: string
 function highlightTextWithLinks(
   text: string,
   projects: Project[],
-  team: TeamMember[],
+  _team: TeamMember[],
   linkedProjectIds: string[],
-  linkedTeamIds: string[],
+  _linkedTeamIds: string[],
   onAddProject: (id: string) => void,
-  onAddPerson: (id: string) => void
+  _onAddPerson: (id: string) => void
 ): React.ReactNode {
   if (!text) return null
   
