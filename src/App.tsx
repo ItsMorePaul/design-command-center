@@ -816,9 +816,9 @@ const [showFilters, setShowFilters] = useState(false)
       setSessionId(data.sessionId)
       setCurrentUser(data.user)
       setIsAuthenticated(true)
-      setActiveTab('projects') // Redirect to default page after login
-      setLoginForm({ email: '', password: '' })
-      window.location.reload() // Force full page refresh after login
+      setActiveTab('projects')
+      // Delay reload so browser can capture credentials and offer "Save password?"
+      setTimeout(() => window.location.reload(), 100)
     } catch (err) {
       setLoginError('Login failed. Please try again.')
     }
@@ -1954,15 +1954,15 @@ const [showFilters, setShowFilters] = useState(false)
           <h1>Wandi Hub</h1>
           <p className="login-subtitle">Design Command Center</p>
 
-          <form className="login-form" onSubmit={handleLogin} autoComplete="on">
+          <form className="login-form" onSubmit={handleLogin} action="/api/auth/login" method="post" autoComplete="on">
             {loginError && <div className="login-error">{loginError}</div>}
             <div className="form-field">
               <label htmlFor="login-email" className="sr-only">Email</label>
               <input
                 id="login-email"
-                name="email"
+                name="username"
                 type="email"
-                autoComplete="email"
+                autoComplete="username"
                 placeholder="Email"
                 value={loginForm.email}
                 onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
