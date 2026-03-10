@@ -186,6 +186,27 @@ git push origin <commit-hash>:main --force
 
 ---
 
+### ✅ v260310-notes-cleanup
+**Date:** 2026-03-10
+**Time:** ~10:41 AM PST
+**Git tag:** `v260310-notes-cleanup`
+**Commit:** `037a010`
+**Site version:** `2026.03.10 1741`
+**DB version at save:** `2026.03.10 1041`
+
+**To restore:**
+```bash
+git checkout v260310-notes-cleanup
+```
+
+#### What was built
+
+- **Content preview cleaning**: Added `cleanContentPreview()` to Gemini notes sync that strips raw `.md` header blocks — `📝 Notes`, date lines, title, `Invited` name lists, `Attachments` lines — leaving only the actual meeting content summary. Fixed 59 notes that previously showed headers instead of summaries.
+- **Person highlighting removed**: Removed person name matching and pink highlight `<span>` with `+` button from `highlightTextWithLinks()` in notes detail body. Project highlighting (blue) remains.
+- **Notes re-synced**: All 223 notes updated with cleaned content_previews via `/api/notes/sync`.
+
+---
+
 ### ✅ v260310-optimistic-locking
 **Date:** 2026-03-10
 **Time:** ~10:05 AM PST
@@ -503,13 +524,15 @@ git checkout v260226-period-version-format
 
 ---
 
-### ✅ v260306-3phase-workflow
-**Date:** 2026-03-06  
-**Time:** ~8:40 AM PST  
-**Git tag:** `v260306-3phase-workflow`  
-**Commit:** (pending — create after testing workflow)  
-**Site version:** `2026.03.06.0840`  
+### ⚠️ v260306-3phase-workflow (SUPERSEDED — scripts deprecated)
+**Date:** 2026-03-06
+**Time:** ~8:40 AM PST
+**Git tag:** `v260306-3phase-workflow`
+**Commit:** (pending — create after testing workflow)
+**Site version:** `2026.03.06.0840`
 **DB version at save:** (current)
+
+> **⚠️ WARNING:** The scripts created in this checkpoint (`dcc-data-workflow.sh`, `dcc-push-to-railway.sh`) use table-by-table `/api/seed` sync which causes data corruption. They were replaced by `deploy.sh` and `pull-from-railway.sh` in v260310-deployment-pipeline. **NEVER use the scripts from this checkpoint.**
 
 **To restore:**
 ```bash
