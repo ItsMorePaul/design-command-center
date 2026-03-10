@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import sqlite3 from 'sqlite3';
 import path from 'path';
+import fs from 'fs';
 import { searchProjects, searchTeam, searchBusinessLines, searchNotes } from './search';
 import { homedir } from 'os';
 import bcrypt from 'bcrypt';
@@ -1026,7 +1027,6 @@ app.put('/api/notes/:id', async (req, res) => {
 app.post('/api/notes/sync', async (req, res) => {
   try {
     // Check if Gemini notes DB exists
-    const fs = require('fs')
     if (!fs.existsSync(GEMINI_NOTES_DB)) {
       // If no external DB, assume notes are already in DCC's own table
       // Just return success with current count
@@ -1509,8 +1509,8 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 // Format: YYYY.MM.DD.hhmm (e.g., 2026.02.26.2059) → displays as "2026.02.26 2059"
 
-const SITE_VERSION = '2026.03.09.1906'
-const SITE_TIME = '1906'
+const SITE_VERSION = '2026.03.09.1920'
+const SITE_TIME = '1920'
 
 const VERSION_KEY = 'dcc_versions'
 
