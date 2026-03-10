@@ -52,6 +52,25 @@ if [[ ! -f "$LOCAL_DB" ]]; then
   exit 1
 fi
 
+# ── Stop local servers BEFORE reading DB ─────────────────────────
+# Critical: a running server holds the DB in memory and can overwrite
+# the file at any time. We must kill servers so the file on disk is
+# the authoritative copy.
+API_PID=$(lsof -ti:3001 2>/dev/null || true)
+VITE_PID=$(lsof -ti:5173 2>/dev/null || true)
+if [[ -n "$API_PID" || -n "$VITE_PID" ]]; then
+  log "Stopping local servers to ensure DB file is authoritative..."
+  [[ -n "$API_PID" ]] && kill $API_PID 2>/dev/null || true
+  [[ -n "$VITE_PID" ]] && kill $VITE_PID 2>/dev/null || true
+  sleep 2
+  # Verify they're actually dead
+  if lsof -ti:3001 &>/dev/null; then
+    err "API server on :3001 still running after kill. Aborting."
+    exit 1
+  fi
+  log "Local servers stopped."
+fi
+
 # Validate local DB integrity
 if ! sqlite3 "$LOCAL_DB" "PRAGMA integrity_check;" | grep -q "ok"; then
   err "Local database failed integrity check!"
@@ -105,12 +124,17 @@ if [[ "$DATA_ONLY" == "false" ]]; then
   log "Pushing code to Railway..."
   git push origin main
 
-  log "Waiting for Railway to rebuild..."
+  # Capture current Railway version so we can detect when the new build is live
+  OLD_VERSION=$(curl -sf "$RAILWAY_URL/api/versions" 2>/dev/null | jq -r '.site_version // "unknown"' 2>/dev/null || echo "unknown")
+  log "Current Railway version: $OLD_VERSION"
+
+  log "Waiting for Railway to rebuild with new version..."
   ATTEMPTS=0
-  while [[ $ATTEMPTS -lt 40 ]]; do
+  while [[ $ATTEMPTS -lt 60 ]]; do
     sleep 5
-    if curl -sf "$RAILWAY_URL/api/health" &>/dev/null; then
-      log "Railway is back up."
+    NEW_VERSION=$(curl -sf "$RAILWAY_URL/api/versions" 2>/dev/null | jq -r '.site_version // "unknown"' 2>/dev/null || echo "unreachable")
+    if [[ "$NEW_VERSION" != "unknown" && "$NEW_VERSION" != "unreachable" && "$NEW_VERSION" != "$OLD_VERSION" ]]; then
+      log "Railway rebuilt with new version: $NEW_VERSION"
       break
     fi
     echo -n "."
@@ -118,8 +142,9 @@ if [[ "$DATA_ONLY" == "false" ]]; then
   done
   echo ""
 
-  if [[ $ATTEMPTS -eq 40 ]]; then
-    err "Railway deploy timeout after 200s. Check dashboard."
+  if [[ $ATTEMPTS -eq 60 ]]; then
+    err "Railway deploy timeout after 300s. New version not detected."
+    err "Old version: $OLD_VERSION — check Railway dashboard."
     exit 1
   fi
 fi
@@ -185,6 +210,35 @@ if [[ "$PASS" == "true" ]]; then
 else
   err "DEPLOYMENT HAS MISMATCHES - check above."
   warn "Railway backup at: $BACKUP_DIR"
+fi
+
+# ── Restart local servers ──────────────────────────────────────────
+cd "$DCC_DIR"
+
+log "Restarting local API server on :3001..."
+NODE_ENV=production npm start >> /tmp/dcc-server.log 2>&1 &
+for i in {1..15}; do
+  if curl -sf http://localhost:3001/api/health &>/dev/null; then
+    log "API server ready."
+    break
+  fi
+  sleep 1
+done
+if ! curl -sf http://localhost:3001/api/health &>/dev/null; then
+  warn "API server did not start. Check /tmp/dcc-server.log"
+fi
+
+log "Restarting Vite dev server on :5173..."
+npm run dev >> /tmp/dcc-vite.log 2>&1 &
+for i in {1..10}; do
+  if curl -sf http://localhost:5173 &>/dev/null; then
+    log "Vite dev server ready."
+    break
+  fi
+  sleep 1
+done
+if ! curl -sf http://localhost:5173 &>/dev/null; then
+  warn "Vite did not start. Check /tmp/dcc-vite.log"
 fi
 
 echo ""

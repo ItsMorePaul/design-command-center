@@ -186,6 +186,28 @@ git push origin <commit-hash>:main --force
 
 ---
 
+### ✅ v260310-deploy-hardening
+**Date:** 2026-03-10
+**Time:** ~3:35 PM PST
+**Git tag:** `v260310-deploy-hardening`
+**Commit:** (this commit)
+**Site version:** `2026.03.10 2235`
+**DB version at save:** `2026.03.10 0845`
+
+**To restore:**
+```bash
+git checkout v260310-deploy-hardening
+```
+
+#### What was built
+
+- **Deploy script kills servers first**: `deploy.sh` now stops API (:3001) and Vite (:5173) before reading the DB file, preventing the stale in-memory DB overwrite that caused recurring note bloat (365 → 223 corruption happened 3 times)
+- **Version-aware Railway rebuild wait**: After `git push`, deploy.sh now polls `/api/versions` for a new `site_version` instead of just checking `/api/health` (which could return 200 from the old instance), ensuring the DB upload goes to the new deployment
+- **Auto-restart after deploy**: Both local servers restart automatically after deploy completes
+- **Designer edits recovered**: Merged Railway backup data (MW Typography timeline + UAT Feedback link, W&I Ad Block Recovery project, Mansion Global timestamp) into clean 223-note DB
+
+---
+
 ### ✅ v260310-healthcheck-fix
 **Date:** 2026-03-10
 **Time:** ~3:14 PM PST
