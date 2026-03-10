@@ -898,7 +898,7 @@ const [showFilters, setShowFilters] = useState(false)
   // Notes state
   const [notes, setNotes] = useState<Note[]>([])
   const [notesSyncing, setNotesSyncing] = useState(false)
-  const [notesFilter, setNotesFilter] = useState<{ project: string | null; person: string | null; search: string }>({ project: null, person: '5', search: '' })
+  const [notesFilter, setNotesFilter] = useState<{ project: string | null; person: string | null; search: string; id: string | null }>({ project: null, person: '5', search: '', id: null })
   const [selectedNote, setSelectedNote] = useState<Note | null>(null)
   const [noteDetailOpen, setNoteDetailOpen] = useState(false)
   const [editingNote, setEditingNote] = useState<Note | null>(null) // note being edited in modal
@@ -3424,8 +3424,8 @@ const [showFilters, setShowFilters] = useState(false)
                 <option key={m.id} value={m.id}>{m.name}</option>
               ))}
             </select>
-            {(notesFilter.search || notesFilter.project || notesFilter.person) && (
-              <button className="text-btn" onClick={() => setNotesFilter({ project: null, person: null, search: '' })}>
+            {(notesFilter.search || notesFilter.project || notesFilter.person || notesFilter.id) && (
+              <button className="text-btn" onClick={() => setNotesFilter({ project: null, person: null, search: '', id: null })}>
                 Clear filters
               </button>
             )}
@@ -3440,6 +3440,7 @@ const [showFilters, setShowFilters] = useState(false)
             ) : (
               (() => {
                 const filtered = notes.filter(note => {
+                  if (notesFilter.id && note.id !== notesFilter.id) return false
                   if (notesFilter.project && !note.linkedProjectIds.includes(notesFilter.project)) return false
                   if (notesFilter.person) {
                     // Check if the selected person is linked OR if their nickname matches someone linked
@@ -4775,6 +4776,8 @@ const [showFilters, setShowFilters] = useState(false)
                             setActiveTab('notes')
                             setShowSearch(false)
                             setSearchQuery('')
+                            setNotesFilter({ project: null, person: null, search: '', id: note.id })
+                            setSelectedNote(note)
                           }}
                         >
                           <div className="search-result-main">
