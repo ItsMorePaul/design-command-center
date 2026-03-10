@@ -2876,7 +2876,7 @@ input:checked + .slider:before {
   padding: 0.5rem;
 }
 
-/* Week-row based calendar with spanning events */
+/* Week-row calendar with spanning events inside cells */
 .week-row {
   position: relative;
 }
@@ -2884,19 +2884,22 @@ input:checked + .slider:before {
 .week-cells {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 2px;
+  gap: 4px;
 }
 
-.week-events {
-  position: relative;
-  margin: 0 0 2px 0;
+.week-events-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  z-index: 1;
 }
 
 .day-cell {
-  min-height: 32px;
+  min-height: 80px;
   background: var(--color-bg);
   border: 1px solid var(--color-border-subtle);
-  border-radius: 6px 6px 0 0;
+  border-radius: 6px;
   padding: 0.25rem;
   display: flex;
   flex-direction: column;
@@ -2905,22 +2908,17 @@ input:checked + .slider:before {
   min-width: 0;
 }
 
-.day-cell.weekend {
-  opacity: 0.3;
-}
-
 .day-cell.empty {
   background: transparent;
   border: none;
 }
 
 .day-cell.has-events {
-  background: rgba(59, 130, 246, 0.05);
   cursor: pointer;
 }
 
 .day-cell.has-events:hover {
-  background: rgba(59, 130, 246, 0.1);
+  background: rgba(59, 130, 246, 0.05);
   border-color: var(--color-accent);
 }
 
@@ -2943,7 +2941,7 @@ input:checked + .slider:before {
   white-space: nowrap;
   text-overflow: ellipsis;
   cursor: pointer;
-  z-index: 1;
+  pointer-events: auto;
   box-sizing: border-box;
 }
 

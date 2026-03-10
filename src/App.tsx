@@ -2987,30 +2987,22 @@ const [showFilters, setShowFilters] = useState(false)
                     </div>
 
                   {calendarData.months.map((month: CalendarMonth, mIdx: number) => {
-                    // Build week rows for Google Calendar-style spanning
                     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
                     const firstDayIdx = month.days[0] ? dayNames.indexOf(month.days[0].dayName) : 0
 
-                    // Build flat array: empty slots + real days
+                    // Build flat cell array: empty slots + real days (no weekend filtering)
                     type CellData = { type: 'empty' } | { type: 'day'; day: CalendarDay; dayEvents: CalendarEvent[] }
                     const cells: CellData[] = []
                     for (let i = 0; i < firstDayIdx; i++) cells.push({ type: 'empty' })
                     month.days.forEach(day => {
-                      const isWeekend = day.dayName === 'Sat' || day.dayName === 'Sun'
-                      const weekendAwareEvents = isWeekend
-                        ? day.events.filter((e: CalendarEvent) => e.type === 'timeoff' || e.type === 'holiday')
-                        : day.events
-                      const dayEvents = filterCalendarEvents(weekendAwareEvents)
-                      cells.push({ type: 'day', day, dayEvents })
+                      cells.push({ type: 'day', day, dayEvents: filterCalendarEvents(day.events) })
                     })
-                    // Pad last week
                     while (cells.length % 7 !== 0) cells.push({ type: 'empty' })
 
                     // Split into week rows
                     const weeks: CellData[][] = []
                     for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7))
 
-                    // Collect all unique multi-day events in this month for spanning
                     const eventKey = (e: CalendarEvent) => `${e.type}-${e.name}-${e.startDate}-${e.endDate}-${e.person || ''}-${e.projectName || ''}`
 
                     return (
@@ -3035,15 +3027,12 @@ const [showFilters, setShowFilters] = useState(false)
                               const k = eventKey(ev)
                               if (seenKeys.has(k)) return
                               seenKeys.add(k)
-
-                              // Find how far this event spans in this week
                               let endCol = colIdx
                               if (ev.startDate && ev.endDate && ev.startDate !== ev.endDate) {
                                 for (let c = colIdx + 1; c < 7; c++) {
                                   const nextCell = week[c]
                                   if (nextCell.type !== 'day') break
-                                  const hasEv = nextCell.dayEvents.some(e2 => eventKey(e2) === k)
-                                  if (hasEv) endCol = c
+                                  if (nextCell.dayEvents.some(e2 => eventKey(e2) === k)) endCol = c
                                   else break
                                 }
                               }
@@ -3051,21 +3040,17 @@ const [showFilters, setShowFilters] = useState(false)
                             })
                           })
 
-                          // Assign rows to spanning events (greedy: first available row)
+                          // Assign rows (greedy packing, longer spans first)
                           const eventRows: { event: CalendarEvent; startCol: number; endCol: number; row: number; key: string }[] = []
-                          const rowOccupied: number[][] = [] // rowOccupied[row] = list of occupied columns
-
-                          // Sort: multi-day first (longer spans first), then single-day
+                          const rowOccupied: number[][] = []
                           spanEvents.sort((a, b) => (b.endCol - b.startCol) - (a.endCol - a.startCol))
-
                           spanEvents.forEach(se => {
                             let row = 0
                             while (true) {
                               if (!rowOccupied[row]) rowOccupied[row] = []
-                              const conflict = rowOccupied[row].some(c => c >= se.startCol && c <= se.endCol)
-                              if (!conflict) break
+                              if (!rowOccupied[row].some(c => c >= se.startCol && c <= se.endCol)) break
                               row++
-                              if (row > 5) break // max 6 rows of events
+                              if (row > 5) break
                             }
                             for (let c = se.startCol; c <= se.endCol; c++) {
                               if (!rowOccupied[row]) rowOccupied[row] = []
@@ -3075,19 +3060,22 @@ const [showFilters, setShowFilters] = useState(false)
                           })
 
                           const maxEventRows = Math.max(0, ...eventRows.map(e => e.row + 1))
+                          const EVENT_H = 20
+                          const DATE_H = 24
+                          const cellMinH = Math.max(80, DATE_H + maxEventRows * EVENT_H + 4)
 
                           return (
-                          <div key={wIdx} className="week-row">
+                          <div key={wIdx} className="week-row" style={{ position: 'relative' }}>
                             <div className="week-cells">
                               {week.map((cell, colIdx) => {
-                                if (cell.type === 'empty') return <div key={colIdx} className="day-cell empty" />
+                                if (cell.type === 'empty') return <div key={colIdx} className="day-cell empty" style={{ minHeight: cellMinH }} />
                                 const isToday = cell.day.date === getTodayStr()
-                                const isWeekend = cell.day.dayName === 'Sat' || cell.day.dayName === 'Sun'
                                 const hasEvents = cell.dayEvents.length > 0
                                 return (
                                   <div
                                     key={colIdx}
-                                    className={`day-cell ${hasEvents ? 'has-events' : ''} ${isToday ? 'today' : ''} ${isWeekend ? 'weekend' : ''}`}
+                                    className={`day-cell ${hasEvents ? 'has-events' : ''} ${isToday ? 'today' : ''}`}
+                                    style={{ minHeight: cellMinH }}
                                     onClick={() => hasEvents && setSelectedDay({ date: cell.day.date, events: cell.dayEvents, dayName: cell.day.dayName })}
                                   >
                                     <span className="day-number">{isToday ? '★ ' : ''}{cell.day.day}</span>
@@ -3095,7 +3083,8 @@ const [showFilters, setShowFilters] = useState(false)
                                 )
                               })}
                             </div>
-                            <div className="week-events" style={{ height: maxEventRows > 0 ? `${maxEventRows * 20}px` : '0px' }}>
+                            {/* Event bars overlaid inside cells, below date numbers */}
+                            <div className="week-events-overlay" style={{ top: `${DATE_H}px` }}>
                               {eventRows.map((er, eIdx) => {
                                 const isMultiDay = er.startCol !== er.endCol
                                 const isStart = !er.event.startDate || (() => {
@@ -3107,11 +3096,12 @@ const [showFilters, setShowFilters] = useState(false)
                                   return cell.type === 'day' && cell.day.date === er.event.endDate
                                 })()
                                 const span = er.endCol - er.startCol + 1
+                                // Project and timeoff use same label style: just the name
                                 const label = er.event.type === 'timeoff'
                                   ? `🌴 ${er.event.person || er.event.name}`
                                   : er.event.type === 'holiday'
                                   ? er.event.name
-                                  : (er.event.projectName ? `${er.event.name} · ${er.event.projectName}` : er.event.name)
+                                  : er.event.name
                                 return (
                                   <div
                                     key={eIdx}
@@ -3119,12 +3109,12 @@ const [showFilters, setShowFilters] = useState(false)
                                     style={{
                                       left: `calc(${er.startCol} * (100% / 7) + 1px)`,
                                       width: `calc(${span} * (100% / 7) - 2px)`,
-                                      top: `${er.row * 20}px`,
+                                      top: `${er.row * EVENT_H}px`,
                                       backgroundColor: er.event.color || (er.event.type === 'holiday' ? '#6b7280' : er.event.type === 'timeoff' ? '#ef4444' : '#3b82f6'),
                                     }}
-                                    title={`${er.event.name}${er.event.person ? ` - ${er.event.person}` : ''}${er.event.projectName ? ` (${er.event.projectName})` : ''}`}
+                                    title={`${er.event.name}${er.event.person ? ` - ${er.event.person}` : ''}`}
                                   >
-                                    {(isStart || er.startCol === 0) && <span className="span-event-text">{label}</span>}
+                                    <span className="span-event-text">{label}</span>
                                   </div>
                                 )
                               })}

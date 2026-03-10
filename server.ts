@@ -815,61 +815,15 @@ app.get('/api/calendar', async (req, res) => {
       return new Date(+match[1], +match[2] - 1, +match[3], 12, 0, 0, 0)
     }
 
-    // Find date range - start from current month
+    // Full calendar year: Jan–Dec of current year
     const now = new Date();
-    let minDate = new Date(now.getFullYear(), now.getMonth(), 1, 12, 0, 0, 0); // Start of current month
-    let maxDate = new Date(now.getFullYear(), now.getMonth(), 1, 12, 0, 0, 0); // Start of current month
+    const calYear = now.getFullYear();
+    const minDate = new Date(calYear, 0, 1, 12, 0, 0, 0);  // Jan 1
+    const maxDate = new Date(calYear, 11, 31, 12, 0, 0, 0); // Dec 31
 
-    // Check project dates
-    projects.forEach(proj => {
-      if (proj.startDate) {
-        const d = toLocalDate(proj.startDate);
-        if (d && d < minDate) minDate = d;
-      }
-      if (proj.endDate) {
-        const d = toLocalDate(proj.endDate);
-        if (d && d > maxDate) maxDate = d;
-      }
-      // Check timeline ranges
-      if (proj.timeline) {
-        proj.timeline.forEach((t: { startDate: string; endDate: string }) => {
-          if (t.startDate) {
-            const d = toLocalDate(t.startDate);
-            if (d && d < minDate) minDate = d;
-          }
-          if (t.endDate) {
-            const d = toLocalDate(t.endDate);
-            if (d && d > maxDate) maxDate = d;
-          }
-        });
-      }
-    });
-
-    // Check team time off dates
-    team.forEach(member => {
-      if (member.timeOff) {
-        member.timeOff.forEach((off: { startDate: string; endDate: string }) => {
-          if (off.startDate) {
-            const d = toLocalDate(off.startDate);
-            if (d && d < minDate) minDate = d;
-          }
-          if (off.endDate) {
-            const d = toLocalDate(off.endDate);
-            if (d && d > maxDate) maxDate = d;
-          }
-        });
-      }
-    });
-    
-    // Add 3 months to max date
-    maxDate.setMonth(maxDate.getMonth() + 3);
-    
     // Generate months
     const months: CalendarMonth[] = [];
-    // Start from the month of minDate
-    const startMonth = minDate.getMonth();
-    const startYear = minDate.getFullYear();
-    const current = new Date(startYear, startMonth, 1);
+    const current = new Date(calYear, 0, 1);
     while (current <= maxDate) {
       const monthName = current.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
       const daysInMonth = new Date(current.getFullYear(), current.getMonth() + 1, 0).getDate();
@@ -882,20 +836,16 @@ app.get('/api/calendar', async (req, res) => {
         
         const events: CalendarEvent[] = [];
         
-        // Add project timeline events
+        // Add project events (based on project start/end dates only, not timeline sub-ranges)
         projects.forEach(proj => {
-          if (proj.timeline) {
-            proj.timeline.forEach((t: { name: string; startDate: string; endDate: string }) => {
-              if (t.startDate && t.endDate && dateStr >= t.startDate && dateStr <= t.endDate) {
-                events.push({
-                  type: 'project',
-                  name: t.name,
-                  projectName: proj.name,
-                  startDate: t.startDate,
-                  endDate: t.endDate,
-                  color: '#6366f1'
-                });
-              }
+          if (proj.startDate && proj.endDate && dateStr >= proj.startDate && dateStr <= proj.endDate) {
+            events.push({
+              type: 'project',
+              name: proj.name,
+              projectName: proj.name,
+              startDate: proj.startDate,
+              endDate: proj.endDate,
+              color: '#6366f1'
             });
           }
         });
@@ -1910,8 +1860,8 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 // Format: YYYY.MM.DD.hhmm (e.g., 2026.02.26.2059) → displays as "2026.02.26 2059"
 
-const SITE_VERSION = '2026.03.10.2310'
-const SITE_TIME = '2310'
+const SITE_VERSION = '2026.03.10.2345'
+const SITE_TIME = '2345'
 
 const VERSION_KEY = 'dcc_versions'
 
