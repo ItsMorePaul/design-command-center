@@ -96,6 +96,20 @@ if ! sqlite3 "$TEMP_DB" "PRAGMA integrity_check;" | grep -q "ok"; then
   exit 1
 fi
 
+# ── Stop local servers BEFORE replacing DB ───────────────────────
+# Critical: a running server holds the old DB in memory and can overwrite
+# the new file on any write operation (version bump, note edit, etc.)
+WAS_RUNNING=false
+API_PID=$(lsof -ti:3001 2>/dev/null || true)
+VITE_PID=$(lsof -ti:5173 2>/dev/null || true)
+if [[ -n "$API_PID" || -n "$VITE_PID" ]]; then
+  WAS_RUNNING=true
+  log "Stopping local servers before DB replacement..."
+  [[ -n "$API_PID" ]] && kill $API_PID 2>/dev/null || true
+  [[ -n "$VITE_PID" ]] && kill $VITE_PID 2>/dev/null || true
+  sleep 2
+fi
+
 # ── Replace local DB ────────────────────────────────────────────
 mv "$TEMP_DB" "$LOCAL_DB"
 log "Local database replaced."
@@ -111,32 +125,37 @@ for TABLE in $TABLES; do
   printf "%-30s %s\n" "$TABLE" "$COUNT"
 done
 
-# ── Restart local server if running ──────────────────────────────
-SERVER_PID=$(lsof -ti:3001 2>/dev/null || true)
-if [[ -n "$SERVER_PID" ]]; then
-  log "Restarting local DCC server (killing PID $SERVER_PID)..."
-  kill $SERVER_PID 2>/dev/null || true
-  sleep 1
-  # Re-launch server
-  cd "$DCC_DIR"
-  NODE_ENV=production npm start >> /tmp/dcc-server.log 2>&1 &
-  NEW_PID=$!
-  # Wait for it to come up
-  for i in {1..15}; do
-    if curl -sf http://localhost:3001/api/health &>/dev/null; then
-      log "Server restarted (PID $NEW_PID) — serving new data."
-      break
-    fi
-    sleep 1
-  done
-  if ! curl -sf http://localhost:3001/api/health &>/dev/null; then
-    warn "Server did not come back up. Check /tmp/dcc-server.log"
+# ── Restart local servers ────────────────────────────────────────
+cd "$DCC_DIR"
+
+log "Starting API server on :3001..."
+NODE_ENV=production npm start >> /tmp/dcc-server.log 2>&1 &
+for i in {1..15}; do
+  if curl -sf http://localhost:3001/api/health &>/dev/null; then
+    log "API server ready."
+    break
   fi
-else
-  warn "Local server not running on port 3001. Start it to use the new data."
+  sleep 1
+done
+if ! curl -sf http://localhost:3001/api/health &>/dev/null; then
+  err "API server did not start. Check /tmp/dcc-server.log"
+fi
+
+log "Starting Vite dev server on :5173..."
+npm run dev >> /tmp/dcc-vite.log 2>&1 &
+for i in {1..10}; do
+  if curl -sf http://localhost:5173 &>/dev/null; then
+    log "Vite dev server ready."
+    break
+  fi
+  sleep 1
+done
+if ! curl -sf http://localhost:5173 &>/dev/null; then
+  warn "Vite did not start. Check /tmp/dcc-vite.log"
 fi
 
 echo ""
 log "PULL COMPLETE — local DB is now an exact copy of Railway."
+log "View site at: http://localhost:5173"
 echo ""
 log "Rollback backup: ${BACKUP_DIR:-none}"

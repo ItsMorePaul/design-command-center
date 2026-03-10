@@ -43,11 +43,15 @@ DCC_DEPLOY_OK=1 ./scripts/deploy.sh --data
 ```
 
 **What happens:**
-1. Backs up local DB to `backups/local/pre_pull_*`
-2. Downloads entire SQLite file from Railway via `GET /api/download-db`
-3. Validates SQLite magic bytes and integrity
-4. Replaces local `data/shared.db`
-5. **Restart local server** to pick up new data
+1. Stops local servers (API on :3001 and Vite on :5173) — **must stop before replacing DB**
+2. Backs up local DB to `backups/local/pre_pull_*`
+3. Downloads entire SQLite file from Railway via `GET /api/download-db`
+4. Validates SQLite magic bytes and integrity
+5. Replaces local `data/shared.db`
+6. Restarts API server (:3001) and Vite dev server (:5173)
+7. Site is ready at http://localhost:5173
+
+**CRITICAL:** Never modify `data/shared.db` while the API server is running. The server holds the DB in memory and will overwrite the file on any write. Always use pull/deploy scripts which handle server lifecycle.
 
 ### Authentication
 Both endpoints use `X-Seed-Secret` header (from `DCC_SEED_SECRET` env var in `~/.openclaw/.env` and Railway).
