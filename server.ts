@@ -945,6 +945,34 @@ app.put('/api/notes/:id', async (req, res) => {
     const note = await get('SELECT id FROM notes WHERE id = ?', [noteId])
     if (!note) return res.status(404).json({ error: 'Note not found' })
 
+// Create a new note (for bulk import from other DCC instances)
+app.post('/api/notes', async (req, res) => {
+  try {
+    const { id, source_id, source_filename, title, date, content_preview, projects_raw, people_raw, drive_url, source_created_at, next_steps, details, attachments } = req.body
+    
+    if (!id || !title) {
+      return res.status(400).json({ error: 'id and title required' })
+    }
+    
+    // Check if already exists
+    const existing = await get('SELECT id FROM notes WHERE id = ?', [id])
+    if (existing) {
+      return res.status(409).json({ error: 'Note already exists', id })
+    }
+    
+    await run(
+      `INSERT INTO notes (id, source_id, source_filename, title, date, content_preview, people_raw, projects_raw, drive_url, source_created_at, next_steps, details, attachments)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, source_id || null, source_filename || '', title, date || '', content_preview || '', 
+       people_raw || '', projects_raw || '', drive_url || '', source_created_at || '', 
+       next_steps || '', details || '', attachments || '']
+    )
+    
+    const newNote = await get('SELECT * FROM notes WHERE id = ?', [id])
+    res.status(201).json(newNote)
+  } catch (e: any) { res.status(500).json({ error: e.message }) }
+})
+
     // Build update query dynamically
     const updates: string[] = []
     const params: any[] = []
@@ -993,6 +1021,19 @@ app.put('/api/notes/:id', async (req, res) => {
 // Sync notes from gemini-notes.db into DCC
 app.post('/api/notes/sync', async (req, res) => {
   try {
+    // Check if Gemini notes DB exists
+    const fs = require('fs')
+    if (!fs.existsSync(GEMINI_NOTES_DB)) {
+      // If no external DB, assume notes are already in DCC's own table
+      // Just return success with current count
+      const existingNotes = await all('SELECT COUNT(*) as count FROM notes')
+      return res.json({ 
+        success: true, 
+        message: 'No external Gemini DB found, notes already in DCC',
+        stats: { total: existingNotes[0]?.count || 0, inserted: 0, updated: 0 }
+      })
+    }
+    
     // Open the Gemini notes database
     const geminiDb = new sqlite3.Database(GEMINI_NOTES_DB)
     const geminiAll = (sql: string, params: any[] = []) => new Promise<any[]>((resolve, reject) => {
