@@ -1,118 +1,118 @@
 #!/bin/bash
-# Pull data from Railway production DB to local SQLite
-# Reverse of sync-to-railway.sh
+# pull-from-railway.sh - Download entire Railway DB to local
+#
+# Usage:
+#   ./scripts/pull-from-railway.sh
+#
+# Downloads the byte-for-byte SQLite file from Railway's /api/download-db.
+# Backs up local DB first, then replaces it.
+#
+# Requires:
+#   DCC_SEED_SECRET env var (shared with Railway)
 
+set -euo pipefail
+
+# Source seed secret from openclaw env if not already set
+if [[ -z "${DCC_SEED_SECRET:-}" && -f "$HOME/.openclaw/.env" ]]; then
+  export $(grep '^DCC_SEED_SECRET=' "$HOME/.openclaw/.env" | head -1)
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DCC_DIR="$(dirname "$SCRIPT_DIR")"
+LOCAL_DB="$DCC_DIR/data/shared.db"
 RAILWAY_URL="https://design-command-center-production.up.railway.app"
-LOCAL_SERVER="http://localhost:3001"
-DCC_DIR="$HOME/.openclaw/workspace/design-command-center"
 
-echo "Fetching data from Railway..."
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
+log()  { echo -e "${GREEN}[$(date '+%H:%M:%S')]${NC} $1"; }
+warn() { echo -e "${YELLOW}[$(date '+%H:%M:%S')] WARNING:${NC} $1"; }
+err()  { echo -e "${RED}[$(date '+%H:%M:%S')] ERROR:${NC} $1"; }
 
-# Fetch main data
-DATA=$(curl -sf "$RAILWAY_URL/api/data")
-if [ $? -ne 0 ] || [ -z "$DATA" ]; then
-    echo "ERROR: Failed to fetch from Railway. Is the URL correct and the server running?"
-    exit 1
+# ── Preflight ────────────────────────────────────────────────────
+if [[ -z "${DCC_SEED_SECRET:-}" ]]; then
+  err "DCC_SEED_SECRET not set. Cannot authenticate with Railway."
+  echo "  Set it: export DCC_SEED_SECRET=<token>"
+  exit 1
 fi
 
-PROJECTS=$(echo "$DATA" | jq '.projects')
-TEAM=$(echo "$DATA" | jq '.team')
-PROJECT_COUNT=$(echo "$PROJECTS" | jq 'length')
-TEAM_COUNT=$(echo "$TEAM" | jq 'length')
-echo "✓ Fetched $PROJECT_COUNT projects, $TEAM_COUNT team members"
-
-# Fetch capacity data (includes project_assignments)
-CAPACITY=$(curl -sf "$RAILWAY_URL/api/capacity")
-if [ $? -ne 0 ] || [ -z "$CAPACITY" ]; then
-    echo "WARNING: Failed to fetch capacity data"
-    ASSIGNMENTS="[]"
-else
-    ASSIGNMENTS=$(echo "$CAPACITY" | jq '.assignments // []')
-    echo "✓ Fetched $(echo "$ASSIGNMENTS" | jq 'length') project assignments"
-fi
-
-# Fetch priorities (force rankings)
-PRIORITIES=$(curl -sf "$RAILWAY_URL/api/priorities")
-if [ $? -ne 0 ] || [ -z "$PRIORITIES" ]; then
-    echo "WARNING: Failed to fetch priorities"
-    PRIORITIES="[]"
-else
-    echo "✓ Fetched $(echo "$PRIORITIES" | jq 'length') priority entries"
-fi
-
-# Fetch business lines
-BUSINESS_LINES=$(curl -sf "$RAILWAY_URL/api/business-lines")
-if [ $? -ne 0 ] || [ -z "$BUSINESS_LINES" ]; then
-    echo "WARNING: Failed to fetch business lines"
-    BUSINESS_LINES="[]"
-else
-    echo "✓ Fetched $(echo "$BUSINESS_LINES" | jq 'length') business lines"
-fi
-
-# Fetch brand options
-BRAND_OPTIONS=$(curl -sf "$RAILWAY_URL/api/brandOptions")
-if [ $? -ne 0 ] || [ -z "$BRAND_OPTIONS" ]; then
-    echo "WARNING: Failed to fetch brand options"
-    BRAND_OPTIONS="[]"
-else
-    echo "✓ Fetched $(echo "$BRAND_OPTIONS" | jq 'length') brand options"
-fi
-
-# Fetch notes
-NOTES=$(curl -sf "$RAILWAY_URL/api/notes")
-if [ $? -ne 0 ] || [ -z "$NOTES" ]; then
-    echo "WARNING: Failed to fetch notes"
-    NOTES="[]"
-else
-    echo "✓ Fetched $(echo "$NOTES" | jq 'length') notes"
-fi
-
-# Check if local server is running, start if not
-if ! curl -sf "$LOCAL_SERVER/api/health" &>/dev/null; then
-    echo ""
-    echo "Local server not running on port 3001. Starting it now..."
-    cd "$DCC_DIR"
-    NODE_ENV=production npm start &>/tmp/dcc-server.log &
-    SERVER_PID=$!
-    
-    # Wait for server to be ready (max 30 seconds)
-    for i in {1..30}; do
-        if curl -sf "$LOCAL_SERVER/api/health" &>/dev/null; then
-            echo "✓ Server ready (PID: $SERVER_PID)"
-            break
-        fi
-        sleep 1
-    done
-    
-    # Final check
-    if ! curl -sf "$LOCAL_SERVER/api/health" &>/dev/null; then
-        echo "ERROR: Server failed to start within 30 seconds. Check /tmp/dcc-server.log"
-        exit 1
-    fi
-fi
-
-# Seed all data
+# ── Show Railway DB summary ──────────────────────────────────────
 echo ""
-echo "Seeding local database..."
-RESULT=$(curl -sf -X POST "$LOCAL_SERVER/api/seed" \
-  -H "Content-Type: application/json" \
-  -d "{\"projects\":$PROJECTS,\"team\":$TEAM,\"assignments\":$ASSIGNMENTS,\"priorities\":$PRIORITIES,\"businessLines\":$BUSINESS_LINES,\"brandOptions\":$BRAND_OPTIONS,\"notes\":$NOTES}")
+echo -e "${BLUE}=== RAILWAY DATABASE ===${NC}"
+echo ""
 
-if [ $? -ne 0 ]; then
-    echo "ERROR: Failed to seed local DB."
-    exit 1
+HEALTH=$(curl -sf "$RAILWAY_URL/api/health" 2>/dev/null) || {
+  err "Railway is not reachable at $RAILWAY_URL"
+  exit 1
+}
+log "Railway is up."
+
+# ── Back up local DB ─────────────────────────────────────────────
+if [[ -f "$LOCAL_DB" ]]; then
+  BACKUP_TS=$(date +%Y%m%d_%H%M%S)
+  BACKUP_DIR="$DCC_DIR/backups/local/pre_pull_${BACKUP_TS}"
+  mkdir -p "$BACKUP_DIR"
+  cp "$LOCAL_DB" "$BACKUP_DIR/shared.db"
+  log "Local DB backed up to: $BACKUP_DIR/shared.db"
+
+  echo ""
+  echo -e "${BLUE}LOCAL (before pull):${NC}"
+  TABLES=$(sqlite3 "$LOCAL_DB" "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;")
+  printf "%-30s %s\n" "Table" "Rows"
+  printf "%-30s %s\n" "─────" "────"
+  for TABLE in $TABLES; do
+    COUNT=$(sqlite3 "$LOCAL_DB" "SELECT COUNT(*) FROM \"$TABLE\";")
+    printf "%-30s %s\n" "$TABLE" "$COUNT"
+  done
+  echo ""
 fi
 
-echo "✓ Success! Local DB updated from Railway"
+# ── Download Railway DB ──────────────────────────────────────────
+TEMP_DB="$DCC_DIR/data/shared.db.downloading"
+
+log "Downloading Railway database..."
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$TEMP_DB" \
+  -H "X-Seed-Secret: $DCC_SEED_SECRET" \
+  "$RAILWAY_URL/api/download-db")
+
+if [[ "$HTTP_CODE" != "200" ]]; then
+  err "Download failed with HTTP $HTTP_CODE"
+  rm -f "$TEMP_DB"
+  exit 1
+fi
+
+# Validate downloaded file
+DOWNLOAD_SIZE=$(wc -c < "$TEMP_DB" | tr -d ' ')
+log "Downloaded $DOWNLOAD_SIZE bytes"
+
+HEADER=$(head -c 16 "$TEMP_DB" | strings | head -1)
+if [[ "$HEADER" != *"SQLite format 3"* ]]; then
+  err "Downloaded file is not a valid SQLite database"
+  rm -f "$TEMP_DB"
+  exit 1
+fi
+
+if ! sqlite3 "$TEMP_DB" "PRAGMA integrity_check;" | grep -q "ok"; then
+  err "Downloaded database failed integrity check!"
+  rm -f "$TEMP_DB"
+  exit 1
+fi
+
+# ── Replace local DB ────────────────────────────────────────────
+mv "$TEMP_DB" "$LOCAL_DB"
+log "Local database replaced."
+
+# ── Show result ──────────────────────────────────────────────────
 echo ""
-echo "Synced:"
-echo "  - Projects: $PROJECT_COUNT"
-echo "  - Team: $TEAM_COUNT"
-echo "  - Assignments: $(echo "$ASSIGNMENTS" | jq 'length')"
-echo "  - Priorities: $(echo "$PRIORITIES" | jq 'length')"
-echo "  - Business Lines: $(echo "$BUSINESS_LINES" | jq 'length')"
-echo "  - Brand Options: $(echo "$BRAND_OPTIONS" | jq 'length')"
-echo "  - Notes: $(echo "$NOTES" | jq 'length')"
+echo -e "${BLUE}LOCAL (after pull):${NC}"
+TABLES=$(sqlite3 "$LOCAL_DB" "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;")
+printf "%-30s %s\n" "Table" "Rows"
+printf "%-30s %s\n" "─────" "────"
+for TABLE in $TABLES; do
+  COUNT=$(sqlite3 "$LOCAL_DB" "SELECT COUNT(*) FROM \"$TABLE\";")
+  printf "%-30s %s\n" "$TABLE" "$COUNT"
+done
+
 echo ""
-echo "Running verification..."
-"$DCC_DIR/scripts/verify-railway-sync.sh"
+log "PULL COMPLETE — local DB is now an exact copy of Railway."
+warn "Restart the local DCC server to pick up the new data."
+echo ""
+log "Rollback backup: ${BACKUP_DIR:-none}"

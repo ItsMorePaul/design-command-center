@@ -329,7 +329,7 @@ app.use('/api', (req, res, next) => {
   const skipAuthPaths = ['/auth/login', '/auth/logout', '/auth/me', '/health', '/search', '/data', '/projects', '/team', '/business-lines', '/brandOptions', '/capacity', '/calendar', '/priorities', '/notes', '/versions']
   const isReadOnly = req.method === 'GET'
   const isLocalhost = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1'
-  const isSeedEndpoint = req.path === '/seed' || req.path === '/upload-db'
+  const isSeedEndpoint = req.path === '/seed' || req.path === '/upload-db' || req.path === '/download-db'
   const hasSeedToken = isSeedEndpoint && SEED_SECRET && req.headers['x-seed-secret'] === SEED_SECRET
 
   // Allow seed/upload operations from localhost OR with valid seed secret token
@@ -1430,6 +1430,30 @@ app.post('/api/kb/sync', async (_req, res) => {
 const DIST_PATH = path.join(process.cwd(), 'dist');
 const isProduction = process.env.NODE_ENV === 'production';
 
+// Download-db endpoint - stream the entire SQLite database file
+// Authenticated via X-Seed-Secret header (same as upload-db)
+app.get('/api/download-db', async (req, res) => {
+  try {
+    const secret = req.headers['x-seed-secret']
+    if (!SEED_SECRET || secret !== SEED_SECRET) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+
+    if (!fs.existsSync(DB_PATH)) {
+      return res.status(404).json({ error: 'Database file not found' })
+    }
+
+    const stat = fs.statSync(DB_PATH)
+    res.setHeader('Content-Type', 'application/octet-stream')
+    res.setHeader('Content-Disposition', 'attachment; filename="shared.db"')
+    res.setHeader('Content-Length', stat.size)
+    fs.createReadStream(DB_PATH).pipe(res)
+  } catch (e: any) {
+    console.error('Download-db error:', e)
+    res.status(500).json({ error: e.message })
+  }
+})
+
 // Upload-db endpoint - replace entire SQLite database with uploaded file
 // This is the foolproof sync: local DB file → Railway, byte-for-byte identical.
 app.post('/api/upload-db', express.raw({ type: 'application/octet-stream', limit: '50mb' }), async (req, res) => {
@@ -1610,8 +1634,8 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 // Format: YYYY.MM.DD.hhmm (e.g., 2026.02.26.2059) → displays as "2026.02.26 2059"
 
-const SITE_VERSION = '2026.03.09.2225'
-const SITE_TIME = '2225'
+const SITE_VERSION = '2026.03.09.2235'
+const SITE_TIME = '2235'
 
 const VERSION_KEY = 'dcc_versions'
 
