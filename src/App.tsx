@@ -378,9 +378,13 @@ interface CapacityData {
 // Auth fetch helper - adds session ID to all requests
 const authFetch = async (url: string, options: RequestInit = {}) => {
   const sessionId = localStorage.getItem('dcc-session-id')
-  const headers = {
-    ...options.headers,
+  const headers: Record<string, string> = {
+    ...(options.headers as Record<string, string>),
     ...(sessionId ? { 'x-session-id': sessionId } : {}),
+  }
+  // Auto-add Content-Type for JSON bodies when not explicitly set
+  if (options.body && typeof options.body === 'string' && !headers['Content-Type'] && !headers['content-type']) {
+    headers['Content-Type'] = 'application/json'
   }
   return fetch(url, { ...options, headers })
 }
@@ -658,6 +662,8 @@ const [showFilters, setShowFilters] = useState(false)
       return events
     }
     return events.filter(event => {
+      // Holidays always show regardless of filters
+      if (event.type === 'holiday') return true
       // Designer filter - shows ONLY time off (not projects)
       if (calendarFilters.designers.length > 0 && event.type === 'timeoff' && event.person) {
         const matchesPerson = calendarFilters.designers.includes(event.person)
@@ -863,22 +869,24 @@ const [showFilters, setShowFilters] = useState(false)
   }
 
   // Delete user
-  const handleDeleteUser = async (userId: number) => {
-    if (!confirm('Are you sure you want to delete this user?')) return
-    try {
-      const res = await fetch(`/api/users/${userId}`, {
-        method: 'DELETE',
-        headers: { 'x-session-id': getSessionId() || '' }
-      })
-      if (res.ok) {
-        fetchUsers()
-      } else {
-        const err = await res.json()
-        alert(err.error || 'Failed to delete user')
+  const handleDeleteUser = (userId: number) => {
+    openConfirmModal('Delete user?', 'This will permanently remove this user account.', async () => {
+      try {
+        const res = await fetch(`/api/users/${userId}`, {
+          method: 'DELETE',
+          headers: { 'x-session-id': getSessionId() || '' }
+        })
+        if (res.ok) {
+          fetchUsers()
+        } else {
+          const err = await res.json()
+          alert(err.error || 'Failed to delete user')
+        }
+      } catch (err) {
+        alert('Failed to delete user')
       }
-    } catch (err) {
-      alert('Failed to delete user')
-    }
+      closeConfirmModal()
+    })
   }
 
   const isAdmin = currentUser?.role === 'admin'
@@ -1037,7 +1045,7 @@ const [showFilters, setShowFilters] = useState(false)
           if (data.length === 0) {
             // Seed default holidays on first load
             for (const h of defaultHolidays) {
-              await authFetch('/api/holidays', { method: 'POST', body: JSON.stringify(h) })
+              await authFetch('/api/holidays', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(h) })
             }
             const res2 = await authFetch('/api/holidays')
             setHolidays(await res2.json())
@@ -1550,7 +1558,11 @@ const [showFilters, setShowFilters] = useState(false)
   }
 
   const handleDeleteTimeOff = (id: string) => {
-    setFormData(prev => ({ ...prev, timeOff: prev.timeOff.filter(o => o.id !== id) }))
+    const off = formData.timeOff.find(o => o.id === id)
+    openConfirmModal('Remove time off?', `This will remove "${off?.name || 'this time off'}" from the team member.`, () => {
+      setFormData(prev => ({ ...prev, timeOff: prev.timeOff.filter(o => o.id !== id) }))
+      closeConfirmModal()
+    })
   }
 
   const handleSaveTimeOff = () => {
@@ -4163,9 +4175,12 @@ const [showFilters, setShowFilters] = useState(false)
                     <span className="timeline-dates">{h.date}</span>
                   </div>
                   <div className="timeline-actions">
-                    <button type="button" className="action-btn delete" onClick={async () => {
-                      const res = await authFetch(`/api/holidays/${h.id}`, { method: 'DELETE' })
-                      if (res.ok) { setHolidays(await res.json()); setCalendarData(null) }
+                    <button type="button" className="action-btn delete" onClick={() => {
+                      openConfirmModal('Remove holiday?', `This will remove "${h.name}" from the calendar.`, async () => {
+                        const res = await authFetch(`/api/holidays/${h.id}`, { method: 'DELETE' })
+                        if (res.ok) { setHolidays(await res.json()); setCalendarData(null) }
+                        closeConfirmModal()
+                      })
                     }}><Trash2 size={14} /></button>
                   </div>
                 </div>
@@ -4236,6 +4251,7 @@ const [showFilters, setShowFilters] = useState(false)
                         }
                         const res = await authFetch('/api/maintenance', {
                           method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify(body),
                         })
                         if (res.ok) {
@@ -4272,6 +4288,7 @@ const [showFilters, setShowFilters] = useState(false)
                       onClick={async () => {
                         const res = await authFetch('/api/maintenance', {
                           method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ enabled: false }),
                         })
                         if (res.ok) {
@@ -4800,8 +4817,8 @@ const [showFilters, setShowFilters] = useState(false)
               <button className="secondary-btn" onClick={() => setShowHolidayModal(false)}>Cancel</button>
               <button className="primary-btn" onClick={async () => {
                 if (!holidayForm.name || !holidayForm.date) return
-                const res = await authFetch('/api/holidays', { method: 'POST', body: JSON.stringify(holidayForm) })
-                if (res.ok) { setHolidays(await res.json()); setCalendarData(null); setShowHolidayModal(false) }
+                const res = await authFetch('/api/holidays', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(holidayForm) })
+                if (res.ok) { setHolidays(await res.json()); setCalendarData(null); setShowHolidayModal(false); setHolidayForm({ name: '', date: '' }) }
               }}>Add Holiday</button>
             </div>
           </div>

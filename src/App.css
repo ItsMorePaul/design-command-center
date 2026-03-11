@@ -2879,6 +2879,7 @@ input:checked + .slider:before {
 /* Week-row calendar with spanning events inside cells */
 .week-row {
   position: relative;
+  margin-bottom: 4px;
 }
 
 .week-cells {
