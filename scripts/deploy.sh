@@ -1,14 +1,26 @@
 #!/bin/bash
-# deploy.sh - Single-command deploy: push code + upload entire DB to Railway
+# deploy.sh - Single-command deploy: push code + upload DB to Railway
 #
 # Usage:
 #   DCC_DEPLOY_OK=1 ./scripts/deploy.sh          # full deploy (code + data)
 #   DCC_DEPLOY_OK=1 ./scripts/deploy.sh --data    # data-only (no git push)
 #
+# GOLDEN RULE: Railway DB data is NEVER lost or overwritten.
+#
 # How it works:
-#   Uploads the local SQLite file directly to Railway's /api/upload-db endpoint.
-#   This is byte-for-byte identical — no table-by-table sync, no hardcoded lists.
-#   Any new tables, columns, or data added locally will appear on Railway exactly.
+#   1. Downloads Railway DB as safety backup
+#   2. Runs containment check (all Railway row IDs must exist in local)
+#   3. AUTO-MERGES Railway data into local DB before upload:
+#      - Railway-owned tables (projects, team, etc.): Railway REPLACES local
+#      - Notes: union merge, Railway hidden flags win
+#      - Local-computed tables (note links): kept as-is
+#   4. Pushes code to Railway (if not --data)
+#   5. Uploads the merged local DB to Railway
+#   6. Verifies all table counts match
+#   7. Re-enables maintenance mode for admin testing
+#
+# This means even if you forget to run merge-railway.sh first,
+# Railway production edits are automatically preserved.
 #
 # Requires:
 #   DCC_SEED_SECRET env var (shared with Railway)
@@ -230,6 +242,88 @@ if [[ "$CONTAIN_FAIL" == "true" ]]; then
   err "Railway backup saved at: $RAILWAY_DB_BACKUP"
   exit 1
 fi
+
+# ── AUTO-MERGE: Railway data into local DB ────────────────────────
+# CRITICAL: Railway DB is the source of truth for user-edited tables.
+# This step ensures Railway edits (projects, team, etc.) are NEVER lost,
+# even if the deployer forgot to run merge-railway.sh manually.
+echo ""
+echo -e "${BLUE}=== AUTO-MERGE: RAILWAY → LOCAL ===${NC}"
+echo -e "Merging Railway production data into local DB before upload..."
+echo ""
+
+# Backup local DB before merge
+PRE_MERGE_BACKUP="$BACKUP_DIR/local-pre-merge.db"
+cp "$LOCAL_DB" "$PRE_MERGE_BACKUP"
+log "Local DB backed up before merge: $PRE_MERGE_BACKUP"
+
+# Railway-owned tables: Railway REPLACES local
+RAILWAY_TABLES="projects team project_assignments project_priorities business_lines brand_options users holidays app_versions activity_log"
+for TABLE in $RAILWAY_TABLES; do
+  COLS=$(sqlite3 "$RAILWAY_DB_BACKUP" "PRAGMA table_info($TABLE);" 2>/dev/null | cut -d'|' -f2 | tr '\n' ',' | sed 's/,$//')
+  if [[ -z "$COLS" ]]; then
+    warn "$TABLE: not found in Railway DB, skipping."
+    continue
+  fi
+  R_COUNT=$(sqlite3 "$RAILWAY_DB_BACKUP" "SELECT COUNT(*) FROM \"$TABLE\";" 2>/dev/null || echo "0")
+  sqlite3 "$LOCAL_DB" "DELETE FROM \"$TABLE\";"
+  sqlite3 "$RAILWAY_DB_BACKUP" ".mode insert $TABLE" ".output /tmp/dcc_deploy_merge_$TABLE.sql" "SELECT * FROM \"$TABLE\";"
+  sqlite3 "$LOCAL_DB" < "/tmp/dcc_deploy_merge_$TABLE.sql" 2>/dev/null || true
+  rm -f "/tmp/dcc_deploy_merge_$TABLE.sql"
+  L_COUNT=$(sqlite3 "$LOCAL_DB" "SELECT COUNT(*) FROM \"$TABLE\";" 2>/dev/null || echo "0")
+  log "$TABLE: replaced with $R_COUNT Railway rows (local now: $L_COUNT)"
+done
+
+# Notes: union + Railway hidden flags win
+R_NOTE_IDS=$(sqlite3 "$RAILWAY_DB_BACKUP" "SELECT quote(id) FROM notes;" 2>/dev/null | tr '\n' ',' | sed 's/,$//')
+L_NOTE_IDS=$(sqlite3 "$LOCAL_DB" "SELECT quote(id) FROM notes;" 2>/dev/null | tr '\n' ',' | sed 's/,$//')
+
+# Insert Railway-only notes into local
+if [[ -n "$R_NOTE_IDS" ]]; then
+  sqlite3 "$RAILWAY_DB_BACKUP" ".mode insert notes" ".output /tmp/dcc_deploy_merge_notes.sql" \
+    "SELECT * FROM notes WHERE id NOT IN ($L_NOTE_IDS);" 2>/dev/null || true
+  if [[ -s /tmp/dcc_deploy_merge_notes.sql ]]; then
+    sqlite3 "$LOCAL_DB" < /tmp/dcc_deploy_merge_notes.sql 2>/dev/null || true
+    INSERTED=$(wc -l < /tmp/dcc_deploy_merge_notes.sql | tr -d ' ')
+    log "notes: inserted $INSERTED Railway-only notes"
+  else
+    log "notes: no Railway-only notes to insert"
+  fi
+  rm -f /tmp/dcc_deploy_merge_notes.sql
+fi
+
+# Update hidden flags from Railway (Railway wins)
+sqlite3 "$LOCAL_DB" "
+  ATTACH '$RAILWAY_DB_BACKUP' AS railway;
+  UPDATE notes SET
+    hidden = COALESCE((SELECT r.hidden FROM railway.notes r WHERE r.id = notes.id), notes.hidden),
+    hidden_at = COALESCE((SELECT r.hidden_at FROM railway.notes r WHERE r.id = notes.id AND r.hidden = 1), notes.hidden_at)
+  WHERE id IN (SELECT id FROM railway.notes);
+  DETACH railway;
+"
+R_HIDDEN=$(sqlite3 "$LOCAL_DB" "SELECT COUNT(*) FROM notes WHERE hidden = 1;")
+log "notes: hidden flags synced from Railway ($R_HIDDEN hidden)"
+
+# Hidden note fingerprints: union
+if [[ -n "$L_NOTE_IDS" ]]; then
+  sqlite3 "$RAILWAY_DB_BACKUP" ".mode insert hidden_note_fingerprints" \
+    ".output /tmp/dcc_deploy_merge_fp.sql" \
+    "SELECT * FROM hidden_note_fingerprints WHERE fingerprint NOT IN ($(sqlite3 "$LOCAL_DB" "SELECT quote(fingerprint) FROM hidden_note_fingerprints;" | tr '\n' ',' | sed 's/,$//'));" 2>/dev/null || true
+  if [[ -s /tmp/dcc_deploy_merge_fp.sql ]]; then
+    sqlite3 "$LOCAL_DB" < /tmp/dcc_deploy_merge_fp.sql 2>/dev/null || true
+  fi
+  rm -f /tmp/dcc_deploy_merge_fp.sql
+fi
+FP_COUNT=$(sqlite3 "$LOCAL_DB" "SELECT COUNT(*) FROM hidden_note_fingerprints;")
+log "hidden_note_fingerprints: $FP_COUNT total after merge"
+
+# Local-computed tables (note_people_links, note_project_links): kept as-is
+log "Local-computed tables kept as-is."
+
+# Update DB size after merge
+DB_SIZE=$(wc -c < "$LOCAL_DB" | tr -d ' ')
+log "Local DB after merge: $DB_SIZE bytes"
+echo ""
 
 # ── Deploy code (git push) ───────────────────────────────────────
 if [[ "$DATA_ONLY" == "false" ]]; then

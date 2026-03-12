@@ -4723,7 +4723,7 @@ const [showFilters, setShowFilters] = useState(false)
                     ><Trash2 size={14} /></button>
                   </div>
                 ))}
-                {(!projectFormData.customLinks || projectFormData.customLinks.length < 3) && (
+                {(
                   <button
                     type="button"
                     className="add-link-btn"
@@ -5308,7 +5308,7 @@ const [showFilters, setShowFilters] = useState(false)
                     </button>
                   </div>
                 ))}
-                {(!businessLineFormData.customLinks || businessLineFormData.customLinks.length < 3) && (
+                {(
                   <button
                     type="button"
                     className="add-link-btn"
