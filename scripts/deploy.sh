@@ -197,38 +197,26 @@ echo -e "Verifying local DB contains all Railway production data..."
 echo ""
 CONTAIN_FAIL=false
 
-declare -A TABLE_PKS=(
-  ["projects"]="id"
-  ["team"]="id"
-  ["project_assignments"]="id"
-  ["project_priorities"]="id"
-  ["business_lines"]="id"
-  ["brand_options"]="id"
-  ["users"]="id"
-  ["holidays"]="id"
-  ["notes"]="id"
-  ["hidden_note_fingerprints"]="fingerprint"
-)
+# Table:PK pairs for containment check (bash 3.2 compatible)
+CONTAIN_TABLES="projects:id team:id project_assignments:id project_priorities:id business_lines:id brand_options:id users:id holidays:id notes:id hidden_note_fingerprints:fingerprint"
 
-for TABLE in "${!TABLE_PKS[@]}"; do
-  PK="${TABLE_PKS[$TABLE]}"
-  # Find Railway IDs not in local
-  MISSING=$(sqlite3 "$RAILWAY_DB_BACKUP" "SELECT $PK FROM $TABLE;" 2>/dev/null | while read -r ID; do
-    EXISTS=$(sqlite3 "$LOCAL_DB" "SELECT COUNT(*) FROM $TABLE WHERE $PK = '$ID';" 2>/dev/null || echo "0")
-    if [[ "$EXISTS" == "0" ]]; then
-      echo "$ID"
-    fi
-  done)
+for ENTRY in $CONTAIN_TABLES; do
+  TABLE="${ENTRY%%:*}"
+  PK="${ENTRY##*:}"
 
   R_COUNT=$(sqlite3 "$RAILWAY_DB_BACKUP" "SELECT COUNT(*) FROM $TABLE;" 2>/dev/null || echo "0")
   L_COUNT=$(sqlite3 "$LOCAL_DB" "SELECT COUNT(*) FROM $TABLE;" 2>/dev/null || echo "0")
 
-  if [[ -n "$MISSING" ]]; then
-    MISSING_COUNT=$(echo "$MISSING" | wc -l | tr -d ' ')
+  # Use ATTACH to find Railway rows missing from local in a single query
+  MISSING_COUNT=$(sqlite3 "$RAILWAY_DB_BACKUP" "
+    ATTACH '$LOCAL_DB' AS local_db;
+    SELECT COUNT(*) FROM $TABLE r
+    WHERE r.$PK NOT IN (SELECT $PK FROM local_db.$TABLE);
+    DETACH local_db;
+  " 2>/dev/null || echo "0")
+
+  if [[ "$MISSING_COUNT" -gt 0 ]] 2>/dev/null; then
     err "$TABLE: $MISSING_COUNT Railway rows MISSING from local (railway=$R_COUNT local=$L_COUNT)"
-    echo "$MISSING" | head -5 | while read -r ID; do
-      echo "    missing: $ID"
-    done
     CONTAIN_FAIL=true
   else
     log "$TABLE: all $R_COUNT Railway rows present in local (local=$L_COUNT)"
