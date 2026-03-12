@@ -924,7 +924,7 @@ const [showFilters, setShowFilters] = useState(false)
     countdownTarget: string | null
     isLockout: boolean
   }>({ enabled: false, bannerMessage: '', lockoutMessage: '', countdownTarget: null, isLockout: false })
-  const [maintenanceForm, setMaintenanceForm] = useState({ bannerMessage: 'Save your work. Wandi Hub maintenance about to begin in 5 minutes.', lockoutMessage: 'Wandi Hub in maintenance mode and will be back soon.', countdownMinutes: 5 })
+  const [maintenanceForm, setMaintenanceForm] = useState({ bannerMessage: 'Save your work. Wandi Hub maintenance about to begin in 5 minutes.', lockoutMessage: 'Wandi Hub will be back soon.', countdownMinutes: 5 })
   const [countdownDisplay, setCountdownDisplay] = useState('')
 
   // Poll maintenance status every 30s
@@ -1875,9 +1875,12 @@ const [showFilters, setShowFilters] = useState(false)
         return designerA.localeCompare(designerB)
       }
       case 'dueDate': {
-        const dateA = a.endDate || 'zzz'
-        const dateB = b.endDate || 'zzz'
-        return dateA.localeCompare(dateB)
+        const dateA = a.endDate || ''
+        const dateB = b.endDate || ''
+        if (!dateA && !dateB) return 0
+        if (!dateA) return 1
+        if (!dateB) return -1
+        return dateB.localeCompare(dateA)
       }
       case 'status':
         return a.name.localeCompare(b.name)
@@ -2340,7 +2343,16 @@ const [showFilters, setShowFilters] = useState(false)
 
               {projectViewMode === 'list' && <div className="projects-list">
                 {(() => {
-                  // Group projects by business line
+                  if (filteredProjects.length === 0) return <div className="priority-empty">No projects found</div>
+
+                  // Flat list for dueDate sort — no grouping
+                  if (projectSortBy === 'dueDate') {
+                    return <div className="list-bl-section">
+                      {filteredProjects.map(project => renderProjectRow(project))}
+                    </div>
+                  }
+
+                  // Grouped by business line for all other sorts
                   const groups: { name: string; projects: typeof filteredProjects }[] = []
                   const blOrder = businessLines.map(bl => bl.name)
                   const grouped = new Map<string, typeof filteredProjects>()
@@ -2351,217 +2363,184 @@ const [showFilters, setShowFilters] = useState(false)
                       grouped.get(bl)!.push(p)
                     }
                   }
-                  // Sort groups by business line order, uncategorized last
                   for (const blName of blOrder) {
                     if (grouped.has(blName)) {
                       groups.push({ name: blName, projects: grouped.get(blName)! })
                       grouped.delete(blName)
                     }
                   }
-                  // Any remaining (uncategorized or unrecognized BLs)
                   for (const [name, projects] of grouped) {
                     groups.push({ name, projects })
                   }
-                  if (groups.length === 0) return <div className="priority-empty">No projects found</div>
+                  const renderProjectRow = (project: any) => {
+                    const isOverdue = (() => {
+                      if (!project.endDate || project.status === 'done') return false
+                      const end = parseLocalDate(project.endDate)
+                      if (!end) return false
+                      const today = new Date()
+                      today.setHours(12, 0, 0, 0)
+                      return end < today
+                    })()
+
+                    return (
+                      <div key={project.id} className="project-row">
+                        <div className="project-info">
+                          <span className="project-name-cell">
+                            {isOverdue && <span className="overdue-label">Overdue</span>}
+                            {project.url ? (
+                              <a href={project.url} target="_blank" rel="noopener noreferrer" className="project-name-link">{project.name}</a>
+                            ) : (
+                              <span className="project-name">{project.name}</span>
+                            )}
+                          </span>
+                          <div className="project-designers">
+                            {(project.designers || []).map((d: string, idx: number) => {
+                              const firstName = d.split(' ')[0]
+                              return (
+                                <span key={d}>
+                                  <button
+                                    className="designer-link"
+                                    onClick={() => {
+                                      const member = team.find(m => m.name === d)
+                                      if (member) {
+                                        setEditingMember(member)
+                                        setFormData({ name: member.name, role: member.role, brands: member.brands, status: member.status, slack: member.slack || '', email: member.email || '', timeOff: member.timeOff || [] })
+                                        setShowModal(true)
+                                      }
+                                    }}
+                                  >
+                                    {firstName}
+                                  </button>
+                                  {idx < (project.designers || []).length - 1 ? ', ' : ''}
+                                </span>
+                              )
+                            })}
+                          </div>
+                          <span className="status-badge" style={{ color: { active: '#3b82f6', review: '#f59e0b', done: '#22c55e', blocked: '#ef4444' }[project.status as string] }}>
+                            <span className={`status-badge-dot ${getStatusColor(project.status)}`}></span>
+                            {getStatusLabel(project.status)}
+                          </span>
+                        </div>
+                        {((project.timeline && project.timeline.length > 0) || (project.startDate && project.endDate)) && (() => {
+                            const ganttRange = getGanttRange(project)
+                            if (!ganttRange) return null
+                            const today = new Date()
+                            today.setHours(12, 0, 0, 0)
+                            const isTodayInRange = today >= ganttRange.start && today <= ganttRange.end
+                            const todayPosition = isTodayInRange
+                              ? ((today.getTime() - ganttRange.start.getTime()) / DAY_MS / ganttRange.totalDays) * 100
+                              : null
+                            const weeklyTickCount = Math.max(1, Math.ceil(ganttRange.totalDays / 7))
+                            const weeklyTickPositions = Array.from({ length: weeklyTickCount + 1 }, (_, i) => (i / weeklyTickCount) * 100)
+                            return (
+                              <div className="project-gantt">
+                                <div className="gantt-header">
+                                  <span className="gantt-header-spacer" />
+                                  <div className="gantt-header-track">
+                                    <span className="gantt-start"><span className="gantt-edge-line gantt-edge-line-start" />{formatMonthDayFromDate(ganttRange.start)}</span>
+                                    <span className="gantt-end">{formatMonthDayFromDate(ganttRange.end)}<span className="gantt-edge-line gantt-edge-line-end" /></span>
+                                  </div>
+                                </div>
+                                <div className="gantt-container">
+                                  <div
+                                    className="gantt-bars"
+                                    style={todayPosition !== null ? ({ ['--today-pos' as any]: `${todayPosition / 100}` } as any) : undefined}
+                                  >
+                                    <div className="gantt-weekly-grid">
+                                      {weeklyTickPositions.map((left, i) => (
+                                        <span key={i} className="gantt-weekly-tick" style={{ left: `${left}%` }} />
+                                      ))}
+                                    </div>
+                                    {todayPosition !== null && (
+                                      <div className="gantt-today-global">
+                                        <span className="gantt-today-label">Today</span>
+                                      </div>
+                                    )}
+                                    {project.timeline && project.timeline.length > 0 ? (
+                                      project.timeline.map((range: any, idx: number) => (
+                                        <div key={range.id} className="gantt-track">
+                                          <span className="gantt-track-label" title={range.name}>{range.name}</span>
+                                          <div className="gantt-track-bars">
+                                            <div
+                                              className={`gantt-bar bar-${(idx % 5) + 1}`}
+                                              style={getGanttBarStyle(range, ganttRange)}
+                                              title={`${range.name}: ${formatMonthDay(range.startDate)} → ${formatMonthDay(range.endDate)}`}
+                                            >
+                                              <span className="gantt-label">{formatMonthDay(range.startDate)} <span className="gantt-arrow">→</span> {formatMonthDay(range.endDate)}</span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ))
+                                    ) : project.startDate && project.endDate ? (
+                                      <div className="gantt-track">
+                                        <span className="gantt-track-label" title="Duration">Duration</span>
+                                        <div className="gantt-track-bars">
+                                          <div
+                                            className="gantt-bar bar-duration"
+                                            style={getGanttBarStyle({ id: 'duration', name: 'Duration', startDate: project.startDate, endDate: project.endDate }, ganttRange)}
+                                            title={`Duration: ${formatMonthDay(project.startDate)} → ${formatMonthDay(project.endDate)}`}
+                                          >
+                                            <span className="gantt-label">{formatMonthDay(project.startDate)} <span className="gantt-arrow">→</span> {formatMonthDay(project.endDate)}</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          })()}
+                        <div className="project-card-footer">
+                          <div className="project-links-footer">
+                            {project.deckLink && (
+                              <Tooltip content={`Deck: ${project.deckName || 'Design Deck'}`}>
+                                <a href={project.deckLink} target="_blank" rel="noopener noreferrer" className="project-link-icon">
+                                  <Presentation size={14} className="link-icon" />
+                                </a>
+                              </Tooltip>
+                            )}
+                            {project.prdLink && (
+                              <Tooltip content={`PRD: ${project.prdName || 'PRD'}`}>
+                                <a href={project.prdLink} target="_blank" rel="noopener noreferrer" className="project-link-icon">
+                                  <FileText size={14} className="link-icon" />
+                                </a>
+                              </Tooltip>
+                            )}
+                            {project.briefLink && (
+                              <Tooltip content={`Brief: ${project.briefName || 'Design Brief'}`}>
+                                <a href={project.briefLink} target="_blank" rel="noopener noreferrer" className="project-link-icon">
+                                  <FileEdit size={14} className="link-icon" />
+                                </a>
+                              </Tooltip>
+                            )}
+                            {project.figmaLink && (
+                              <Tooltip content="Figma">
+                                <a href={project.figmaLink} target="_blank" rel="noopener noreferrer" className="project-link-icon">
+                                  <Figma size={14} className="link-icon" />
+                                </a>
+                              </Tooltip>
+                            )}
+                            {project.customLinks?.map((link: any, idx: number) => (
+                              <Tooltip key={idx} content={`Link: ${link.name}`}>
+                                <a href={link.url} target="_blank" rel="noopener noreferrer" className="project-link-icon">
+                                  <LinkIcon size={14} className="link-icon" />
+                                </a>
+                              </Tooltip>
+                            ))}
+                          </div>
+                          <div className="project-actions">
+                            <button className="action-btn" onClick={() => handleEditProject(project)} aria-label="Edit"><Pencil size={14} /></button>
+                            <button className="action-btn delete" onClick={() => handleDeleteProject(project.id)} aria-label="Delete"><Trash2 size={14} /></button>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  }
+
                   return groups.map(group => (
                     <div key={group.name} className="list-bl-section">
                       <div className="list-bl-header">{group.name}</div>
-                      {group.projects.map(project => {
-                        const isOverdue = (() => {
-                          if (!project.endDate || project.status === 'done') return false
-                          const end = parseLocalDate(project.endDate)
-                          if (!end) return false
-                          const today = new Date()
-                          today.setHours(12, 0, 0, 0)
-                          return end < today
-                        })()
-                        const formatDate = (dateStr?: string) => {
-                          if (!dateStr) return ''
-                          return formatShortDate(dateStr)
-                        }
-                        return (
-                        <div key={project.id} className="project-row">
-                          <div className="project-info">
-                            <span className="project-name-cell">
-                              {isOverdue && <span className="overdue-label">Overdue</span>}
-                              {project.url ? (
-                                <a href={project.url} target="_blank" rel="noopener noreferrer" className="project-name-link">{project.name}</a>
-                              ) : (
-                                <span className="project-name">{project.name}</span>
-                              )}
-                            </span>
-                            <div className="project-designers">
-                              {(project.designers || []).map((d, idx) => {
-                                const firstName = d.split(' ')[0]
-                                return (
-                                  <span key={d}>
-                                    <button
-                                      className="designer-link"
-                                      onClick={() => {
-                                        const member = team.find(m => m.name === d)
-                                        if (member) {
-                                          setEditingMember(member)
-                                          setFormData({ name: member.name, role: member.role, brands: member.brands, status: member.status, slack: member.slack || '', email: member.email || '', timeOff: member.timeOff || [] })
-                                          setShowModal(true)
-                                        }
-                                      }}
-                                    >
-                                      {firstName}
-                                    </button>
-                                    {idx < (project.designers || []).length - 1 ? ', ' : ''}
-                                  </span>
-                                )
-                              })}
-                            </div>
-                            <span className="status-badge" style={{ color: { active: '#3b82f6', review: '#f59e0b', done: '#22c55e', blocked: '#ef4444' }[project.status] }}>
-                              <span className={`status-badge-dot ${getStatusColor(project.status)}`}></span>
-                              {getStatusLabel(project.status)}
-                            </span>
-                            <span className="due-date">{formatDate(project.endDate)}</span>
-                          </div>
-                          {((project.timeline && project.timeline.length > 0) || (project.startDate && project.endDate)) && (() => {
-                              const ganttRange = getGanttRange(project)
-                              if (!ganttRange) return null
-
-                              const today = new Date()
-                              today.setHours(12, 0, 0, 0)
-                              const isTodayInRange = today >= ganttRange.start && today <= ganttRange.end
-                              const todayPosition = isTodayInRange
-                                ? ((today.getTime() - ganttRange.start.getTime()) / DAY_MS / ganttRange.totalDays) * 100
-                                : null
-
-                              const weeklyTickCount = Math.max(1, Math.ceil(ganttRange.totalDays / 7))
-                              const weeklyTickPositions = Array.from({ length: weeklyTickCount + 1 }, (_, i) => (i / weeklyTickCount) * 100)
-
-                              return (
-                                <div className="project-gantt">
-                                  <div className="gantt-header">
-                                    <span className="gantt-header-spacer" />
-                                    <div className="gantt-header-track">
-                                      <span className="gantt-start"><span className="gantt-edge-line gantt-edge-line-start" />{formatMonthDayFromDate(ganttRange.start)}</span>
-                                      <span className="gantt-end">{formatMonthDayFromDate(ganttRange.end)}<span className="gantt-edge-line gantt-edge-line-end" /></span>
-                                    </div>
-                                  </div>
-                                  <div className="gantt-container">
-                                    <div
-                                      className="gantt-bars"
-                                      style={todayPosition !== null ? ({ ['--today-pos' as any]: `${todayPosition / 100}` } as any) : undefined}
-                                    >
-                                      <div className="gantt-weekly-grid">
-                                        {weeklyTickPositions.map((left, i) => (
-                                          <span key={i} className="gantt-weekly-tick" style={{ left: `${left}%` }} />
-                                        ))}
-                                      </div>
-                                      {todayPosition !== null && (
-                                        <div className="gantt-today-global">
-                                          <span className="gantt-today-label">Today</span>
-                                        </div>
-                                      )}
-                                      {project.timeline && project.timeline.length > 0 ? (
-                                        project.timeline.map((range, idx) => (
-                                          <div key={range.id} className="gantt-track">
-                                            <span className="gantt-track-label" title={range.name}>{range.name}</span>
-                                            <div className="gantt-track-bars">
-                                              <div
-                                                className={`gantt-bar bar-${(idx % 5) + 1}`}
-                                                style={getGanttBarStyle(range, ganttRange)}
-                                                title={`${range.name}: ${formatMonthDay(range.startDate)} → ${formatMonthDay(range.endDate)}`}
-                                              >
-                                                <span className="gantt-label">{formatMonthDay(range.startDate)} <span className="gantt-arrow">→</span> {formatMonthDay(range.endDate)}</span>
-                                              </div>
-                                            </div>
-                                          </div>
-                                        ))
-                                      ) : project.startDate && project.endDate ? (
-                                        <div className="gantt-track">
-                                          <span className="gantt-track-label" title="Duration">Duration</span>
-                                          <div className="gantt-track-bars">
-                                            <div
-                                              className="gantt-bar bar-duration"
-                                              style={getGanttBarStyle({ id: 'duration', name: 'Duration', startDate: project.startDate, endDate: project.endDate }, ganttRange)}
-                                              title={`Duration: ${formatMonthDay(project.startDate)} → ${formatMonthDay(project.endDate)}`}
-                                            >
-                                              <span className="gantt-label">{formatMonthDay(project.startDate)} <span className="gantt-arrow">→</span> {formatMonthDay(project.endDate)}</span>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      ) : null}
-                                    </div>
-                                  </div>
-                                </div>
-                              )
-                            })()}
-                          <div className="project-card-footer">
-                            <div className="project-links-footer">
-                              {project.deckLink && (
-                                <Tooltip content={`Deck: ${project.deckName || 'Design Deck'}`}>
-                                  <a
-                                    href={project.deckLink}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="project-link-icon"
-                                  >
-                                    <Presentation size={14} className="link-icon" />
-                                  </a>
-                                </Tooltip>
-                              )}
-                              {project.prdLink && (
-                                <Tooltip content={`PRD: ${project.prdName || 'PRD'}`}>
-                                  <a
-                                    href={project.prdLink}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="project-link-icon"
-                                  >
-                                    <FileText size={14} className="link-icon" />
-                                  </a>
-                                </Tooltip>
-                              )}
-                              {project.briefLink && (
-                                <Tooltip content={`Brief: ${project.briefName || 'Design Brief'}`}>
-                                  <a
-                                    href={project.briefLink}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="project-link-icon"
-                                  >
-                                    <FileEdit size={14} className="link-icon" />
-                                  </a>
-                                </Tooltip>
-                              )}
-                              {project.figmaLink && (
-                                <Tooltip content="Figma">
-                                  <a
-                                    href={project.figmaLink}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="project-link-icon"
-                                  >
-                                    <Figma size={14} className="link-icon" />
-                                  </a>
-                                </Tooltip>
-                              )}
-                              {project.customLinks?.map((link, idx) => (
-                                <Tooltip key={idx} content={`Link: ${link.name}`}>
-                                  <a
-                                    href={link.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="project-link-icon"
-                                  >
-                                    <LinkIcon size={14} className="link-icon" />
-                                  </a>
-                                </Tooltip>
-                              ))}
-                            </div>
-                            <div className="project-actions">
-                              <button className="action-btn" onClick={() => handleEditProject(project)} aria-label="Edit"><Pencil size={14} /></button>
-                              <button className="action-btn delete" onClick={() => handleDeleteProject(project.id)} aria-label="Delete"><Trash2 size={14} /></button>
-                            </div>
-                          </div>
-                        </div>
-                        );
-                      })}
+                      {group.projects.map(project => renderProjectRow(project))}
                     </div>
                   ))
                 })()}
@@ -2862,7 +2841,7 @@ const [showFilters, setShowFilters] = useState(false)
                         </div>
                         <div className="legend-item">
                           <span className="legend-dot" style={{ backgroundColor: '#6b7280' }}></span>
-                          <span>Holiday</span>
+                          <span>Special Day</span>
                         </div>
                       </div>
                       
@@ -4178,19 +4157,19 @@ const [showFilters, setShowFilters] = useState(false)
           {/* Holidays Section (All Users) */}
           <div className="settings-section" style={{ marginTop: '32px' }}>
             <div className="settings-header">
-              <h2>Holidays</h2>
-              <button className="add-timeline-btn" onClick={() => { setHolidayForm({ name: '', date: '' }); setShowHolidayModal(true) }}>+ Add Holiday</button>
+              <h2>Special Days</h2>
+              <button className="add-timeline-btn" onClick={() => { setHolidayForm({ name: '', date: '' }); setShowHolidayModal(true) }}>+ Add Special Day</button>
             </div>
             <div className="timeline-list">
               {holidays.map(h => (
                 <div key={h.id} className="timeline-item">
                   <div className="timeline-info">
                     <span className="timeline-name">{h.name}</span>
-                    <span className="timeline-dates">{h.date}</span>
+                    <span className="timeline-dates">{formatFullDate(h.date)}</span>
                   </div>
                   <div className="timeline-actions">
                     <button type="button" className="action-btn delete" onClick={() => {
-                      openConfirmModal('Remove holiday?', `This will remove "${h.name}" from the calendar.`, async () => {
+                      openConfirmModal('Remove special day?', `This will remove "${h.name}" from the calendar.`, async () => {
                         const res = await authFetch(`/api/holidays/${h.id}`, { method: 'DELETE' })
                         if (res.ok) { setHolidays(await res.json()); setCalendarData(null) }
                         closeConfirmModal()
@@ -4199,7 +4178,7 @@ const [showFilters, setShowFilters] = useState(false)
                   </div>
                 </div>
               ))}
-              {holidays.length === 0 && <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>No holidays added yet.</p>}
+              {holidays.length === 0 && <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>No special days added yet.</p>}
             </div>
           </div>
 
@@ -4260,7 +4239,7 @@ const [showFilters, setShowFilters] = useState(false)
                         const body = {
                           enabled: true,
                           bannerMessage: maintenanceForm.bannerMessage || 'Save your work. Wandi Hub maintenance about to begin in 5 minutes.',
-                          lockoutMessage: maintenanceForm.lockoutMessage || 'Wandi Hub in maintenance mode and will be back soon.',
+                          lockoutMessage: maintenanceForm.lockoutMessage || 'Wandi Hub will be back soon.',
                           countdownTarget: target,
                         }
                         const res = await authFetch('/api/maintenance', {
@@ -4804,7 +4783,7 @@ const [showFilters, setShowFilters] = useState(false)
         <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: 360 }}>
             <div className="modal-header">
-              <h2>Add Holiday</h2>
+              <h2>Add Special Day</h2>
             </div>
             <div className="modal-body">
               <div className={`float-field${holidayForm.name ? ' has-value' : ''}`} style={{ marginBottom: '0.75rem' }}>
@@ -4814,7 +4793,7 @@ const [showFilters, setShowFilters] = useState(false)
                   onChange={e => setHolidayForm({ ...holidayForm, name: e.target.value })}
                   placeholder=" "
                 />
-                <label>Holiday Name</label>
+                <label>Name</label>
               </div>
               <div className={`float-field${holidayForm.date ? ' has-value' : ''}`}>
                 <input
@@ -4833,7 +4812,7 @@ const [showFilters, setShowFilters] = useState(false)
                 if (!holidayForm.name || !holidayForm.date) return
                 const res = await authFetch('/api/holidays', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(holidayForm) })
                 if (res.ok) { setHolidays(await res.json()); setCalendarData(null); setShowHolidayModal(false); setHolidayForm({ name: '', date: '' }) }
-              }}>Add Holiday</button>
+              }}>Add Special Day</button>
             </div>
           </div>
         </div>

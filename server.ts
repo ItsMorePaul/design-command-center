@@ -18,7 +18,7 @@ const GEMINI_NOTES_DB = process.env.GEMINI_NOTES_DB || path.join(homedir(), '.op
 let maintenanceState = {
   enabled: false,
   bannerMessage: '',
-  lockoutMessage: 'Wandi Hub in maintenance mode and will be back soon.',
+  lockoutMessage: 'Wandi Hub will be back soon.',
   countdownTarget: null as string | null, // ISO timestamp when lockout begins
 }
 
@@ -1869,8 +1869,8 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 // Format: YYYY.MM.DD.hhmm (e.g., 2026.02.26.2059) → displays as "2026.02.26 2059"
 
-const SITE_VERSION = '2026.03.11.0855'
-const SITE_TIME = '0855'
+const SITE_VERSION = '2026.03.12.1115'
+const SITE_TIME = '1115'
 
 const VERSION_KEY = 'dcc_versions'
 

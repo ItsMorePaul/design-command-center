@@ -134,12 +134,25 @@ const searchProjects = async (query: string, allFn: (sql: string, params?: any[]
       }
     }
 
-    // Check designers (weight: 0.6)
+    // Check designers and their aliases (weight: 0.6)
     for (const designer of designers) {
       const designerMatch = getMatchType(designer, query, allowContains);
       if (designerMatch) {
         score += calculateScore(designerMatch.type, 0.6);
         matches.push(`designer:${designerMatch.type}`);
+      } else {
+        const aliases = NAME_ALIASES[designer.toLowerCase().trim()] || [];
+        let found = false;
+        for (const alias of aliases) {
+          const aliasMatch = getMatchType(alias, query, allowContains);
+          if (aliasMatch) {
+            score += calculateScore(aliasMatch.type, 0.6);
+            matches.push(`designer:alias:${aliasMatch.type}`);
+            found = true;
+            break;
+          }
+        }
+        if (found) break;
       }
     }
 
