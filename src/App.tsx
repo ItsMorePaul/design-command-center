@@ -4072,6 +4072,41 @@ const [showFilters, setShowFilters] = useState(false)
       {/* Settings View */}
       {activeTab === 'settings' && (
         <div className="settings-page">
+          {/* General Section — Account, Theme, Version */}
+          <div className="settings-section">
+            <div className="settings-header">
+              <h2>General</h2>
+            </div>
+            <div className="settings-general-card">
+              <div className="settings-row">
+                <span>Account</span>
+                <span className="settings-account-detail">{currentUser?.email} <span className="settings-role-badge">{currentUser?.role}</span></span>
+              </div>
+              <div className="settings-row">
+                <span>Theme</span>
+                <button className="theme-switch" onClick={toggleTheme} aria-label="Toggle theme">
+                  <span className="theme-switch-track">
+                    <Sun size={12} className="theme-switch-icon theme-switch-sun" />
+                    <Moon size={12} className="theme-switch-icon theme-switch-moon" />
+                    <span className="theme-switch-thumb" />
+                  </span>
+                </button>
+              </div>
+              <div className="settings-row">
+                <span>Site version</span>
+                <span className="settings-version-value">{formatVersionDisplay(siteVersion.version) || '-'}</span>
+              </div>
+              <div className="settings-row">
+                <span>DB version</span>
+                <span className="settings-version-value">{formatVersionDisplay(dbVersion.version) || '-'}</span>
+              </div>
+              <div className="settings-row">
+                <span />
+                <button className="secondary-btn" onClick={handleLogout}>Sign Out</button>
+              </div>
+            </div>
+          </div>
+
           <div className="settings-section">
             <div className="settings-header">
               <h2>Business Lines</h2>
@@ -4113,15 +4148,11 @@ const [showFilters, setShowFilters] = useState(false)
                     </div>
                     <div className="business-line-links">
                       {line.customLinks?.map((link, idx) => (
-                        <Tooltip key={idx} content={`Link: ${link.name}`}>
-                          <a href={link.url} target="_blank" rel="noopener noreferrer" className="project-link-icon">
-                            <LinkIcon size={14} className="link-icon" />
-                          </a>
-                        </Tooltip>
+                        <a key={idx} href={link.url} target="_blank" rel="noopener noreferrer" className="project-footer-link">
+                          <LinkIcon size={12} />
+                          <span>{link.name}</span>
+                        </a>
                       ))}
-                      {!line.customLinks?.length && (
-                        <span className="no-links">No links configured</span>
-                      )}
                     </div>
                   </div>
                 ))}
@@ -4130,7 +4161,7 @@ const [showFilters, setShowFilters] = useState(false)
           </div>
 
           {/* Hidden Notes Section */}
-          <div className="settings-section" style={{ marginTop: '32px' }}>
+          <div className="settings-section">
             <div className="settings-header">
               <h2>Hidden Notes</h2>
               {!hiddenNotesUnlocked && (
@@ -4208,7 +4239,7 @@ const [showFilters, setShowFilters] = useState(false)
 
           {/* User Management Section (Admin Only) */}
           {isAdmin && (
-            <div className="settings-section" style={{ marginTop: '32px' }}>
+            <div className="settings-section">
               <div className="settings-header">
                 <h2>User Accounts</h2>
                 <button className="primary-btn" onClick={() => {
@@ -4248,7 +4279,7 @@ const [showFilters, setShowFilters] = useState(false)
           )}
 
           {/* Holidays Section (All Users) */}
-          <div className="settings-section" style={{ marginTop: '32px' }}>
+          <div className="settings-section">
             <div className="settings-header">
               <h2>Special Days</h2>
               <button className="add-timeline-btn" onClick={() => { setHolidayForm({ name: '', date: '' }); setShowHolidayModal(true) }}>+ Add Special Day</button>
@@ -4277,7 +4308,7 @@ const [showFilters, setShowFilters] = useState(false)
 
           {/* Maintenance Mode Section (Admin Only) */}
           {isAdmin && (
-            <div className="settings-section" style={{ marginTop: '32px' }}>
+            <div className="settings-section">
               <div className="settings-header">
                 <h2>Maintenance Mode</h2>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -4391,52 +4422,6 @@ const [showFilters, setShowFilters] = useState(false)
             </div>
           )}
 
-          {/* Appearance Section */}
-          <div className="settings-section" style={{ marginTop: '32px' }}>
-            <div className="settings-header">
-              <h2>Appearance</h2>
-            </div>
-            <div className="settings-appearance">
-              <div className="settings-row">
-                <span>Theme</span>
-                <button className="theme-toggle-setting" onClick={toggleTheme}>
-                  {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
-                  <span>{theme === 'light' ? 'Dark mode' : 'Light mode'}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Version Info Section */}
-          <div className="settings-section" style={{ marginTop: '32px' }}>
-            <div className="settings-header">
-              <h2>Version</h2>
-            </div>
-            <div className="settings-version-info">
-              <div className="settings-row">
-                <span>Site</span>
-                <span className="settings-version-value">{formatVersionDisplay(siteVersion.version) || '-'}</span>
-              </div>
-              <div className="settings-row">
-                <span>Database</span>
-                <span className="settings-version-value">{formatVersionDisplay(dbVersion.version) || '-'}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Account Info Section */}
-          <div className="settings-section" style={{ marginTop: '32px' }}>
-            <div className="settings-header">
-              <h2>Account</h2>
-            </div>
-            <div className="account-info">
-              <p><strong>Email:</strong> {currentUser?.email}</p>
-              <p><strong>Role:</strong> {currentUser?.role}</p>
-              <button className="secondary-btn" onClick={handleLogout} style={{ marginTop: '12px' }}>
-                Sign Out
-              </button>
-            </div>
-          </div>
         </div>
       )}
 
