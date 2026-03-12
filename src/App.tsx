@@ -2237,8 +2237,8 @@ const [showFilters, setShowFilters] = useState(false)
             <span className="nav-icon"><Settings size={18} /></span>
             <span className="nav-label">Settings</span>
           </button>
-          <button className="nav-collapse-toggle" onClick={toggleNavCollapsed} aria-label={navCollapsed ? 'Expand navigation' : 'Collapse navigation'}>
-            {navCollapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
+          <button className="nav-item nav-collapse-toggle" onClick={toggleNavCollapsed} aria-label={navCollapsed ? 'Expand navigation' : 'Collapse navigation'}>
+            <span className="nav-icon">{navCollapsed ? <ChevronsRight size={18} /> : <ChevronsLeft size={18} />}</span>
             <span className="nav-label">Collapse</span>
           </button>
         </div>
