@@ -3,7 +3,7 @@ import cors from 'cors';
 import sqlite3 from 'sqlite3';
 import path from 'path';
 import fs from 'fs';
-import { searchProjects, searchTeam, searchBusinessLines, searchNotes } from './search';
+import { searchProjects, searchTeam, searchBusinessLines, searchNotes, NAME_ALIASES, getNameVariants } from './search';
 import { homedir } from 'os';
 import bcrypt from 'bcrypt';
 
@@ -1377,20 +1377,29 @@ app.post('/api/notes/sync', async (req, res) => {
         }
       }
 
-      // Match note people to DCC team members
+      // Match note people to DCC team members (including name aliases)
       const peopleRaw = gNote.people || ''
       // Also check the content preview and filename for names
       const searchText = `${peopleRaw} ${gNote.content_preview || ''} ${gNote.filename || ''}`
       for (const member of dccTeam) {
-        const nameParts = member.name.split(/\s+/)
-        const firstName = nameParts[0]?.toLowerCase()
-        const lastName = nameParts[nameParts.length - 1]?.toLowerCase()
-        const fullName = member.name.toLowerCase()
         const textLower = searchText.toLowerCase()
+        // Check all name variants (canonical + aliases)
+        const nameVariants = getNameVariants(member.name)
+        let matched = false
 
-        // Match on full name or (first + last name appearing near each other)
-        if (textLower.includes(fullName) ||
-            (firstName && lastName && textLower.includes(firstName) && textLower.includes(lastName))) {
+        for (const variant of nameVariants) {
+          const nameParts = variant.split(/\s+/)
+          const firstName = nameParts[0]
+          const lastName = nameParts[nameParts.length - 1]
+
+          if (textLower.includes(variant) ||
+              (firstName && lastName && textLower.includes(firstName) && textLower.includes(lastName))) {
+            matched = true
+            break
+          }
+        }
+
+        if (matched) {
           await run(
             'INSERT OR IGNORE INTO note_people_links (note_id, team_id) VALUES (?, ?)',
             [noteId, member.id]
@@ -1860,8 +1869,8 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 // Format: YYYY.MM.DD.hhmm (e.g., 2026.02.26.2059) → displays as "2026.02.26 2059"
 
-const SITE_VERSION = '2026.03.11.1707'
-const SITE_TIME = '1707'
+const SITE_VERSION = '2026.03.11.0855'
+const SITE_TIME = '0855'
 
 const VERSION_KEY = 'dcc_versions'
 

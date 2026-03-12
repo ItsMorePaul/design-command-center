@@ -3578,7 +3578,7 @@ input:checked + .slider:before {
 }
 
 .chip-input {
-  width: 50px;
+  width: 62px;
   padding: 0.25rem 0.35rem;
   border: 1px solid var(--color-border);
   border-radius: 4px;

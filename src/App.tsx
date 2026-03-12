@@ -643,7 +643,7 @@ function App() {
 }, [projectFilters])
 
 const [showFilters, setShowFilters] = useState(false)
-  const [assignmentForm, setAssignmentForm] = useState({ project_id: '', designer_id: '', allocation_percent: 0 })
+  const [assignmentForm, setAssignmentForm] = useState({ project_id: '', designer_id: '', allocation_hours: 0 })
   const [hoursDraft, setHoursDraft] = useState<Record<string, number>>({})
   const [assignmentDraft, setAssignmentDraft] = useState<Record<string, number>>({})
   const [expandedDesigners, setExpandedDesigners] = useState<Set<string>>(new Set())
@@ -1182,10 +1182,17 @@ const [showFilters, setShowFilters] = useState(false)
       alert('Select both a project and a designer')
       return
     }
+    const designer = capacityData?.team.find(m => m.id === assignmentForm.designer_id)
+    const weeklyHours = designer?.weekly_hours || 35
+    const allocationPercent = Math.round((assignmentForm.allocation_hours / weeklyHours) * 100)
     await authFetch('/api/capacity/assignments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(assignmentForm)
+      body: JSON.stringify({
+        project_id: assignmentForm.project_id,
+        designer_id: assignmentForm.designer_id,
+        allocation_percent: allocationPercent,
+      })
     })
     await refreshCapacity()
   }
@@ -3241,10 +3248,11 @@ const [showFilters, setShowFilters] = useState(false)
                 type="number"
                 className="quick-add-input"
                 min={0}
-                max={100}
-                placeholder="%"
-                value={assignmentForm.allocation_percent || ''}
-                onChange={e => setAssignmentForm({ ...assignmentForm, allocation_percent: Number(e.target.value) })}
+                max={80}
+                step={0.5}
+                placeholder="hours"
+                value={assignmentForm.allocation_hours || ''}
+                onChange={e => setAssignmentForm({ ...assignmentForm, allocation_hours: Number(e.target.value) })}
               />
               <button className="primary-btn" onClick={saveCapacityAssignment}>Assign</button>
             </div>
@@ -3344,7 +3352,10 @@ const [showFilters, setShowFilters] = useState(false)
                           })
 
                           const renderChip = (assignment: CapacityAssignment, isDone: boolean) => {
-                            const effectiveAlloc = isDone ? 0 : (assignmentDraft[assignment.id] ?? (assignment.allocation_percent || 0))
+                            const allocPct = assignment.allocation_percent || 0
+                            const allocHours = parseFloat(((available * allocPct) / 100).toFixed(1))
+                            const effectiveHours = isDone ? 0 : (assignmentDraft[assignment.id] ?? allocHours)
+                            const effectivePct = isDone ? 0 : Math.round((effectiveHours / available) * 100)
                             return (
                               <div key={assignment.id} className={`assignment-chip${isDone ? ' chip-done' : ''}`}>
                                 <div className="chip-main">
@@ -3363,19 +3374,21 @@ const [showFilters, setShowFilters] = useState(false)
                                       type="number"
                                       className="chip-input"
                                       min={0}
-                                      max={100}
-                                      value={effectiveAlloc}
+                                      max={available}
+                                      step={0.5}
+                                      value={effectiveHours}
                                       disabled={isDone}
                                       onChange={e => !isDone && setAssignmentDraft({ ...assignmentDraft, [assignment.id]: Number(e.target.value) })}
                                       onBlur={(e) => {
                                         if (isDone) return
-                                        const newVal = Number(e.target.value)
-                                        const oldVal = assignment.allocation_percent || 0
-                                        if (newVal !== oldVal) saveAssignmentAllocation(assignment, newVal)
+                                        const newHours = Number(e.target.value)
+                                        const newPct = Math.round((newHours / available) * 100)
+                                        const oldPct = allocPct
+                                        if (newPct !== oldPct) saveAssignmentAllocation(assignment, newPct)
                                       }}
                                       onClick={e => e.stopPropagation()}
                                     />
-                                    <span className="chip-pct">%</span>
+                                    <span className="chip-pct">h</span>
                                     <button
                                       className="chip-delete"
                                       onClick={(e) => {
@@ -3393,7 +3406,7 @@ const [showFilters, setShowFilters] = useState(false)
                                 <div
                                   className="chip-bar"
                                   style={{
-                                    width: `${Math.min(effectiveAlloc, 100)}%`,
+                                    width: `${Math.min(effectivePct, 100)}%`,
                                     backgroundColor: getUtilColor()
                                   }}
                                 />
@@ -3440,10 +3453,11 @@ const [showFilters, setShowFilters] = useState(false)
                                 type="number"
                                 className="inline-add-input"
                                 min={0}
-                                max={100}
-                                placeholder="%"
-                                value={assignmentForm.allocation_percent || ''}
-                                onChange={e => setAssignmentForm({ ...assignmentForm, allocation_percent: Number(e.target.value) })}
+                                max={available}
+                                step={0.5}
+                                placeholder="hours"
+                                value={assignmentForm.allocation_hours || ''}
+                                onChange={e => setAssignmentForm({ ...assignmentForm, allocation_hours: Number(e.target.value) })}
                               />
                               <button 
                                 className="inline-add-btn"

@@ -1,6 +1,19 @@
 // ============ SEARCH ============
 // Smart search with word boundaries and relevance scoring
 
+// Name aliases — people who go by different names (bidirectional)
+// Each key maps to all alternate names for the same person
+const NAME_ALIASES: Record<string, string[]> = {
+  'andrew nelson': ['andy nelson'],
+  'andy nelson': ['andrew nelson'],
+};
+
+// Given a name, return all names that should match (including the original)
+const getNameVariants = (name: string): string[] => {
+  const lower = name.toLowerCase().trim();
+  return [lower, ...(NAME_ALIASES[lower] || [])];
+};
+
 interface SearchResult {
   item: any;
   score: number;
@@ -187,11 +200,22 @@ const searchTeam = async (query: string, allFn: (sql: string, params?: any[]) =>
 
     const brands = JSON.parse(member.brands || '[]');
 
-    // Check name (highest weight: 1.0)
+    // Check name and aliases (highest weight: 1.0)
     const nameMatch = getMatchType(member.name, query, allowContains);
     if (nameMatch) {
       score += calculateScore(nameMatch.type, 1.0);
       matches.push(`name:${nameMatch.type}`);
+    } else {
+      // Check if query matches any alias for this team member
+      const aliases = NAME_ALIASES[member.name.toLowerCase().trim()] || [];
+      for (const alias of aliases) {
+        const aliasMatch = getMatchType(alias, query, allowContains);
+        if (aliasMatch) {
+          score += calculateScore(aliasMatch.type, 1.0);
+          matches.push(`name:alias:${aliasMatch.type}`);
+          break;
+        }
+      }
     }
 
     // Check role (weight: 0.7)
@@ -312,12 +336,23 @@ const searchNotes = async (query: string, allFn: (sql: string, params?: any[]) =
       }
     }
 
-    // Check people_raw (weight: 0.7)
+    // Check people_raw (weight: 0.7) — also check name aliases
     if (note.people_raw) {
       const peopleMatch = getMatchType(note.people_raw, query, allowContains);
       if (peopleMatch) {
         score += calculateScore(peopleMatch.type, 0.7);
         matches.push(`people:${peopleMatch.type}`);
+      } else {
+        // Check if any alias of the query appears in people_raw
+        for (const variant of getNameVariants(query)) {
+          if (variant === normalize(query)) continue;
+          const aliasMatch = getMatchType(note.people_raw, variant, allowContains);
+          if (aliasMatch) {
+            score += calculateScore(aliasMatch.type, 0.7);
+            matches.push(`people:alias:${aliasMatch.type}`);
+            break;
+          }
+        }
       }
     }
 
@@ -347,4 +382,4 @@ const searchNotes = async (query: string, allFn: (sql: string, params?: any[]) =
   return results.sort((a, b) => b.score - a.score);
 };
 
-export { searchProjects, searchTeam, searchBusinessLines, searchNotes, SearchResult };
+export { searchProjects, searchTeam, searchBusinessLines, searchNotes, SearchResult, NAME_ALIASES, getNameVariants };
