@@ -16,19 +16,10 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Gauge, ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, Settings, GripVertical, Folder, StickyNote, RefreshCw, User, CheckSquare, Sun, Moon, Edit2 } from 'lucide-react'
+import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Gauge, ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, Settings, GripVertical, Folder, StickyNote, RefreshCw, User, CheckSquare, Sun, Moon, Edit2, Bell } from 'lucide-react'
 import { Tooltip } from './Tooltip'
 import './App.css'
 import initialData from './data.json'
-import { WebHaptics } from 'web-haptics'
-
-// Mobile haptic helper — only triggers on mobile breakpoints
-const isMobile = () => window.matchMedia('(max-width: 768px)').matches
-const haptics = new WebHaptics()
-const hapticLight = () => isMobile() && haptics.trigger([{ duration: 30, intensity: 0.3 }])
-const hapticMedium = () => isMobile() && haptics.trigger([{ duration: 50, intensity: 0.6 }])
-const hapticHeavy = () => isMobile() && haptics.trigger([{ duration: 80, intensity: 1.0 }])
-
 // Default US holidays to seed on first load
 const defaultHolidays = [
   { name: "New Year's Day", date: '2026-01-01' },
@@ -373,6 +364,16 @@ interface CapacityAssignment {
 interface CapacityData {
   team: CapacityMember[]
   assignments: CapacityAssignment[]
+}
+
+interface ActivityItem {
+  id: number
+  category: string
+  action: string
+  target_name: string
+  user_email: string
+  details: string | null
+  created_at: string
 }
 
 // Auth fetch helper - adds session ID to all requests
@@ -737,6 +738,12 @@ const [showFilters, setShowFilters] = useState(false)
   const [showUserModal, setShowUserModal] = useState(false)
   const [userFormData, setUserFormData] = useState({ email: '', password: '', role: 'user' })
 
+  // Notifications
+  const [activityItems, setActivityItems] = useState<ActivityItem[]>([])
+  const [showNotifications, setShowNotifications] = useState(false)
+  const [lastSeenActivity, setLastSeenActivity] = useState<string>(() => localStorage.getItem('dcc-last-seen-activity') || '')
+  const notifRef = useRef<HTMLDivElement>(null)
+
   // Get session ID from localStorage
   const getSessionId = () => localStorage.getItem('dcc-session-id')
   const setSessionId = (id: string) => {
@@ -745,6 +752,9 @@ const [showFilters, setShowFilters] = useState(false)
   const clearSessionId = () => {
     localStorage.removeItem('dcc-session-id')
   }
+
+  // Clear recovery flag on successful mount
+  useEffect(() => { sessionStorage.removeItem('dcc-recovery') }, [])
 
   // Check auth on mount
   useEffect(() => {
@@ -762,10 +772,14 @@ const [showFilters, setShowFilters] = useState(false)
           const user = await res.json()
           setCurrentUser(user)
           setIsAuthenticated(true)
-          setActiveTab('projects') // Redirect to default page on auth check
+          setActiveTab('projects')
+        } else {
+          // Stale session (server restarted) — clear so login page shows cleanly
+          clearSessionId()
         }
       } catch (err) {
         console.error('Auth check failed:', err)
+        clearSessionId()
       }
       setIsLoading(false)
     }
@@ -778,6 +792,46 @@ const [showFilters, setShowFilters] = useState(false)
       setActiveTab('projects')
     }
   }, [isAuthenticated])
+
+  // Fetch activity log for notifications
+  const fetchActivity = async () => {
+    try {
+      const res = await authFetch('/api/activity?limit=100')
+      if (res.ok) {
+        const data = await res.json()
+        setActivityItems(data)
+      }
+    } catch (e) { /* silent */ }
+  }
+
+  useEffect(() => {
+    if (!isAuthenticated) return
+    fetchActivity()
+    const interval = setInterval(fetchActivity, 60000) // poll every 60s
+    return () => clearInterval(interval)
+  }, [isAuthenticated])
+
+  // Close notification panel on outside click
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (showNotifications && notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setShowNotifications(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [showNotifications])
+
+  const hasUnseenActivity = activityItems.length > 0 && (!lastSeenActivity || activityItems[0].created_at > lastSeenActivity)
+
+  const openNotifications = () => {
+    setShowNotifications(prev => !prev)
+    if (!showNotifications && activityItems.length > 0) {
+      const latest = activityItems[0].created_at
+      setLastSeenActivity(latest)
+      localStorage.setItem('dcc-last-seen-activity', latest)
+    }
+  }
 
   // Handle login
   const handleLogin = async (e: React.FormEvent) => {
@@ -951,7 +1005,8 @@ const [showFilters, setShowFilters] = useState(false)
       const remaining = new Date(maintenance.countdownTarget!).getTime() - Date.now()
       if (remaining <= 0) {
         setCountdownDisplay('0:00')
-        setMaintenance(prev => ({ ...prev, isLockout: true }))
+        // Re-fetch from server to get authoritative lockout state
+        fetch('/api/maintenance').then(r => r.json()).then(data => setMaintenance(data)).catch(() => {})
         return
       }
       const mins = Math.floor(remaining / 60000)
@@ -1477,7 +1532,7 @@ const [showFilters, setShowFilters] = useState(false)
       try {
         await deleteProject(id)
         setProjects(projects.filter(p => p.id !== id))
-        hapticHeavy()
+        
       } catch (err) {
         console.error('Delete failed:', err)
         alert('Failed to delete project')
@@ -1687,7 +1742,7 @@ const [showFilters, setShowFilters] = useState(false)
       refreshCapacity()
       refreshProjects()
     }
-    hapticMedium()
+    
     setShowProjectModal(false)
   }
 
@@ -1880,7 +1935,7 @@ const [showFilters, setShowFilters] = useState(false)
         if (!dateA && !dateB) return 0
         if (!dateA) return 1
         if (!dateB) return -1
-        return dateB.localeCompare(dateA)
+        return dateA.localeCompare(dateB)
       }
       case 'status':
         return a.name.localeCompare(b.name)
@@ -1995,7 +2050,7 @@ const [showFilters, setShowFilters] = useState(false)
     openConfirmModal('Remove team member?', 'This will remove the team member and related assignment links.', async () => {
       await deleteTeamMember(id)
       setTeam(team.filter(m => m.id !== id))
-      hapticHeavy()
+      
       closeConfirmModal()
     })
   }
@@ -2025,7 +2080,7 @@ const [showFilters, setShowFilters] = useState(false)
       setTeam(prev => [...prev, newMember])
       refreshCalendar()
     }
-    hapticMedium()
+    
     setShowModal(false)
   }
 
@@ -2096,6 +2151,14 @@ const [showFilters, setShowFilters] = useState(false)
             <span className="maintenance-pulse" />
             This page auto-refreshes every 30 seconds
           </div>
+          <button
+            className="maintenance-admin-link"
+            onClick={() => {
+              handleLogout()
+            }}
+          >
+            Admin access
+          </button>
         </div>
       </div>
     )
@@ -2125,7 +2188,7 @@ const [showFilters, setShowFilters] = useState(false)
         <nav className="nav">
           <button
             className={`nav-item ${activeTab === 'projects' ? 'active' : ''}`}
-            onClick={() => { hapticLight(); setActiveTab('projects') }}
+            onClick={() => { setActiveTab('projects') }}
             aria-label="Projects"
           >
             <span className="nav-icon"><FileText size={18} /></span>
@@ -2133,7 +2196,7 @@ const [showFilters, setShowFilters] = useState(false)
           </button>
           <button
             className={`nav-item ${activeTab === 'team' ? 'active' : ''}`}
-            onClick={() => { hapticLight(); setActiveTab('team') }}
+            onClick={() => { setActiveTab('team') }}
             aria-label="Team"
           >
             <span className="nav-icon"><Users size={18} /></span>
@@ -2141,7 +2204,7 @@ const [showFilters, setShowFilters] = useState(false)
           </button>
           <button
             className={`nav-item ${activeTab === 'capacity' ? 'active' : ''}`}
-            onClick={() => { hapticLight(); setActiveTab('capacity') }}
+            onClick={() => { setActiveTab('capacity') }}
             aria-label="Capacity"
           >
             <span className="nav-icon"><Gauge size={18} /></span>
@@ -2149,7 +2212,7 @@ const [showFilters, setShowFilters] = useState(false)
           </button>
           <button
             className={`nav-item ${activeTab === 'calendar' ? 'active' : ''}`}
-            onClick={() => { hapticLight(); setActiveTab('calendar') }}
+            onClick={() => { setActiveTab('calendar') }}
             aria-label="Calendar"
           >
             <span className="nav-icon"><Calendar size={18} /></span>
@@ -2157,7 +2220,7 @@ const [showFilters, setShowFilters] = useState(false)
           </button>
           <button
             className={`nav-item ${activeTab === 'notes' ? 'active' : ''}`}
-            onClick={() => { hapticLight(); setActiveTab('notes') }}
+            onClick={() => { setActiveTab('notes') }}
             aria-label="Notes"
           >
             <span className="nav-icon"><StickyNote size={18} /></span>
@@ -2167,20 +2230,17 @@ const [showFilters, setShowFilters] = useState(false)
         </nav>
 
         <div className="sidebar-footer">
+          <button
+            className={`nav-item${activeTab === 'settings' ? ' active' : ''}`}
+            onClick={() => { setActiveTab('settings') }}
+          >
+            <span className="nav-icon"><Settings size={18} /></span>
+            <span className="nav-label">Settings</span>
+          </button>
           <button className="nav-collapse-toggle" onClick={toggleNavCollapsed} aria-label={navCollapsed ? 'Expand navigation' : 'Collapse navigation'}>
             {navCollapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
             <span className="nav-label">Collapse</span>
           </button>
-          <div className="version-info">
-            <div className="version-row">
-              <span className="version-label">Site</span>
-              <span className="version-num">{formatVersionDisplay(siteVersion.version) || '-'}</span>
-            </div>
-            <div className="version-row">
-              <span className="version-label">DB</span>
-              <span className="version-num">{formatVersionDisplay(dbVersion.version) || '-'}</span>
-            </div>
-          </div>
         </div>
       </aside>
 
@@ -2204,10 +2264,65 @@ const [showFilters, setShowFilters] = useState(false)
             <button className="icon-btn" aria-label="Search" onClick={() => setShowSearch(true)}>
               <Search size={18} />
             </button>
-            <button className="icon-btn" aria-label="Settings" onClick={() => setActiveTab('settings')}><Settings size={18} /></button>
-            <button className="theme-toggle" aria-label="Toggle theme" onClick={toggleTheme}>
-              {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
-            </button>
+            <div className="notif-wrapper" ref={notifRef}>
+              <button className="icon-btn" aria-label="Notifications" onClick={openNotifications}>
+                <Bell size={18} />
+                {hasUnseenActivity && <span className="notif-dot" />}
+              </button>
+              {showNotifications && (
+                <div className="notif-panel">
+                  <div className="notif-panel-header">
+                    <h3>Recent Activity</h3>
+                  </div>
+                  {activityItems.length === 0 ? (
+                    <div className="notif-empty">No recent updates</div>
+                  ) : (
+                    <div className="notif-list">
+                      {(() => {
+                        const grouped: Record<string, ActivityItem[]> = {}
+                        for (const item of activityItems) {
+                          const d = new Date(item.created_at + 'Z')
+                          const today = new Date()
+                          const yesterday = new Date(today)
+                          yesterday.setDate(yesterday.getDate() - 1)
+                          let label: string
+                          if (d.toDateString() === today.toDateString()) label = 'Today'
+                          else if (d.toDateString() === yesterday.toDateString()) label = 'Yesterday'
+                          else label = d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+                          if (!grouped[label]) grouped[label] = []
+                          grouped[label].push(item)
+                        }
+                        return Object.entries(grouped).map(([day, items]) => (
+                          <div key={day} className="notif-day-group">
+                            <div className="notif-day-label">{day}</div>
+                            {items.map(item => (
+                              <div key={item.id} className="notif-item">
+                                <div className="notif-item-icon" data-category={item.category}>
+                                  {item.category === 'project' && <LayoutGrid size={14} />}
+                                  {item.category === 'priority' && <GripVertical size={14} />}
+                                  {item.category === 'holiday' && <Calendar size={14} />}
+                                  {item.category === 'capacity' && <Gauge size={14} />}
+                                </div>
+                                <div className="notif-item-content">
+                                  <div className="notif-item-title">
+                                    <span className="notif-action">{item.action === 'create' ? 'Created' : item.action === 'update' ? 'Updated' : 'Deleted'}</span>
+                                    {' '}{item.target_name}
+                                  </div>
+                                  {item.details && <div className="notif-item-detail">{item.details}</div>}
+                                  <div className="notif-item-meta">
+                                    {item.user_email !== 'anonymous' ? item.user_email.split('@')[0] : 'System'} · {new Date(item.created_at + 'Z').toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ))
+                      })()}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
             {activeTab === 'projects' && (
               <button className="primary-btn" onClick={handleAddProject}>+ New Project</button>
             )}
@@ -2345,33 +2460,6 @@ const [showFilters, setShowFilters] = useState(false)
                 {(() => {
                   if (filteredProjects.length === 0) return <div className="priority-empty">No projects found</div>
 
-                  // Flat list for dueDate sort — no grouping
-                  if (projectSortBy === 'dueDate') {
-                    return <div className="list-bl-section">
-                      {filteredProjects.map(project => renderProjectRow(project))}
-                    </div>
-                  }
-
-                  // Grouped by business line for all other sorts
-                  const groups: { name: string; projects: typeof filteredProjects }[] = []
-                  const blOrder = businessLines.map(bl => bl.name)
-                  const grouped = new Map<string, typeof filteredProjects>()
-                  for (const p of filteredProjects) {
-                    const blNames = p.businessLines && p.businessLines.length > 0 ? p.businessLines : ['Uncategorized']
-                    for (const bl of blNames) {
-                      if (!grouped.has(bl)) grouped.set(bl, [])
-                      grouped.get(bl)!.push(p)
-                    }
-                  }
-                  for (const blName of blOrder) {
-                    if (grouped.has(blName)) {
-                      groups.push({ name: blName, projects: grouped.get(blName)! })
-                      grouped.delete(blName)
-                    }
-                  }
-                  for (const [name, projects] of grouped) {
-                    groups.push({ name, projects })
-                  }
                   const renderProjectRow = (project: any) => {
                     const isOverdue = (() => {
                       if (!project.endDate || project.status === 'done') return false
@@ -2388,34 +2476,11 @@ const [showFilters, setShowFilters] = useState(false)
                           <span className="project-name-cell">
                             {isOverdue && <span className="overdue-label">Overdue</span>}
                             {project.url ? (
-                              <a href={project.url} target="_blank" rel="noopener noreferrer" className="project-name-link">{project.name}</a>
+                              <a href={project.url} target="_blank" rel="noopener noreferrer" className="project-name-link"><LinkIcon size={14} className="project-name-link-icon" />{project.name}</a>
                             ) : (
                               <span className="project-name">{project.name}</span>
                             )}
                           </span>
-                          <div className="project-designers">
-                            {(project.designers || []).map((d: string, idx: number) => {
-                              const firstName = d.split(' ')[0]
-                              return (
-                                <span key={d}>
-                                  <button
-                                    className="designer-link"
-                                    onClick={() => {
-                                      const member = team.find(m => m.name === d)
-                                      if (member) {
-                                        setEditingMember(member)
-                                        setFormData({ name: member.name, role: member.role, brands: member.brands, status: member.status, slack: member.slack || '', email: member.email || '', timeOff: member.timeOff || [] })
-                                        setShowModal(true)
-                                      }
-                                    }}
-                                  >
-                                    {firstName}
-                                  </button>
-                                  {idx < (project.designers || []).length - 1 ? ', ' : ''}
-                                </span>
-                              )
-                            })}
-                          </div>
                           <span className="status-badge" style={{ color: { active: '#3b82f6', review: '#f59e0b', done: '#22c55e', blocked: '#ef4444' }[project.status as string] }}>
                             <span className={`status-badge-dot ${getStatusColor(project.status)}`}></span>
                             {getStatusLabel(project.status)}
@@ -2492,40 +2557,41 @@ const [showFilters, setShowFilters] = useState(false)
                           })()}
                         <div className="project-card-footer">
                           <div className="project-links-footer">
+                            {(project.designers || []).length > 0 && (
+                              <span className="project-footer-designer">
+                                <User size={12} />
+                                <span>{(project.designers || []).map((d: string) => d.split(' ')[0]).join(', ')}</span>
+                              </span>
+                            )}
                             {project.deckLink && (
-                              <Tooltip content={`Deck: ${project.deckName || 'Design Deck'}`}>
-                                <a href={project.deckLink} target="_blank" rel="noopener noreferrer" className="project-link-icon">
-                                  <Presentation size={14} className="link-icon" />
-                                </a>
-                              </Tooltip>
+                              <a href={project.deckLink} target="_blank" rel="noopener noreferrer" className="project-footer-link">
+                                <Presentation size={12} />
+                                <span>{project.deckName || 'Design Deck'}</span>
+                              </a>
                             )}
                             {project.prdLink && (
-                              <Tooltip content={`PRD: ${project.prdName || 'PRD'}`}>
-                                <a href={project.prdLink} target="_blank" rel="noopener noreferrer" className="project-link-icon">
-                                  <FileText size={14} className="link-icon" />
-                                </a>
-                              </Tooltip>
+                              <a href={project.prdLink} target="_blank" rel="noopener noreferrer" className="project-footer-link">
+                                <FileText size={12} />
+                                <span>{project.prdName || 'PRD'}</span>
+                              </a>
                             )}
                             {project.briefLink && (
-                              <Tooltip content={`Brief: ${project.briefName || 'Design Brief'}`}>
-                                <a href={project.briefLink} target="_blank" rel="noopener noreferrer" className="project-link-icon">
-                                  <FileEdit size={14} className="link-icon" />
-                                </a>
-                              </Tooltip>
+                              <a href={project.briefLink} target="_blank" rel="noopener noreferrer" className="project-footer-link">
+                                <FileEdit size={12} />
+                                <span>{project.briefName || 'Design Brief'}</span>
+                              </a>
                             )}
                             {project.figmaLink && (
-                              <Tooltip content="Figma">
-                                <a href={project.figmaLink} target="_blank" rel="noopener noreferrer" className="project-link-icon">
-                                  <Figma size={14} className="link-icon" />
-                                </a>
-                              </Tooltip>
+                              <a href={project.figmaLink} target="_blank" rel="noopener noreferrer" className="project-footer-link">
+                                <Figma size={12} />
+                                <span>Figma</span>
+                              </a>
                             )}
                             {project.customLinks?.map((link: any, idx: number) => (
-                              <Tooltip key={idx} content={`Link: ${link.name}`}>
-                                <a href={link.url} target="_blank" rel="noopener noreferrer" className="project-link-icon">
-                                  <LinkIcon size={14} className="link-icon" />
-                                </a>
-                              </Tooltip>
+                              <a key={idx} href={link.url} target="_blank" rel="noopener noreferrer" className="project-footer-link">
+                                <LinkIcon size={12} />
+                                <span>{link.name}</span>
+                              </a>
                             ))}
                           </div>
                           <div className="project-actions">
@@ -2535,6 +2601,34 @@ const [showFilters, setShowFilters] = useState(false)
                         </div>
                       </div>
                     )
+                  }
+
+                  // Flat list for dueDate sort — no grouping
+                  if (projectSortBy === 'dueDate') {
+                    return <div className="list-bl-section">
+                      {filteredProjects.map(project => renderProjectRow(project))}
+                    </div>
+                  }
+
+                  // Grouped by business line for all other sorts
+                  const groups: { name: string; projects: typeof filteredProjects }[] = []
+                  const blOrder = businessLines.map(bl => bl.name)
+                  const grouped = new Map<string, typeof filteredProjects>()
+                  for (const p of filteredProjects) {
+                    const blNames = p.businessLines && p.businessLines.length > 0 ? p.businessLines : ['Uncategorized']
+                    for (const bl of blNames) {
+                      if (!grouped.has(bl)) grouped.set(bl, [])
+                      grouped.get(bl)!.push(p)
+                    }
+                  }
+                  for (const blName of blOrder) {
+                    if (grouped.has(blName)) {
+                      groups.push({ name: blName, projects: grouped.get(blName)! })
+                      grouped.delete(blName)
+                    }
+                  }
+                  for (const [name, projects] of grouped) {
+                    groups.push({ name, projects })
                   }
 
                   return groups.map(group => (
@@ -2608,21 +2702,21 @@ const [showFilters, setShowFilters] = useState(false)
                               // Dropped on in-progress zone (empty list) or a live item
                               if (overStr === ipZoneId) {
                                 markProjectUndone(projectId, blId, allRankedIds, 0)
-                                hapticMedium()
+                                
                                 return
                               }
                               // Determine insert position: if dropped on a live item, insert at its index; otherwise append
                               const overIndex = allRankedIds.indexOf(overStr)
                               const insertIndex = overIndex !== -1 ? overIndex : allRankedIds.length
                               markProjectUndone(projectId, blId, allRankedIds, insertIndex)
-                              hapticMedium()
+                              
                               return
                             }
 
                             // Dragging a live project to done zone
                             if (overStr === doneZoneId) {
                               markProjectDone(activeStr, blId, allRankedIds)
-                              hapticMedium()
+                              
                               return
                             }
                             if (active.id === over.id) return
@@ -2630,7 +2724,6 @@ const [showFilters, setShowFilters] = useState(false)
                             const newIndex = allRankedIds.indexOf(overStr)
                             if (oldIndex === -1 || newIndex === -1) return
                             savePriorities(blId, arrayMove(allRankedIds, oldIndex, newIndex))
-                            hapticLight()
                           }}
                         >
                           {/* In Progress zone — droppable so done items can return even when empty */}
@@ -4298,6 +4391,39 @@ const [showFilters, setShowFilters] = useState(false)
             </div>
           )}
 
+          {/* Appearance Section */}
+          <div className="settings-section" style={{ marginTop: '32px' }}>
+            <div className="settings-header">
+              <h2>Appearance</h2>
+            </div>
+            <div className="settings-appearance">
+              <div className="settings-row">
+                <span>Theme</span>
+                <button className="theme-toggle-setting" onClick={toggleTheme}>
+                  {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
+                  <span>{theme === 'light' ? 'Dark mode' : 'Light mode'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Version Info Section */}
+          <div className="settings-section" style={{ marginTop: '32px' }}>
+            <div className="settings-header">
+              <h2>Version</h2>
+            </div>
+            <div className="settings-version-info">
+              <div className="settings-row">
+                <span>Site</span>
+                <span className="settings-version-value">{formatVersionDisplay(siteVersion.version) || '-'}</span>
+              </div>
+              <div className="settings-row">
+                <span>Database</span>
+                <span className="settings-version-value">{formatVersionDisplay(dbVersion.version) || '-'}</span>
+              </div>
+            </div>
+          </div>
+
           {/* Account Info Section */}
           <div className="settings-section" style={{ marginTop: '32px' }}>
             <div className="settings-header">
@@ -4319,7 +4445,7 @@ const [showFilters, setShowFilters] = useState(false)
 
       {/* Modal */}
       {showModal && (
-        <div className="modal-overlay" onClick={() => { hapticLight(); setShowModal(false) }}>
+        <div className="modal-overlay" onClick={() => { setShowModal(false) }}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2>{editingMember ? 'Edit Team Member' : 'Add Team Member'}</h2>
@@ -4428,7 +4554,7 @@ const [showFilters, setShowFilters] = useState(false)
             </div>
 
             <div className="modal-footer">
-              <button className="secondary-btn" onClick={() => { hapticLight(); setShowModal(false) }}>Cancel</button>
+              <button className="secondary-btn" onClick={() => { setShowModal(false) }}>Cancel</button>
               <button className="primary-btn" onClick={handleSave}>
                 {editingMember ? 'Save Changes' : 'Add Member'}
               </button>

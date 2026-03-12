@@ -138,21 +138,110 @@ if [[ "$SANITY_FAIL" == "true" ]]; then
   exit 1
 fi
 
-# ── Backup Railway before any changes ─────────────────────────────
-log "Backing up Railway production data..."
+# ── Download Railway DB binary BEFORE any changes ────────────────
+# CRITICAL: Railway uses ephemeral filesystem. A code push triggers a
+# rebuild that DESTROYS the DB. We must capture the full binary DB
+# BEFORE pushing code. Deploy is ABORTED if this download fails.
+log "Downloading Railway database (pre-deploy safety backup)..."
 BACKUP_TS=$(date +%Y%m%d_%H%M%S)
 BACKUP_DIR="$DCC_DIR/backups/railway/pre_deploy_${BACKUP_TS}"
 mkdir -p "$BACKUP_DIR"
 
-curl -sf "$RAILWAY_URL/api/data"           > "$BACKUP_DIR/data.json" || true
-curl -sf "$RAILWAY_URL/api/capacity"       > "$BACKUP_DIR/capacity.json" || true
-curl -sf "$RAILWAY_URL/api/priorities"     > "$BACKUP_DIR/priorities.json" || true
-curl -sf "$RAILWAY_URL/api/business-lines" > "$BACKUP_DIR/business_lines.json" || true
-curl -sf "$RAILWAY_URL/api/brandOptions"   > "$BACKUP_DIR/brand_options.json" || true
-curl -sf "$RAILWAY_URL/api/notes"          > "$BACKUP_DIR/notes.json" || echo "[]" > "$BACKUP_DIR/notes.json"
+RAILWAY_DB_BACKUP="$BACKUP_DIR/shared.db"
+BACKUP_HTTP=$(curl -s -w "%{http_code}" -o "$RAILWAY_DB_BACKUP" \
+  -H "X-Seed-Secret: $DCC_SEED_SECRET" \
+  "$RAILWAY_URL/api/download-db")
 
+if [[ "$BACKUP_HTTP" != "200" ]]; then
+  err "Failed to download Railway DB (HTTP $BACKUP_HTTP). DEPLOY ABORTED."
+  err "Cannot proceed without a safety backup of Railway data."
+  rm -f "$RAILWAY_DB_BACKUP"
+  exit 1
+fi
+
+BACKUP_SIZE=$(wc -c < "$RAILWAY_DB_BACKUP" | tr -d ' ')
+BACKUP_HEADER=$(head -c 16 "$RAILWAY_DB_BACKUP" | strings | head -1)
+if [[ "$BACKUP_HEADER" != *"SQLite format 3"* ]]; then
+  err "Downloaded file is not a valid SQLite database. DEPLOY ABORTED."
+  rm -f "$RAILWAY_DB_BACKUP"
+  exit 1
+fi
+
+if ! sqlite3 "$RAILWAY_DB_BACKUP" "PRAGMA integrity_check;" | grep -q "ok"; then
+  err "Railway DB backup failed integrity check! DEPLOY ABORTED."
+  exit 1
+fi
+
+# Show Railway DB state
+echo ""
+echo -e "${BLUE}RAILWAY (before deploy):${NC}"
+R_TABLES=$(sqlite3 "$RAILWAY_DB_BACKUP" "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;")
+printf "%-30s %s\n" "Table" "Rows"
+printf "%-30s %s\n" "─────" "────"
+for TABLE in $R_TABLES; do
+  COUNT=$(sqlite3 "$RAILWAY_DB_BACKUP" "SELECT COUNT(*) FROM \"$TABLE\";")
+  printf "%-30s %s\n" "$TABLE" "$COUNT"
+done
+echo ""
+
+log "Railway DB backed up: $RAILWAY_DB_BACKUP ($BACKUP_SIZE bytes)"
 echo "$BACKUP_DIR" > "$DCC_DIR/backups/railway/LATEST_PRE_DEPLOY"
-log "Backup saved: $BACKUP_DIR"
+
+# ── Railway data containment check ───────────────────────────────
+# Verify local DB contains ALL Railway rows for user-edited tables.
+# This ensures merge-railway.sh was run and no production data will be lost.
+# Checks by primary key — every Railway row ID must exist in local.
+echo ""
+echo -e "${BLUE}=== RAILWAY DATA CONTAINMENT CHECK ===${NC}"
+echo -e "Verifying local DB contains all Railway production data..."
+echo ""
+CONTAIN_FAIL=false
+
+declare -A TABLE_PKS=(
+  ["projects"]="id"
+  ["team"]="id"
+  ["project_assignments"]="id"
+  ["project_priorities"]="id"
+  ["business_lines"]="id"
+  ["brand_options"]="id"
+  ["users"]="id"
+  ["holidays"]="id"
+  ["notes"]="id"
+  ["hidden_note_fingerprints"]="fingerprint"
+)
+
+for TABLE in "${!TABLE_PKS[@]}"; do
+  PK="${TABLE_PKS[$TABLE]}"
+  # Find Railway IDs not in local
+  MISSING=$(sqlite3 "$RAILWAY_DB_BACKUP" "SELECT $PK FROM $TABLE;" 2>/dev/null | while read -r ID; do
+    EXISTS=$(sqlite3 "$LOCAL_DB" "SELECT COUNT(*) FROM $TABLE WHERE $PK = '$ID';" 2>/dev/null || echo "0")
+    if [[ "$EXISTS" == "0" ]]; then
+      echo "$ID"
+    fi
+  done)
+
+  R_COUNT=$(sqlite3 "$RAILWAY_DB_BACKUP" "SELECT COUNT(*) FROM $TABLE;" 2>/dev/null || echo "0")
+  L_COUNT=$(sqlite3 "$LOCAL_DB" "SELECT COUNT(*) FROM $TABLE;" 2>/dev/null || echo "0")
+
+  if [[ -n "$MISSING" ]]; then
+    MISSING_COUNT=$(echo "$MISSING" | wc -l | tr -d ' ')
+    err "$TABLE: $MISSING_COUNT Railway rows MISSING from local (railway=$R_COUNT local=$L_COUNT)"
+    echo "$MISSING" | head -5 | while read -r ID; do
+      echo "    missing: $ID"
+    done
+    CONTAIN_FAIL=true
+  else
+    log "$TABLE: all $R_COUNT Railway rows present in local (local=$L_COUNT)"
+  fi
+done
+echo ""
+
+if [[ "$CONTAIN_FAIL" == "true" ]]; then
+  err "LOCAL DB IS MISSING RAILWAY DATA — deploy blocked."
+  err "Run ./scripts/merge-railway.sh first to integrate Railway data."
+  err "Railway backup saved at: $RAILWAY_DB_BACKUP"
+  exit 1
+fi
 
 # ── Deploy code (git push) ───────────────────────────────────────
 if [[ "$DATA_ONLY" == "false" ]]; then

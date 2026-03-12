@@ -461,13 +461,14 @@ app.use((req, res, next) => {
   const isMaintenanceEndpoint = req.path === '/api/maintenance'
   const isHealthEndpoint = req.path === '/api/health'
   const isAuthEndpoint = req.path.startsWith('/api/auth/')
+  const isActivityEndpoint = req.path === '/api/activity'
   const isDbEndpoint = (req.path === '/api/upload-db' || req.path === '/api/download-db') && SEED_SECRET && req.headers['x-seed-secret'] === SEED_SECRET
   const isLocalhost = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1'
   // Allow authenticated admin users through
   const sessionId = req.headers['x-session-id'] as string
   const session = sessionId ? sessions.get(sessionId) : null
   const isAdminUser = session?.role === 'admin'
-  if (isMaintenanceEndpoint || isHealthEndpoint || isAuthEndpoint || isDbEndpoint || isLocalhost || isAdminUser) return next()
+  if (isMaintenanceEndpoint || isHealthEndpoint || isAuthEndpoint || isActivityEndpoint || isDbEndpoint || isLocalhost || isAdminUser) return next()
   // API requests get JSON response
   if (req.path.startsWith('/api/')) {
     return res.status(503).json({ error: 'maintenance', message: maintenanceState.lockoutMessage })
@@ -541,6 +542,7 @@ app.post('/api/projects', async (req, res) => {
 
     // Update DB version
     await updateDbVersion()
+    await logActivity('project', id ? 'update' : 'create', name || projectId, getUserEmail(req))
     const saved = await get('SELECT * FROM projects WHERE id = ?', [projectId])
     res.json(saved);
   } catch (e) { res.status(500).json({error: e.message}); }
@@ -548,9 +550,11 @@ app.post('/api/projects', async (req, res) => {
 
 app.delete('/api/projects/:id', async (req, res) => {
   try {
+    const existing = await get('SELECT name FROM projects WHERE id = ?', [req.params.id]) as any
     await run('DELETE FROM projects WHERE id = ?', [req.params.id]);
     await run('DELETE FROM project_assignments WHERE project_id = ?', [req.params.id]);
     await updateDbVersion()
+    await logActivity('project', 'delete', existing?.name || req.params.id, getUserEmail(req))
     res.json({success: true});
   } catch (e) { res.status(500).json({error: e.message}); }
 });
@@ -558,9 +562,11 @@ app.delete('/api/projects/:id', async (req, res) => {
 // Mark project as done: set status='done' and zero all allocations
 app.put('/api/projects/:id/done', async (req, res) => {
   try {
+    const proj = await get('SELECT name FROM projects WHERE id = ?', [req.params.id]) as any
     await run("UPDATE projects SET status = 'done', updatedAt = datetime('now') WHERE id = ?", [req.params.id])
     await run('UPDATE project_assignments SET allocation_percent = 0 WHERE project_id = ?', [req.params.id])
     await updateDbVersion()
+    await logActivity('project', 'update', proj?.name || req.params.id, getUserEmail(req), 'Marked as done')
     res.json({ success: true })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
@@ -568,8 +574,10 @@ app.put('/api/projects/:id/done', async (req, res) => {
 // Mark project as undone: restore status to 'active'
 app.put('/api/projects/:id/undone', async (req, res) => {
   try {
+    const proj = await get('SELECT name FROM projects WHERE id = ?', [req.params.id]) as any
     await run("UPDATE projects SET status = 'active', updatedAt = datetime('now') WHERE id = ?", [req.params.id])
     await updateDbVersion()
+    await logActivity('project', 'update', proj?.name || req.params.id, getUserEmail(req), 'Restored to active')
     res.json({ success: true })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
@@ -712,6 +720,7 @@ app.post('/api/holidays', async (req, res) => {
       [holidayId, name, date]
     );
     updateDbVersion();
+    await logActivity('holiday', id ? 'update' : 'create', name, getUserEmail(req), date)
     const holidays = await all('SELECT * FROM holidays ORDER BY date');
     res.json(holidays);
   } catch (e) { res.status(500).json({error: e.message}); }
@@ -719,8 +728,10 @@ app.post('/api/holidays', async (req, res) => {
 
 app.delete('/api/holidays/:id', async (req, res) => {
   try {
+    const existing = await get('SELECT name FROM holidays WHERE id = ?', [req.params.id]) as any
     await run('DELETE FROM holidays WHERE id = ?', [req.params.id]);
     updateDbVersion();
+    await logActivity('holiday', 'delete', existing?.name || req.params.id, getUserEmail(req))
     const holidays = await all('SELECT * FROM holidays ORDER BY date');
     res.json(holidays);
   } catch (e) { res.status(500).json({error: e.message}); }
@@ -1907,6 +1918,36 @@ const updateDbVersion = async () => {
   await run("UPDATE app_versions SET db_version = ?, db_time = ?, updated_at = datetime('now') WHERE key = ?", [versionNumber, versionTime, VERSION_KEY])
 }
 
+// ============ ACTIVITY LOG ============
+// Tracks DB mutations for the notification bell
+// Categories: project, priority, holiday, capacity
+const logActivity = async (
+  category: 'project' | 'priority' | 'holiday' | 'capacity',
+  action: 'create' | 'update' | 'delete',
+  targetName: string,
+  userEmail: string | null,
+  details?: string
+) => {
+  try {
+    await run(
+      `INSERT INTO activity_log (category, action, target_name, user_email, details, created_at)
+       VALUES (?, ?, ?, ?, ?, datetime('now'))`,
+      [category, action, targetName, userEmail || 'anonymous', details || null]
+    )
+  } catch (e) {
+    console.error('Activity log error:', e.message)
+  }
+}
+
+// Helper: resolve user email from session header
+const getUserEmail = (req: express.Request): string | null => {
+  const sessionId = req.headers['x-session-id'] as string
+  if (sessionId && sessions.has(sessionId)) {
+    return sessions.get(sessionId)!.email
+  }
+  return null
+}
+
 // Initialize versions table
 const initVersions = async () => {
   try {
@@ -2053,6 +2094,17 @@ run(`ALTER TABLE notes ADD COLUMN attachments TEXT DEFAULT '[]'`).catch(() => {}
 run(`ALTER TABLE notes ADD COLUMN linkedTeamIds TEXT DEFAULT '[]'`).catch(() => {})
 run(`ALTER TABLE notes ADD COLUMN linkedProjectIds TEXT DEFAULT '[]'`).catch(() => {})
 
+// Activity log for notification bell
+run(`CREATE TABLE IF NOT EXISTS activity_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  category TEXT NOT NULL,
+  action TEXT NOT NULL,
+  target_name TEXT NOT NULL,
+  user_email TEXT,
+  details TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+)`).catch(e => console.error('activity_log init error:', e.message))
+
 run(`CREATE TABLE IF NOT EXISTS note_project_links (
   note_id TEXT NOT NULL,
   project_id TEXT NOT NULL,
@@ -2126,6 +2178,8 @@ app.put('/api/priorities', async (req, res) => {
       )
     }
     await updateDbVersion()
+    const blName = (await get('SELECT name FROM business_lines WHERE id = ?', [business_line_id]) as any)?.name || business_line_id
+    await logActivity('priority', 'update', blName, getUserEmail(req), `${project_ids.length} projects reordered`)
     res.json({ ok: true })
   } catch (e) {
     res.status(500).json({ error: String(e) })
@@ -2174,6 +2228,9 @@ app.post('/api/capacity/assignments', async (req, res) => {
     )
     await syncAssignmentToProjectDesigners(project_id, designer_id, true)
     await updateDbVersion()
+    const projName = (await get('SELECT name FROM projects WHERE id = ?', [project_id]) as any)?.name || project_id
+    const designerName = (await get('SELECT name FROM team WHERE id = ?', [designer_id]) as any)?.name || designer_id
+    await logActivity('capacity', 'update', projName, getUserEmail(req), `${designerName} → ${allocation_percent}%`)
     res.json({ success: true, id })
   } catch (e) { res.status(500).json({error: e.message}); }
 })
@@ -2181,12 +2238,13 @@ app.post('/api/capacity/assignments', async (req, res) => {
 // Delete project assignment
 app.delete('/api/capacity/assignments/:id', async (req, res) => {
   try {
-    const existing = await get('SELECT project_id, designer_id FROM project_assignments WHERE id = ?', [req.params.id]) as { project_id?: string; designer_id?: string } | undefined
+    const existing = await get('SELECT pa.project_id, pa.designer_id, p.name as project_name, t.name as designer_name FROM project_assignments pa LEFT JOIN projects p ON pa.project_id = p.id LEFT JOIN team t ON pa.designer_id = t.id WHERE pa.id = ?', [req.params.id]) as any
     await run('DELETE FROM project_assignments WHERE id = ?', [req.params.id])
     if (existing?.project_id && existing?.designer_id) {
       await syncAssignmentToProjectDesigners(existing.project_id, existing.designer_id, false)
     }
     await updateDbVersion()
+    await logActivity('capacity', 'delete', existing?.project_name || req.params.id, getUserEmail(req), `Removed ${existing?.designer_name || 'assignment'}`)
     res.json({ success: true })
   } catch (e) { res.status(500).json({error: e.message}); }
 })
@@ -2195,11 +2253,25 @@ app.delete('/api/capacity/assignments/:id', async (req, res) => {
 app.put('/api/capacity/availability/:designerId', async (req, res) => {
   try {
     const { weekly_hours, excluded } = req.body
-    await run('UPDATE team SET weekly_hours = ?, excluded = ?, updatedAt = datetime("now") WHERE id = ?', 
+    await run('UPDATE team SET weekly_hours = ?, excluded = ?, updatedAt = datetime("now") WHERE id = ?',
       [weekly_hours || 35, excluded !== undefined ? (excluded ? 1 : 0) : 0, req.params.designerId])
     await updateDbVersion()
+    const designer = await get('SELECT name FROM team WHERE id = ?', [req.params.designerId]) as any
+    await logActivity('capacity', 'update', designer?.name || req.params.designerId, getUserEmail(req), `Weekly hours → ${weekly_hours || 35}h`)
     res.json({ success: true })
   } catch (e) { res.status(500).json({error: e.message}); }
+})
+
+// ============ ACTIVITY LOG API ============
+app.get('/api/activity', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit as string) || 100, 500)
+    const rows = await all(
+      `SELECT * FROM activity_log ORDER BY created_at DESC LIMIT ?`,
+      [limit]
+    )
+    res.json(rows)
+  } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
 app.listen(PORT, '0.0.0.0', () => {
