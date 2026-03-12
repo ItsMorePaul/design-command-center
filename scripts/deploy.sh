@@ -331,6 +331,25 @@ else
   warn "Railway backup at: $BACKUP_DIR"
 fi
 
+# ── Re-enable maintenance mode on Railway ─────────────────────────
+# Railway rebuild resets in-memory state. Re-lock so admin can test
+# before going live. Disable via: ./scripts/maintenance.sh off
+log "Re-enabling maintenance mode on Railway..."
+MAINT_RESULT=$(curl -s -X POST "$RAILWAY_URL/api/maintenance" \
+  -H "Content-Type: application/json" \
+  -H "X-Seed-Secret: $DCC_SEED_SECRET" \
+  -d '{"enabled": true, "lockoutMessage": "Wandi Hub will be back soon."}')
+
+MAINT_OK=$(echo "$MAINT_RESULT" | jq -r '.enabled // false' 2>/dev/null)
+if [[ "$MAINT_OK" == "true" ]]; then
+  log "Maintenance mode ON — site locked until you disable it."
+  log "Test via admin login on the maintenance page, then run:"
+  echo "  ./scripts/maintenance.sh off"
+else
+  warn "Failed to re-enable maintenance. Check manually."
+  echo "$MAINT_RESULT"
+fi
+
 # ── Restart local servers ──────────────────────────────────────────
 cd "$DCC_DIR"
 
