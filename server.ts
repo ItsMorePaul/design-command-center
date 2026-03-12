@@ -67,6 +67,16 @@ const MAINTENANCE_HTML = (message: string) => `<!DOCTYPE html>
       0%, 100% { opacity: 1; transform: scale(1); }
       50% { opacity: 0.4; transform: scale(0.8); }
     }
+    .admin-link {
+      display: inline-block;
+      margin-top: 2rem;
+      color: rgba(255,255,255,0.1);
+      font-size: 0.7rem;
+      text-decoration: none;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    .admin-link:hover { color: rgba(255,255,255,0.4); }
   </style>
 </head>
 <body>
@@ -75,6 +85,7 @@ const MAINTENANCE_HTML = (message: string) => `<!DOCTYPE html>
     <h1>Scheduled Maintenance</h1>
     <p>${message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
     <div class="status"><span class="pulse"></span>This page auto-refreshes every 30 seconds</div>
+    <a href="/?admin=1" class="admin-link">Admin access</a>
   </div>
 </body>
 </html>`
@@ -468,7 +479,11 @@ app.use((req, res, next) => {
   const sessionId = req.headers['x-session-id'] as string
   const session = sessionId ? sessions.get(sessionId) : null
   const isAdminUser = session?.role === 'admin'
-  if (isMaintenanceEndpoint || isHealthEndpoint || isAuthEndpoint || isActivityEndpoint || isDbEndpoint || isLocalhost || isAdminUser) return next()
+  // Allow admin login flow — ?admin=1 lets the SPA load so admin can sign in
+  const isAdminLogin = req.query.admin === '1'
+  // Allow static assets through so the SPA can load during admin login
+  const isStaticAsset = /\.(js|css|ico|svg|png|jpg|woff2?)$/i.test(req.path)
+  if (isMaintenanceEndpoint || isHealthEndpoint || isAuthEndpoint || isActivityEndpoint || isDbEndpoint || isLocalhost || isAdminUser || isAdminLogin || isStaticAsset) return next()
   // API requests get JSON response
   if (req.path.startsWith('/api/')) {
     return res.status(503).json({ error: 'maintenance', message: maintenanceState.lockoutMessage })
@@ -1880,8 +1895,8 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 // Format: YYYY.MM.DD.hhmm (e.g., 2026.02.26.2059) → displays as "2026.02.26 2059"
 
-const SITE_VERSION = '2026.03.12.1545'
-const SITE_TIME = '1545'
+const SITE_VERSION = '2026.03.12.1550'
+const SITE_TIME = '1550'
 
 const VERSION_KEY = 'dcc_versions'
 
