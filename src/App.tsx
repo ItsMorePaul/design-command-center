@@ -16,7 +16,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Gauge, ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, Settings, GripVertical, Folder, StickyNote, RefreshCw, User, CheckSquare, Sun, Moon, Edit2, Bell } from 'lucide-react'
+import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Gauge, ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, Settings, GripVertical, Folder, StickyNote, RefreshCw, User, CheckSquare, Sun, Moon, Edit2, Bell, Loader } from 'lucide-react'
 import { Tooltip } from './Tooltip'
 import './App.css'
 import initialData from './data.json'
@@ -1751,6 +1751,7 @@ const [showFilters, setShowFilters] = useState(false)
     return (
       <div className="loading" role="status" aria-live="polite">
         <div className="loading-shell">
+          <Loader size={32} strokeWidth={1.5} className="spin" style={{ margin: '0 auto 0.75rem', display: 'block', color: 'var(--color-text-muted)' }} />
           <div className="loading-title">Wandi Hub</div>
           <div className="loading-subtitle">Loading dashboard…</div>
         </div>
@@ -2088,7 +2089,9 @@ const [showFilters, setShowFilters] = useState(false)
   if (isLoading) {
     return (
       <div className="login-page">
-        <div className="login-spinner">Loading...</div>
+        <div className="loading-placeholder">
+          <Loader size={48} strokeWidth={1.5} className="spin" />
+        </div>
       </div>
     )
   }
@@ -2098,11 +2101,10 @@ const [showFilters, setShowFilters] = useState(false)
     return (
       <div className="login-page">
         <div className="login-container">
-          <div className="login-logo">
-            <LayoutGrid size={36} />
+          <div className="login-lockup">
+            <LayoutGrid size={23} />
+            <h1>Wandi Hub</h1>
           </div>
-          <h1>Wandi Hub</h1>
-          <p className="login-subtitle">Design Command Center</p>
 
           <form className="login-form" onSubmit={handleLogin} action="/api/auth/login" method="post" autoComplete="on">
             {loginError && <div className="login-error">{loginError}</div>}
@@ -2337,22 +2339,15 @@ const [showFilters, setShowFilters] = useState(false)
           {activeTab === 'projects' && (
             <div className="projects-grid">
               <div className="stats-row">
-                <div className="stat-card">
-                  <span className="stat-value">{projects.filter(p => p.status === 'active').length}</span>
-                  <span className="stat-label">Active</span>
-                </div>
-                <div className="stat-card">
-                  <span className="stat-value">{projects.filter(p => p.status === 'review').length}</span>
-                  <span className="stat-label">In Review</span>
-                </div>
-                <div className="stat-card">
-                  <span className="stat-value">{projects.filter(p => p.status === 'done').length}</span>
-                  <span className="stat-label">Done</span>
-                </div>
-                <div className="stat-card">
-                  <span className="stat-value">{projects.filter(p => p.status === 'blocked').length}</span>
-                  <span className="stat-label">Blocked</span>
-                </div>
+                {([['active', 'Active', '#3b82f6'], ['review', 'In Review', '#f59e0b'], ['done', 'Done', '#22c55e'], ['blocked', 'Blocked', '#ef4444']] as const).map(([status, label, color]) => {
+                  const count = projects.filter(p => p.status === status).length
+                  return (
+                    <div key={status} className={`stat-card${count > 0 ? ' stat-card-active' : ''}`} style={count > 0 ? { borderColor: color, background: `color-mix(in srgb, ${color} 8%, var(--color-bg-secondary))` } : undefined}>
+                      <span className="stat-value" style={count > 0 ? { color } : undefined}>{count}</span>
+                      <span className="stat-label" style={count > 0 ? { color } : undefined}>{label}</span>
+                    </div>
+                  )
+                })}
               </div>
 
               <div className="projects-sort-row">
@@ -2913,7 +2908,7 @@ const [showFilters, setShowFilters] = useState(false)
             <div className="calendar-view">
               {!calendarData ? (
                 <div className="calendar-placeholder">
-                  <span className="calendar-icon">📅</span>
+                  <Calendar size={48} strokeWidth={1.5} />
                   <h3>Loading Calendar...</h3>
                 </div>
               ) : (
@@ -3598,15 +3593,15 @@ const [showFilters, setShowFilters] = useState(false)
         <div className="notes-page">
           <div className="notes-header">
             <div className="notes-stats">
-              <div className="stat-card">
+              <div className="stat-card notes-stat-card">
                 <span className="stat-value">{notes.length}</span>
                 <span className="stat-label">Total Notes</span>
               </div>
-              <div className="stat-card">
+              <div className="stat-card notes-stat-card">
                 <span className="stat-value">{notes.filter(n => n.linkedProjectIds.length > 0).length}</span>
                 <span className="stat-label">Linked to Projects</span>
               </div>
-              <div className="stat-card">
+              <div className="stat-card notes-stat-card">
                 <span className="stat-value">{notes.filter(n => n.linkedTeamIds.length > 0).length}</span>
                 <span className="stat-label">Linked to People</span>
               </div>
