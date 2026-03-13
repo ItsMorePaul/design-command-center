@@ -3929,6 +3929,10 @@ select:focus-visible {
   padding: 20px;
 }
 
+.settings-admin-only {
+  border: 1px solid #ef4444;
+}
+
 .settings-header {
   display: flex;
   justify-content: space-between;

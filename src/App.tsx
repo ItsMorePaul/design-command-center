@@ -4067,243 +4067,9 @@ const [showFilters, setShowFilters] = useState(false)
       {/* Settings View */}
       {activeTab === 'settings' && (
         <div className="settings-page">
-          {/* General Section — Account, Theme, Version */}
-          <div className="settings-section">
-            <div className="settings-header">
-              <h2>General</h2>
-            </div>
-            <div className="settings-general-card">
-              <div className="settings-row">
-                <span>Account</span>
-                <span className="settings-account-detail">{currentUser?.email} <span className="settings-role-badge">{currentUser?.role}</span></span>
-              </div>
-              <div className="settings-row">
-                <span>Theme</span>
-                <button className="theme-switch" onClick={toggleTheme} aria-label="Toggle theme">
-                  <span className="theme-switch-track">
-                    <Sun size={12} className="theme-switch-icon theme-switch-sun" />
-                    <Moon size={12} className="theme-switch-icon theme-switch-moon" />
-                    <span className="theme-switch-thumb" />
-                  </span>
-                </button>
-              </div>
-              <div className="settings-row">
-                <span>Site version</span>
-                <span className="settings-version-value">{formatVersionDisplay(siteVersion.version) || '-'}</span>
-              </div>
-              <div className="settings-row">
-                <span>DB version</span>
-                <span className="settings-version-value">{formatVersionDisplay(dbVersion.version) || '-'}</span>
-              </div>
-              <div className="settings-row">
-                <span />
-                <button className="secondary-btn" onClick={handleLogout}>Sign Out</button>
-              </div>
-            </div>
-          </div>
-
-          <div className="settings-section">
-            <div className="settings-header">
-              <h2>Business Lines</h2>
-              <button className="primary-btn" onClick={() => {
-                setEditingBusinessLine(null)
-                setBusinessLineFormData({ name: '', customLinks: [] })
-                setShowBusinessLineModal(true)
-              }}>
-                + Add Business Line
-              </button>
-            </div>
-            
-            {businessLines.length === 0 ? (
-              <p className="settings-empty">No business lines configured. Add one to get started.</p>
-            ) : (
-              <div className="business-lines-list">
-                {businessLines.map(line => (
-                  <div key={line.id} className="business-line-card">
-                    <div className="business-line-header">
-                      <h3>{line.name}</h3>
-                      <div className="business-line-actions">
-                        <button className="action-btn" onClick={() => {
-                          setEditingBusinessLine(line)
-                          setBusinessLineFormData({
-                            name: line.name,
-                            customLinks: line.customLinks || []
-                          })
-                          setShowBusinessLineModal(true)
-                        }}>
-                          <Pencil size={14} />
-                        </button>
-                        <button className="action-btn delete" onClick={() => openConfirmModal('Delete business line?', `This will remove "${line.name}" and its links.`, async () => {
-                          await deleteBusinessLine(line.id)
-                          closeConfirmModal()
-                        })}>
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="business-line-links">
-                      {line.customLinks?.map((link, idx) => (
-                        <a key={idx} href={link.url} target="_blank" rel="noopener noreferrer" className="project-footer-link">
-                          <LinkIcon size={12} />
-                          <span>{link.name}</span>
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Hidden Notes Section */}
-          <div className="settings-section">
-            <div className="settings-header">
-              <h2>Hidden Notes</h2>
-              {!hiddenNotesUnlocked && (
-                <button className="secondary-btn" onClick={() => setShowHiddenNotesPinModal(true)}>
-                  Unlock
-                </button>
-              )}
-              {hiddenNotesUnlocked && (
-                <button className="secondary-btn" onClick={() => setHiddenNotesUnlocked(false)}>
-                  Lock
-                </button>
-              )}
-            </div>
-            
-            {hiddenNotesUnlocked ? (
-              hiddenNotes.length === 0 ? (
-                <p className="settings-empty">No hidden notes.</p>
-              ) : (
-                <div className="hidden-notes-list">
-                  {hiddenNotes.map(note => (
-                    <div key={note.id} className="hidden-note-card">
-                      <div className="hidden-note-info">
-                        <h3>{note.title || 'Untitled Note'}</h3>
-                        {note.hidden_at && (
-                          <span className="hidden-note-date">
-                            Hidden: {new Date(note.hidden_at).toLocaleDateString()}
-                          </span>
-                        )}
-                      </div>
-                      <div className="hidden-note-actions">
-                        <button 
-                          className="action-btn" 
-                          onClick={async () => {
-                            try {
-                              const res = await fetch(`/api/notes/${note.id}/restore`, { method: 'PUT' })
-                              if (res.ok) {
-                                setHiddenNotes(hiddenNotes.filter(n => n.id !== note.id))
-                                // Reload notes to include the restored one
-                                const notesRes = await authFetch('/api/notes')
-                                const notesData = await notesRes.json()
-                                setNotes(notesData)
-                              }
-                            } catch (err) {
-                              console.error('Error restoring note:', err)
-                            }
-                          }}
-                        >
-                          <RefreshCw size={14} /> Restore
-                        </button>
-                        <button 
-                          className="action-btn delete" 
-                          onClick={() => openConfirmModal('Delete note?', `This will permanently delete "${note.title || 'Untitled Note'}".`, async () => {
-                            try {
-                              const res = await fetch(`/api/notes/${note.id}`, { method: 'DELETE' })
-                              if (res.ok) {
-                                setHiddenNotes(hiddenNotes.filter(n => n.id !== note.id))
-                              }
-                            } catch (err) {
-                              console.error('Error deleting note:', err)
-                            }
-                            closeConfirmModal()
-                          })}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )
-            ) : (
-              <p className="settings-empty">Click "Unlock" to view hidden notes.</p>
-            )}
-          </div>
-
-          {/* User Management Section (Admin Only) */}
-          {isAdmin && (
-            <div className="settings-section">
-              <div className="settings-header">
-                <h2>User Accounts</h2>
-                <button className="primary-btn" onClick={() => {
-                  setUserFormData({ email: '', password: '', role: 'user' })
-                  setShowUserModal(true)
-                  fetchUsers()
-                }}>
-                  + Add User
-                </button>
-              </div>
-              
-              {users.length === 0 ? (
-                <p className="settings-empty">No user accounts. Add one to get started.</p>
-              ) : (
-                <div className="users-list">
-                  {users.map(user => (
-                    <div key={user.id} className="user-card">
-                      <div className="user-info">
-                        <h3>{user.email}</h3>
-                        <span className="user-role">{user.role}</span>
-                      </div>
-                      <div className="user-actions">
-                        <button 
-                          className="action-btn delete" 
-                          onClick={() => handleDeleteUser(user.id)}
-                          disabled={user.id === currentUser?.id}
-                          title={user.id === currentUser?.id ? "Cannot delete your own account" : "Delete user"}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Holidays Section (All Users) */}
-          <div className="settings-section">
-            <div className="settings-header">
-              <h2>Special Days</h2>
-              <button className="add-timeline-btn" onClick={() => { setHolidayForm({ name: '', date: '' }); setShowHolidayModal(true) }}>+ Add Special Day</button>
-            </div>
-            <div className="timeline-list">
-              {holidays.map(h => (
-                <div key={h.id} className="timeline-item">
-                  <div className="timeline-info">
-                    <span className="timeline-name">{h.name}</span>
-                    <span className="timeline-dates">{formatFullDate(h.date)}</span>
-                  </div>
-                  <div className="timeline-actions">
-                    <button type="button" className="action-btn delete" onClick={() => {
-                      openConfirmModal('Remove special day?', `This will remove "${h.name}" from the calendar.`, async () => {
-                        const res = await authFetch(`/api/holidays/${h.id}`, { method: 'DELETE' })
-                        if (res.ok) { setHolidays(await res.json()); setCalendarData(null) }
-                        closeConfirmModal()
-                      })
-                    }}><Trash2 size={14} /></button>
-                  </div>
-                </div>
-              ))}
-              {holidays.length === 0 && <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>No special days added yet.</p>}
-            </div>
-          </div>
-
           {/* Maintenance Mode Section (Admin Only) */}
           {isAdmin && (
-            <div className="settings-section">
+            <div className="settings-section settings-admin-only">
               <div className="settings-header">
                 <h2>Maintenance Mode</h2>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -4416,6 +4182,239 @@ const [showFilters, setShowFilters] = useState(false)
               </div>
             </div>
           )}
+
+          {/* General Section — Account, Theme, Version */}
+          <div className="settings-section">
+            <div className="settings-header">
+              <h2>General</h2>
+            </div>
+            <div className="settings-general-card">
+              <div className="settings-row">
+                <span>Account</span>
+                <span className="settings-account-detail">{currentUser?.email} <span className="settings-role-badge">{currentUser?.role}</span></span>
+              </div>
+              <div className="settings-row">
+                <span>Theme</span>
+                <button className="theme-switch" onClick={toggleTheme} aria-label="Toggle theme">
+                  <span className="theme-switch-track">
+                    <Sun size={12} className="theme-switch-icon theme-switch-sun" />
+                    <Moon size={12} className="theme-switch-icon theme-switch-moon" />
+                    <span className="theme-switch-thumb" />
+                  </span>
+                </button>
+              </div>
+              <div className="settings-row">
+                <span>Site version</span>
+                <span className="settings-version-value">{formatVersionDisplay(siteVersion.version) || '-'}</span>
+              </div>
+              <div className="settings-row">
+                <span>DB version</span>
+                <span className="settings-version-value">{formatVersionDisplay(dbVersion.version) || '-'}</span>
+              </div>
+              <div className="settings-row">
+                <span />
+                <button className="secondary-btn" onClick={handleLogout}>Sign Out</button>
+              </div>
+            </div>
+          </div>
+
+          {/* Holidays Section (All Users) */}
+          <div className="settings-section">
+            <div className="settings-header">
+              <h2>Special Days</h2>
+              <button className="add-timeline-btn" onClick={() => { setHolidayForm({ name: '', date: '' }); setShowHolidayModal(true) }}>+ Add Special Day</button>
+            </div>
+            <div className="timeline-list">
+              {holidays.map(h => (
+                <div key={h.id} className="timeline-item">
+                  <div className="timeline-info">
+                    <span className="timeline-name">{h.name}</span>
+                    <span className="timeline-dates">{formatFullDate(h.date)}</span>
+                  </div>
+                  <div className="timeline-actions">
+                    <button type="button" className="action-btn delete" onClick={() => {
+                      openConfirmModal('Remove special day?', `This will remove "${h.name}" from the calendar.`, async () => {
+                        const res = await authFetch(`/api/holidays/${h.id}`, { method: 'DELETE' })
+                        if (res.ok) { setHolidays(await res.json()); setCalendarData(null) }
+                        closeConfirmModal()
+                      })
+                    }}><Trash2 size={14} /></button>
+                  </div>
+                </div>
+              ))}
+              {holidays.length === 0 && <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>No special days added yet.</p>}
+            </div>
+          </div>
+
+          <div className="settings-section">
+            <div className="settings-header">
+              <h2>Business Lines</h2>
+              <button className="primary-btn" onClick={() => {
+                setEditingBusinessLine(null)
+                setBusinessLineFormData({ name: '', customLinks: [] })
+                setShowBusinessLineModal(true)
+              }}>
+                + Add Business Line
+              </button>
+            </div>
+            
+            {businessLines.length === 0 ? (
+              <p className="settings-empty">No business lines configured. Add one to get started.</p>
+            ) : (
+              <div className="business-lines-list">
+                {businessLines.map(line => (
+                  <div key={line.id} className="business-line-card">
+                    <div className="business-line-header">
+                      <h3>{line.name}</h3>
+                      <div className="business-line-actions">
+                        <button className="action-btn" onClick={() => {
+                          setEditingBusinessLine(line)
+                          setBusinessLineFormData({
+                            name: line.name,
+                            customLinks: line.customLinks || []
+                          })
+                          setShowBusinessLineModal(true)
+                        }}>
+                          <Pencil size={14} />
+                        </button>
+                        <button className="action-btn delete" onClick={() => openConfirmModal('Delete business line?', `This will remove "${line.name}" and its links.`, async () => {
+                          await deleteBusinessLine(line.id)
+                          closeConfirmModal()
+                        })}>
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="business-line-links">
+                      {line.customLinks?.map((link, idx) => (
+                        <a key={idx} href={link.url} target="_blank" rel="noopener noreferrer" className="project-footer-link">
+                          <LinkIcon size={12} />
+                          <span>{link.name}</span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* User Management Section (Admin Only) */}
+          {isAdmin && (
+            <div className="settings-section settings-admin-only">
+              <div className="settings-header">
+                <h2>User Accounts</h2>
+                <button className="primary-btn" onClick={() => {
+                  setUserFormData({ email: '', password: '', role: 'user' })
+                  setShowUserModal(true)
+                  fetchUsers()
+                }}>
+                  + Add User
+                </button>
+              </div>
+              
+              {users.length === 0 ? (
+                <p className="settings-empty">No user accounts. Add one to get started.</p>
+              ) : (
+                <div className="users-list">
+                  {users.map(user => (
+                    <div key={user.id} className="user-card">
+                      <div className="user-info">
+                        <h3>{user.email}</h3>
+                        <span className="user-role">{user.role}</span>
+                      </div>
+                      <div className="user-actions">
+                        <button 
+                          className="action-btn delete" 
+                          onClick={() => handleDeleteUser(user.id)}
+                          disabled={user.id === currentUser?.id}
+                          title={user.id === currentUser?.id ? "Cannot delete your own account" : "Delete user"}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Hidden Notes Section (Admin Only) */}
+          {isAdmin && <div className="settings-section settings-admin-only">
+            <div className="settings-header">
+              <h2>Hidden Notes</h2>
+              {!hiddenNotesUnlocked && (
+                <button className="secondary-btn" onClick={() => setShowHiddenNotesPinModal(true)}>
+                  Unlock
+                </button>
+              )}
+              {hiddenNotesUnlocked && (
+                <button className="secondary-btn" onClick={() => setHiddenNotesUnlocked(false)}>
+                  Lock
+                </button>
+              )}
+            </div>
+
+            {hiddenNotesUnlocked ? (
+              hiddenNotes.length === 0 ? (
+                <p className="settings-empty">No hidden notes.</p>
+              ) : (
+                <div className="hidden-notes-list">
+                  {hiddenNotes.map(note => (
+                    <div key={note.id} className="hidden-note-card">
+                      <div className="hidden-note-info">
+                        <h3>{note.title || 'Untitled Note'}</h3>
+                        {note.hidden_at && (
+                          <span className="hidden-note-date">
+                            Hidden: {new Date(note.hidden_at).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                      <div className="hidden-note-actions">
+                        <button
+                          className="action-btn"
+                          onClick={async () => {
+                            try {
+                              const res = await fetch(`/api/notes/${note.id}/restore`, { method: 'PUT' })
+                              if (res.ok) {
+                                setHiddenNotes(hiddenNotes.filter(n => n.id !== note.id))
+                                const notesRes = await authFetch('/api/notes')
+                                const notesData = await notesRes.json()
+                                setNotes(notesData)
+                              }
+                            } catch (err) {
+                              console.error('Error restoring note:', err)
+                            }
+                          }}
+                        >
+                          <RefreshCw size={14} /> Restore
+                        </button>
+                        <button
+                          className="action-btn delete"
+                          onClick={() => openConfirmModal('Delete note?', `This will permanently delete "${note.title || 'Untitled Note'}".`, async () => {
+                            try {
+                              const res = await fetch(`/api/notes/${note.id}`, { method: 'DELETE' })
+                              if (res.ok) {
+                                setHiddenNotes(hiddenNotes.filter(n => n.id !== note.id))
+                              }
+                            } catch (err) {
+                              console.error('Error deleting note:', err)
+                            }
+                            closeConfirmModal()
+                          })}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
+            ) : (
+              <p className="settings-empty">Click "Unlock" to view hidden notes.</p>
+            )}
+          </div>}
 
         </div>
       )}
