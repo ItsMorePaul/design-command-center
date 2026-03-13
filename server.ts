@@ -499,15 +499,15 @@ app.get('/api/health', async (req, res) => {
 
 // All API routes below require authentication for write operations
 app.use('/api', (req, res, next) => {
-  // Skip auth for login/logout/me and read-only endpoints
-  const skipAuthPaths = ['/auth/login', '/auth/logout', '/auth/me', '/health', '/search', '/data', '/projects', '/team', '/business-lines', '/brandOptions', '/capacity', '/calendar', '/priorities', '/notes', '/versions']
+  // Skip auth for auth endpoints unconditionally; all other paths only skip for GET
+  const alwaysSkipPaths = ['/auth/login', '/auth/logout', '/auth/me', '/health', '/versions']
   const isReadOnly = req.method === 'GET'
   const isLocalhost = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1'
   const isSeedEndpoint = req.path === '/seed' || req.path === '/upload-db' || req.path === '/download-db'
   const hasSeedToken = isSeedEndpoint && SEED_SECRET && req.headers['x-seed-secret'] === SEED_SECRET
 
-  // Allow seed/upload operations from localhost OR with valid seed secret token
-  const shouldSkip = skipAuthPaths.some(p => req.path.startsWith(p)) || isReadOnly || (isSeedEndpoint && isLocalhost) || hasSeedToken
+  // Auth endpoints skip always; data endpoints skip only for reads; seed endpoints skip with token or localhost
+  const shouldSkip = alwaysSkipPaths.some(p => req.path.startsWith(p)) || isReadOnly || (isSeedEndpoint && isLocalhost) || hasSeedToken
   
   if (shouldSkip) {
     return next()
