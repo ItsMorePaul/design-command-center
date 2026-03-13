@@ -660,7 +660,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100%;
+  width: 100%;
   min-height: 60vh;
   color: var(--color-text-muted);
 }
@@ -2677,7 +2677,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem 2rem;
+  padding: 0.4rem 2rem;
 }
 
 .calendar-panel-content {
@@ -2690,10 +2690,11 @@
 }
 
 .calendar-panel-content.open {
-  max-height: 560px;
+  max-height: 40vh;
   opacity: 1;
   transform: translateY(0);
   padding-bottom: 1rem;
+  overflow-y: auto;
 }
 
 .calendar-panel-content.closed {
@@ -2712,8 +2713,8 @@
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.65rem 0.9rem;
-  font-size: 0.875rem;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.78rem;
   font-weight: 600;
   background: color-mix(in srgb, var(--color-bg-secondary) 90%, black 10%);
   border: 1px solid var(--color-border);
@@ -2857,7 +2858,12 @@ input:checked + .slider:before {
 .filter-pills {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.35rem;
+}
+
+.calendar-panel-content .filter-pill {
+  padding: 0.2rem 0.5rem;
+  font-size: 0.7rem;
 }
 
 .filter-pill {
@@ -2942,6 +2948,7 @@ input:checked + .slider:before {
   padding: 1.5rem;
   overflow-x: auto;
   min-width: 0;
+  scroll-margin-top: 4rem;
 }
 
 .month-title {
@@ -3215,6 +3222,83 @@ input:checked + .slider:before {
   color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+/* FY Timeline */
+.fy-timeline {
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0 0.5rem;
+}
+
+.fy-timeline-track {
+  position: relative;
+  height: 6px;
+  background: var(--color-border);
+  border-radius: 3px;
+  margin-top: 1.2rem;
+  margin-bottom: 1.5rem;
+}
+
+.fy-timeline-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+.fy-quarter-mark {
+  position: absolute;
+  top: 50%;
+  transform: translateX(-1px) translateY(-50%);
+}
+
+.fy-quarter-tick {
+  width: 2px;
+  height: 14px;
+  background: var(--color-border);
+  border-radius: 1px;
+}
+
+.fy-quarter-label {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.fy-today-marker {
+  position: absolute;
+  top: 50%;
+  transform: translateX(-50%) translateY(-22px);
+  z-index: 10;
+  width: 2px;
+  height: 28px;
+  background: linear-gradient(180deg, transparent 0%, #f59e0b 20%, #f59e0b 80%, transparent 100%);
+  pointer-events: none;
+}
+
+.fy-today-flag {
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: #f59e0b;
+  white-space: nowrap;
+  background: var(--color-bg-secondary);
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid #f59e0b;
+  box-shadow: var(--shadow-glow);
 }
 
 .capacity-section {

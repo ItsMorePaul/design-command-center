@@ -3284,6 +3284,37 @@ const [showFilters, setShowFilters] = useState(false)
                       <span className="gauge-stat-label">Remaining hrs</span>
                     </div>
                   </div>
+                  {(() => {
+                    // DJ Fiscal Year timeline: Q3/FY26 (Jan) through Q2/FY27 (Dec)
+                    const fyStart = new Date(2026, 0, 1) // Jan 1 2026
+                    const fyEnd = new Date(2026, 11, 31) // Dec 31 2026
+                    const now = new Date()
+                    const totalMs = fyEnd.getTime() - fyStart.getTime()
+                    const elapsed = Math.max(0, Math.min(now.getTime() - fyStart.getTime(), totalMs))
+                    const todayPct = (elapsed / totalMs) * 100
+                    const quarters = [
+                      { label: 'Q3/FY26', pct: 0 },
+                      { label: 'Q4/FY26', pct: 25 },
+                      { label: 'Q1/FY27', pct: 50 },
+                      { label: 'Q2/FY27', pct: 75 },
+                    ]
+                    return (
+                      <div className="fy-timeline">
+                        <div className="fy-timeline-track">
+                          <div className="fy-timeline-fill" style={{ width: `${todayPct}%` }} />
+                          {quarters.map(q => (
+                            <div key={q.label} className="fy-quarter-mark" style={{ left: `${q.pct}%` }}>
+                              <div className="fy-quarter-tick" />
+                              <span className="fy-quarter-label">{q.label}</span>
+                            </div>
+                          ))}
+                          <div className="fy-today-marker" style={{ left: `${todayPct}%` }}>
+                            <div className="fy-today-flag">Today</div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })()}
                 </div>
               )
             })()}
@@ -4573,7 +4604,7 @@ const [showFilters, setShowFilters] = useState(false)
                       onChange={e => setProjectFormData({ ...projectFormData, url: e.target.value })}
                       placeholder=" "
                     />
-                    <label htmlFor="project-url">Project Link</label>
+                    <label htmlFor="project-url">Jira Project Link</label>
                   </div>
                 </div>
                 <div className="form-group" style={{ marginTop: '1rem', marginBottom: 0 }}>
