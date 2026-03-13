@@ -3293,10 +3293,11 @@ const [showFilters, setShowFilters] = useState(false)
                     const elapsed = Math.max(0, Math.min(now.getTime() - fyStart.getTime(), totalMs))
                     const todayPct = (elapsed / totalMs) * 100
                     const quarters = [
-                      { label: 'Q3/FY26', pct: 0 },
-                      { label: 'Q4/FY26', pct: 25 },
-                      { label: 'Q1/FY27', pct: 50 },
-                      { label: 'Q2/FY27', pct: 75 },
+                      { label: 'Q3/FY26', month: 'January 2026', pct: 0 },
+                      { label: 'Q4/FY26', month: 'April', pct: 25 },
+                      { label: 'Q1/FY27', month: 'July', pct: 50 },
+                      { label: 'Q2/FY27', month: 'October', pct: 75 },
+                      { label: 'Q3/FY27', month: 'January 2027', pct: 100 },
                     ]
                     return (
                       <div className="fy-timeline">
@@ -3306,6 +3307,7 @@ const [showFilters, setShowFilters] = useState(false)
                             <div key={q.label} className="fy-quarter-mark" style={{ left: `${q.pct}%` }}>
                               <div className="fy-quarter-tick" />
                               <span className="fy-quarter-label">{q.label}</span>
+                              <span className="fy-quarter-month">{q.month}</span>
                             </div>
                           ))}
                           <div className="fy-today-marker" style={{ left: `${todayPct}%` }}>
