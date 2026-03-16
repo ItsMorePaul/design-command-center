@@ -982,19 +982,41 @@ const [showFilters, setShowFilters] = useState(false)
   }>({ enabled: false, bannerMessage: '', lockoutMessage: '', countdownTarget: null, isLockout: false })
   const [maintenanceForm, setMaintenanceForm] = useState({ bannerMessage: 'Save your work. Wandi Hub maintenance about to begin in 5 minutes.', lockoutMessage: 'Wandi Hub will be back soon.', countdownMinutes: 5 })
   const [countdownDisplay, setCountdownDisplay] = useState('')
+  const [updateAvailable, setUpdateAvailable] = useState(false)
+  const [dataStale, setDataStale] = useState(false)
 
-  // Poll maintenance status every 30s
+  // Server-Sent Events — live updates from server
   useEffect(() => {
-    const fetchMaintenance = async () => {
+    const baseUrl = import.meta.env.DEV ? 'http://localhost:3001' : ''
+    const es = new EventSource(`${baseUrl}/api/events`)
+
+    es.addEventListener('maintenance', (e) => {
+      try { setMaintenance(JSON.parse(e.data)) } catch {}
+    })
+
+    es.addEventListener('version', (e) => {
       try {
-        const res = await fetch('/api/maintenance')
-        const data = await res.json()
-        setMaintenance(data)
-      } catch (e) { /* ignore */ }
-    }
-    fetchMaintenance()
-    const interval = setInterval(fetchMaintenance, 30000)
-    return () => clearInterval(interval)
+        const { site_version } = JSON.parse(e.data)
+        setSiteVersion(prev => {
+          // If we already have a version and the server sent a different one, show update banner
+          if (prev.version && site_version && prev.version !== site_version) {
+            setUpdateAvailable(true)
+          }
+          return prev
+        })
+      } catch {}
+    })
+
+    es.addEventListener('data-change', () => {
+      setDataStale(true)
+    })
+
+    es.addEventListener('reload', () => {
+      // Full DB replacement — reload the page
+      window.location.reload()
+    })
+
+    return () => es.close()
   }, [])
 
   // Countdown timer — updates every second when countdown is active
@@ -1007,7 +1029,7 @@ const [showFilters, setShowFilters] = useState(false)
       const remaining = new Date(maintenance.countdownTarget!).getTime() - Date.now()
       if (remaining <= 0) {
         setCountdownDisplay('0:00')
-        // Re-fetch from server to get authoritative lockout state
+        // SSE will push the lockout state, but fetch as fallback
         fetch('/api/maintenance').then(r => r.json()).then(data => setMaintenance(data)).catch(() => {})
         return
       }
@@ -1068,6 +1090,28 @@ const [showFilters, setShowFilters] = useState(false)
     }
     init()
   }, [])
+
+  // Auto-refresh data when tab becomes visible and data is stale
+  useEffect(() => {
+    const onFocus = async () => {
+      if (!dataStale) return
+      try {
+        const data = await loadDataFromAPI()
+        if (data) {
+          setTeam(data.team || [])
+          setProjects(data.projects || [])
+          if (data.brandOptions) setBrandOptions(data.brandOptions.sort())
+        }
+        const blRes = await authFetch('/api/business-lines')
+        setBusinessLines(await blRes.json())
+        setDataStale(false)
+      } catch {}
+    }
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') onFocus()
+    })
+    return () => document.removeEventListener('visibilitychange', onFocus)
+  }, [dataStale])
 
   // Initialize calendar filters with all designers selected once team data is loaded
   useEffect(() => {
@@ -2165,7 +2209,7 @@ const [showFilters, setShowFilters] = useState(false)
           <p>{maintenance.lockoutMessage || 'Wandi Hub is being improved. Back as soon as possible.'}</p>
           <div className="maintenance-lockout-status">
             <span className="maintenance-pulse" />
-            This page auto-refreshes every 30 seconds
+            This page updates automatically
           </div>
           <button
             className="maintenance-admin-link"
@@ -2193,7 +2237,27 @@ const [showFilters, setShowFilters] = useState(false)
           </span>
         </div>
       )}
-    <div className={`app${showMaintenanceBanner ? ' has-maintenance-banner' : ''}`}>
+      {/* Update available banner */}
+      {updateAvailable && (
+        <div className="update-banner" onClick={() => window.location.reload()}>
+          A new version of Wandi Hub is available. Click to refresh.
+        </div>
+      )}
+      {/* Data stale banner */}
+      {dataStale && !updateAvailable && (
+        <div className="update-banner data-stale" onClick={async () => {
+          try {
+            const data = await loadDataFromAPI()
+            if (data) { setTeam(data.team || []); setProjects(data.projects || []); if (data.brandOptions) setBrandOptions(data.brandOptions.sort()) }
+            const blRes = await authFetch('/api/business-lines')
+            setBusinessLines(await blRes.json())
+            setDataStale(false)
+          } catch {}
+        }}>
+          Data has been updated. Click to refresh.
+        </div>
+      )}
+    <div className={`app${showMaintenanceBanner || updateAvailable || dataStale ? ' has-maintenance-banner' : ''}`}>
       {/* Sidebar */}
       <aside className={`sidebar ${navCollapsed ? 'sidebar-collapsed' : ''}`}>
         <div className="logo">

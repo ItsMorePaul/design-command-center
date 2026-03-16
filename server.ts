@@ -455,13 +455,15 @@ app.post('/api/maintenance', (req, res) => {
   if (req.body.message && !req.body.bannerMessage) maintenanceState.bannerMessage = req.body.message
   saveMaintenanceState()
   console.log(`Maintenance mode: ${maintenanceState.enabled ? 'ON' : 'OFF'}${maintenanceState.enabled ? ' — countdown: ' + (maintenanceState.countdownTarget || 'immediate') : ''}`)
-  res.json({
+  const maintPayload = {
     enabled: maintenanceState.enabled,
     bannerMessage: maintenanceState.bannerMessage,
     lockoutMessage: maintenanceState.lockoutMessage,
     countdownTarget: maintenanceState.countdownTarget,
     isLockout: isInLockout(),
-  })
+  }
+  broadcast('maintenance', maintPayload)
+  res.json(maintPayload)
 })
 
 // Maintenance mode middleware — blocks non-admin requests during lockout phase
@@ -470,7 +472,7 @@ app.use((req, res, next) => {
   if (!isInLockout()) return next() // Still in warning/countdown phase — site works
   // Always allow these through during lockout
   const isMaintenanceEndpoint = req.path === '/api/maintenance'
-  const isHealthEndpoint = req.path === '/api/health' || req.path === '/api/versions' || req.path === '/api/table-counts'
+  const isHealthEndpoint = req.path === '/api/health' || req.path === '/api/versions' || req.path === '/api/table-counts' || req.path === '/api/events'
   const isAuthEndpoint = req.path.startsWith('/api/auth/')
   const isActivityEndpoint = req.path === '/api/activity'
   const isDbEndpoint = (req.path === '/api/upload-db' || req.path === '/api/download-db') && SEED_SECRET && req.headers['x-seed-secret'] === SEED_SECRET
@@ -497,10 +499,62 @@ app.get('/api/health', async (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), maintenance: maintenanceState.enabled })
 })
 
+// ============ SERVER-SENT EVENTS (SSE) ============
+// Live push to all connected clients — maintenance, data changes, version updates
+interface SSEClient {
+  id: number
+  res: express.Response
+}
+let sseClientId = 0
+const sseClients: SSEClient[] = []
+
+function broadcast(event: string, data: Record<string, unknown>) {
+  const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
+  for (let i = sseClients.length - 1; i >= 0; i--) {
+    try {
+      sseClients[i].res.write(payload)
+    } catch {
+      sseClients.splice(i, 1)
+    }
+  }
+}
+
+app.get('/api/events', (req, res) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+    'Access-Control-Allow-Origin': '*',
+  })
+  // Send initial state so client doesn't need a separate fetch
+  res.write(`event: maintenance\ndata: ${JSON.stringify({
+    enabled: maintenanceState.enabled,
+    bannerMessage: maintenanceState.bannerMessage,
+    lockoutMessage: maintenanceState.lockoutMessage,
+    countdownTarget: maintenanceState.countdownTarget,
+    isLockout: isInLockout(),
+  })}\n\n`)
+  res.write(`event: version\ndata: ${JSON.stringify({ site_version: SITE_VERSION })}\n\n`)
+
+  const client: SSEClient = { id: ++sseClientId, res }
+  sseClients.push(client)
+
+  // Keep-alive ping every 30s to prevent proxy timeouts
+  const keepAlive = setInterval(() => {
+    try { res.write(': ping\n\n') } catch { clearInterval(keepAlive) }
+  }, 30000)
+
+  req.on('close', () => {
+    clearInterval(keepAlive)
+    const idx = sseClients.findIndex(c => c.id === client.id)
+    if (idx !== -1) sseClients.splice(idx, 1)
+  })
+})
+
 // All API routes below require authentication for write operations
 app.use('/api', (req, res, next) => {
   // Skip auth for auth endpoints unconditionally; all other paths only skip for GET
-  const alwaysSkipPaths = ['/auth/login', '/auth/logout', '/auth/me', '/health', '/versions']
+  const alwaysSkipPaths = ['/auth/login', '/auth/logout', '/auth/me', '/health', '/versions', '/events']
   const isReadOnly = req.method === 'GET'
   const isLocalhost = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1'
   const isSeedEndpoint = req.path === '/seed' || req.path === '/upload-db' || req.path === '/download-db'
@@ -1753,6 +1807,12 @@ app.post('/api/upload-db', express.raw({ type: 'application/octet-stream', limit
       counts[t.name] = row.c
     }
 
+    // Reload maintenance state from new DB
+    await loadMaintenanceState()
+
+    // Tell all connected clients to reload (full DB replacement)
+    broadcast('reload', { reason: 'database-replaced', timestamp: new Date().toISOString() })
+
     res.json({
       success: true,
       sizeBytes: dbBytes.length,
@@ -1762,7 +1822,7 @@ app.post('/api/upload-db', express.raw({ type: 'application/octet-stream', limit
   } catch (e) {
     // Try to reopen DB on failure
     try { db = new sqlite3.Database(DB_PATH) } catch {}
-    res.status(500).json({ error: e.message })
+    res.status(500).json({ error: (e as Error).message })
   }
 })
 
@@ -1931,6 +1991,7 @@ const generateDbVersionParts = () => {
 const updateDbVersion = async () => {
   const { versionNumber, versionTime } = generateDbVersionParts()
   await run("UPDATE app_versions SET db_version = ?, db_time = ?, updated_at = datetime('now') WHERE key = ?", [versionNumber, versionTime, VERSION_KEY])
+  broadcast('data-change', { db_version: versionNumber, timestamp: new Date().toISOString() })
 }
 
 // ============ ACTIVITY LOG ============
