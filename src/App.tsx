@@ -2219,6 +2219,7 @@ const [showFilters, setShowFilters] = useState(false)
           >
             <span className="nav-icon"><FileBarChart size={18} /></span>
             <span className="nav-label">Reports</span>
+            <span className="nav-badge-beta">beta</span>
           </button>
         </nav>
 
@@ -3967,7 +3968,13 @@ const [showFilters, setShowFilters] = useState(false)
 
         return (
         <div className="reports-page">
-          <div className="reports-grid">
+          {!isAdmin && (
+            <div className="reports-locked-banner">
+              <span className="reports-locked-icon">🔒</span>
+              <p>Reports are in beta and currently available to admins only.</p>
+            </div>
+          )}
+          <div className={`reports-grid${!isAdmin ? ' reports-disabled' : ''}`}>
             {reports.map(report => (
               <div key={report.id} className="report-card">
                 <div className="report-card-icon" style={{ color: report.color }}>
@@ -3978,10 +3985,12 @@ const [showFilters, setShowFilters] = useState(false)
                   <p className="report-card-desc">{report.description}</p>
                   <span className="report-card-stats">{report.stats}</span>
                 </div>
-                <button className="report-generate-btn" onClick={report.generate} style={{ borderColor: report.color, color: report.color }}>
-                  <ClipboardCopy size={14} />
-                  {copiedReport ? 'Copied!' : 'Copy Report'}
-                </button>
+                {isAdmin && (
+                  <button className="report-generate-btn" onClick={report.generate} style={{ borderColor: report.color, color: report.color }}>
+                    <ClipboardCopy size={14} />
+                    {copiedReport ? 'Copied!' : 'Copy Report'}
+                  </button>
+                )}
               </div>
             ))}
           </div>
