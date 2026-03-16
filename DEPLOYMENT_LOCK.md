@@ -42,13 +42,23 @@ DCC_DEPLOY_OK=1 ./scripts/deploy.sh --data
 4. **Downloads full Railway DB binary** to `backups/railway/pre_deploy_*/shared.db`
    - Validates SQLite magic bytes + integrity check
    - **If download fails, deploy is ABORTED** (no data loss possible)
-5. **Data drift check** — compares row counts for critical tables (projects, team, assignments, users, business_lines, holidays)
-   - **If Railway has MORE rows than local, deploy is BLOCKED**
-   - Message: "Run `./scripts/pull-from-railway.sh` first"
-6. Pushes code to GitHub (skipped with `--data`)
-7. Waits for Railway rebuild (up to 5 minutes)
-8. Uploads entire `data/shared.db` to Railway via `POST /api/upload-db`
-9. Verifies every table count matches local
+5. **Containment check** — verifies every Railway row ID exists in local DB (not just row counts)
+   - Uses `ATTACH` + SQL to find missing IDs per table
+   - **If ANY Railway row is missing from local, deploy is BLOCKED**
+   - Message: "Run `./scripts/merge-railway.sh` first"
+6. **Auto-merge** — Railway data merged into local DB before upload (safety net)
+   - Railway-owned tables (projects, team, etc.): Railway REPLACES local
+   - Notes: union merge, Railway hidden flags win
+   - Hidden note fingerprints: union
+   - Local-computed tables (note links): kept as-is
+   - Uses `ATTACH` with explicit column names (schema-safe)
+7. Pushes code to GitHub (skipped with `--data`)
+8. Waits for Railway rebuild (up to 5 minutes, polls `/api/versions` for new version)
+   - **Note:** Maintenance mode returns 503 which can block version detection. Use `--data` to upload DB separately if version polling times out after a code push.
+9. Uploads entire `data/shared.db` to Railway via `POST /api/upload-db`
+10. **Live verification** — queries Railway `/api/table-counts` and compares every table to local. **Exits non-zero if any mismatch.**
+11. Re-enables maintenance mode on Railway (admin can test before going live)
+12. Restarts local servers
 
 ### Pull from Railway (Railway → Local)
 
@@ -131,8 +141,13 @@ All endpoints use `X-Seed-Secret` header (from `DCC_SEED_SECRET` env var in `~/.
 | Binary DB backup | Downloads full Railway SQLite before push. Aborts if download fails. | 2026-03-12 |
 | Containment check | Verifies every Railway row ID exists in local DB. Blocks deploy if any missing. | 2026-03-12 |
 | merge-railway.sh | Merges Railway data into local: Railway wins for user tables, local wins for computed. | 2026-03-12 |
-| Sanity check | Validates local row counts are within expected ranges before upload. | 2026-03-10 |
+| Auto-merge in deploy | deploy.sh auto-merges Railway data before upload (safety net even if merge-railway.sh was skipped). Uses ATTACH with explicit columns. | 2026-03-16 |
+| ATTACH-based merge | All merge operations use `ATTACH db AS alias` with explicit column names instead of `.mode insert`. Prevents silent data loss when schemas differ (e.g., new columns added locally but not yet on Railway). | 2026-03-16 |
+| Sanity check | Validates local row counts are within expected ranges before upload. Update ranges in deploy.sh as data grows. | 2026-03-10 |
 | Integrity check | Validates SQLite magic bytes + `PRAGMA integrity_check` on all downloads/uploads. | 2026-03-10 |
+| Maintenance mode re-enable | deploy.sh re-enables maintenance after upload so admin can test before going live. | 2026-03-16 |
+| Live verification | deploy.sh queries `/api/table-counts` on Railway after upload to verify all tables match. Exits non-zero on mismatch. | 2026-03-16 |
+| Maintenance-safe endpoints | `/api/versions`, `/api/table-counts`, `/api/health` are exempt from maintenance lockout so deploy verification works during maintenance. | 2026-03-16 |
 
 ---
 
@@ -141,6 +156,8 @@ All endpoints use `X-Seed-Secret` header (from `DCC_SEED_SECRET` env var in `~/.
 | Location | Contains | Created By |
 |----------|----------|------------|
 | `backups/railway/pre_deploy_*/shared.db` | Full Railway DB binary before deploy | `deploy.sh` |
+| `backups/railway/pre_deploy_*/local-pre-merge.db` | Local DB before auto-merge during deploy | `deploy.sh` |
+| `backups/local/pre_merge_*/shared.db` | Local DB before merge-railway.sh | `merge-railway.sh` |
 | `backups/local/pre_pull_*/shared.db` | Full local DB before pull | `pull-from-railway.sh` |
 
 Latest pre-deploy backup path: `cat backups/railway/LATEST_PRE_DEPLOY`
@@ -162,6 +179,27 @@ These scripts use table-by-table sync via `/api/seed` and **cause data corruptio
 | `verify-railway-sync.sh` | ❌ DEPRECATED — use deploy.sh verification |
 
 The `/api/seed` endpoint still exists for backwards compatibility but **must not be used** for deployment.
+
+---
+
+## Emergency Recovery
+
+## Schema Migration Considerations
+
+When adding new columns to the local schema (e.g., `ALTER TABLE projects ADD COLUMN estimatedHours`), Railway's DB won't have the new column until the code is deployed and runs the migration. During deploy:
+
+1. **Auto-merge uses explicit column names** — `ATTACH` + `INSERT INTO table (col1, col2) SELECT col1, col2 FROM railway.table`. This is safe because it only copies columns that exist in both DBs.
+2. **Old approach (`.mode insert`) was DANGEROUS** — it generated positional `INSERT INTO table VALUES(...)` which silently fails when column counts differ. This caused a production incident (2026-03-16) where all Railway projects were wiped to 0 rows.
+3. **Always test merge-railway.sh after adding columns** — run `--dry` to verify the merge report looks correct before deploying.
+
+## Maintenance Mode vs Version Detection
+
+After `git push`, deploy.sh polls `/api/versions` to detect when Railway finishes rebuilding. If maintenance mode is active, Railway may return 503 for all endpoints (including `/api/versions`), causing version detection to time out.
+
+**Workaround:** If version detection times out after a code push:
+1. Check Railway dashboard to confirm the build completed
+2. Upload DB separately: `DCC_DEPLOY_OK=1 ./scripts/deploy.sh --data`
+3. Then disable maintenance: `./scripts/maintenance.sh off`
 
 ---
 
@@ -193,3 +231,4 @@ Data is unrecoverable. This is why the deploy script now downloads the Railway D
 Created: 2026-03-05 after repeated deployment violations
 Updated: 2026-03-10 — whole-file sync replaces table-by-table
 Updated: 2026-03-12 — binary DB backup before push, data drift check, maintenance.sh script
+Updated: 2026-03-16 — ATTACH-based merge (replaces .mode insert), auto-merge in deploy, schema migration docs, maintenance mode workaround

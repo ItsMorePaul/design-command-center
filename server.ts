@@ -470,7 +470,7 @@ app.use((req, res, next) => {
   if (!isInLockout()) return next() // Still in warning/countdown phase — site works
   // Always allow these through during lockout
   const isMaintenanceEndpoint = req.path === '/api/maintenance'
-  const isHealthEndpoint = req.path === '/api/health'
+  const isHealthEndpoint = req.path === '/api/health' || req.path === '/api/versions' || req.path === '/api/table-counts'
   const isAuthEndpoint = req.path.startsWith('/api/auth/')
   const isActivityEndpoint = req.path === '/api/activity'
   const isDbEndpoint = (req.path === '/api/upload-db' || req.path === '/api/download-db') && SEED_SECRET && req.headers['x-seed-secret'] === SEED_SECRET
@@ -2151,6 +2151,19 @@ const seedBusinessLines = async () => {
   }
 }
 seedBusinessLines().catch(e => console.error('Seed error:', e.message))
+
+// Lightweight table counts for deploy verification (no auth required)
+app.get('/api/table-counts', async (_req, res) => {
+  try {
+    const tables = await all("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
+    const counts: Record<string, number> = {}
+    for (const t of tables) {
+      const row = await get(`SELECT COUNT(*) as c FROM "${t.name}"`)
+      counts[t.name] = row?.c || 0
+    }
+    res.json({ counts })
+  } catch (e) { res.status(500).json({ error: (e as Error).message }) }
+})
 
 // Get versions - returns site version from code, DB version from database
 app.get('/api/versions', async (req, res) => {

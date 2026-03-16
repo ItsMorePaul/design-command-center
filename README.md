@@ -6,7 +6,8 @@ A capacity management dashboard for Dow Jones design teams. Track projects, team
 
 ## Features
 
-- **Projects** — Track design projects with status, due dates, business lines, designers, and timeline
+- **Projects** — Track design projects with status, due dates, business lines, designers, estimated hours, and timeline
+- **Capacity Planning** — Per-designer utilization gauges, slider-based allocation, blocked project pausing, and project funding stats (projected vs estimated hours)
 - **Team** — Manage team members with roles, brands, Slack/email links, and time-off
 - **Calendar** — Visual calendar with project timelines, time off, and holidays
 - **Sorting & Filtering** — Sort projects by name, business line, designer, due date, or status with filter pills
@@ -83,9 +84,11 @@ DCC_DEPLOY_OK=1 ./scripts/deploy.sh    # Backup, containment check, push, upload
 Railway uses ephemeral filesystem — every code push destroys the DB. These safeguards prevent data loss:
 
 1. **merge-railway.sh** — Merges Railway data into local. Railway wins for user-edited tables, local kept for computed tables.
-2. **Containment check** (deploy.sh) — Verifies every Railway row exists in local DB. Blocks deploy if any missing.
-3. **Binary DB backup** — Full Railway SQLite captured before every push
-4. **Sanity check** — Validates local row counts within expected ranges
+2. **Containment check** (deploy.sh) — Verifies every Railway row ID exists in local DB. Blocks deploy if any missing.
+3. **Auto-merge** (deploy.sh) — Automatically merges Railway data into local before upload using ATTACH with explicit column names (schema-safe even when local has new columns Railway doesn't).
+4. **Binary DB backup** — Full Railway SQLite captured before every push
+5. **Sanity check** — Validates local row counts within expected ranges
+6. **Maintenance re-enable** — deploy.sh re-enables maintenance after upload for admin testing
 
 ### Scripts
 

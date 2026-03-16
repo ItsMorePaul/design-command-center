@@ -3,14 +3,14 @@
 **GitHub:** https://github.com/ItsMorePaul/design-command-center  
 **Railway (Production):** https://design-command-center-production.up.railway.app  
 **Local dev:** http://192.168.0.22:5173 (Vite) + http://localhost:3001 (API)  
-**Local repo:** `~/.openclaw/workspace/design-command-center/`
+**Local repo:** `~/.openclaw/workspace/work/design-command-center/`
 
 ---
 
 ## How to Run Locally
 
 ```bash
-cd ~/.openclaw/workspace/design-command-center
+cd ~/.openclaw/workspace/work/design-command-center
 
 # Start API server (port 3001)
 NODE_ENV=production npm start &>> /tmp/dcc-server.log &
@@ -111,7 +111,7 @@ git diff --name-only HEAD~1
 
 **Step 1: Backup Railway DB (BEFORE any risky operation)**
 ```bash
-cd ~/.openclaw/workspace/design-command-center
+cd ~/.openclaw/workspace/work/design-command-center
 ./scripts/backup-railway.sh  # Creates timestamped backup
 ```
 
@@ -163,7 +163,7 @@ curl -s https://design-command-center-production.up.railway.app/api/capacity | j
 
 ### To roll back to any checkpoint (local)
 ```bash
-cd ~/.openclaw/workspace/design-command-center
+cd ~/.openclaw/workspace/work/design-command-center
 git checkout <tag-name>
 # or
 git checkout <commit-hash>
@@ -183,6 +183,37 @@ git push origin <commit-hash>:main --force
 ---
 
 ## Checkpoints
+
+---
+
+### ✅ v260316-capacity-model
+**Date:** 2026-03-16
+**Time:** ~3:10 PM PST
+**Git tag:** (pending)
+**Site version:** `2026.03.16 1510`
+
+#### What was built
+
+**Capacity Model Improvements**
+- **Estimated hours on projects**: New `estimatedHours` REAL column on projects table with ALTER TABLE migration. T-shirt sizing dropdown (XXS–XXL at 35h/week increments) populates a manual hours input.
+- **Range slider allocation**: Assignment chips now use `<input type="range">` instead of number inputs. 0.5h step increments. Saves on mouseUp/touchEnd. Draft-aware header totals update in real-time as sliders move.
+- **Blocked projects pause capacity**: Blocked assignments excluded from gauge totals and per-designer utilization. Shown in separate section with red styling. Allocation preserved for when unblocked.
+- **Project Funding stats**: New section in capacity gauge showing `projected hours` (allocation × weeks remaining to endDate) vs `estimated hours` (sum of estimatedHours). Color-coded delta bar (green = overfunded, red = underfunded).
+- **Required fields**: Projects now require estimatedHours > 0 and at least one designer to save.
+- **Project card warnings**: Red "No estimate" warning on cards missing estimated hours. Clock icon + hours display on cards with estimates.
+- **Active project count**: Designer cards show "N active projects" instead of "35h/week".
+- **Modal reorder**: Basic Info (name, url, business lines, designers) → Status & Schedule → Timeline → Design Artifacts → Custom Links.
+- **Tighter modal styling**: Smaller section padding, smaller brand/designer pills, compact status options.
+
+**Deployment Script Fixes**
+- **ATTACH-based merge**: Replaced `.mode insert` (positional VALUES) with `ATTACH db AS alias` + explicit column names in both `deploy.sh` and `merge-railway.sh`. Prevents silent data loss when schemas differ between local and Railway.
+- **Auto-merge in deploy.sh**: Railway data automatically merged into local before upload, even if merge-railway.sh was skipped.
+- **Maintenance mode re-enable**: deploy.sh re-enables maintenance after upload for admin testing.
+
+**Bug Fixes**
+- `authFetch` for capacity endpoints (exclude switch, weekly hours) — was silently failing with plain `fetch`
+- Exclude state now persists across page reloads (initialized from DB on load)
+- Server PUT `/api/capacity/availability/:designerId` only updates explicitly sent fields (prevents exclude toggle from resetting hours)
 
 ---
 

@@ -399,31 +399,46 @@ echo "$BODY" | jq '.' 2>/dev/null || echo "$BODY"
 # ── Verify ───────────────────────────────────────────────────────
 echo ""
 log "=== POST-DEPLOYMENT VERIFICATION ==="
+echo ""
 
 PASS=true
 
-# Health check
-if curl -sf "$RAILWAY_URL/api/health" &>/dev/null; then
-  log "Health check: PASS"
+# Upload response check (quick sanity)
+UPLOAD_TABLES=$(echo "$BODY" | jq -r '.tables | to_entries[] | "\(.key) \(.value)"' 2>/dev/null)
+if [[ -z "$UPLOAD_TABLES" ]]; then
+  warn "Upload response did not include table counts. Relying on live verification."
+fi
+
+# ── Live Railway verification ──────────────────────────────────────
+# Don't trust upload response alone — query Railway directly to confirm
+log "Verifying Railway database live (via /api/table-counts)..."
+sleep 3  # Give Railway a moment to reload the DB
+
+LIVE_HEALTH=$(curl -sf "$RAILWAY_URL/api/health" 2>/dev/null)
+if [[ -n "$LIVE_HEALTH" ]]; then
+  log "Railway health: PASS"
 else
-  err "Health check: FAIL"
+  err "Railway health: FAIL (could not reach /api/health)"
   PASS=false
 fi
 
-# Compare ALL table counts dynamically
-REMOTE_TABLES=$(echo "$BODY" | jq -r '.tables | to_entries[] | "\(.key) \(.value)"' 2>/dev/null)
-if [[ -n "$REMOTE_TABLES" ]]; then
+# Query live table counts from Railway
+LIVE_COUNTS=$(curl -sf "$RAILWAY_URL/api/table-counts" 2>/dev/null)
+if [[ -z "$LIVE_COUNTS" ]]; then
+  err "Could not reach /api/table-counts on Railway. Live verification FAILED."
+  PASS=false
+else
   echo ""
   printf "%-30s %10s %10s %s\n" "Table" "Local" "Railway" "Status"
   printf "%-30s %10s %10s %s\n" "─────" "─────" "───────" "──────"
 
   for TABLE in $TABLES; do
     L_COUNT=$(sqlite3 "$LOCAL_DB" "SELECT COUNT(*) FROM \"$TABLE\";")
-    R_COUNT=$(echo "$BODY" | jq -r ".tables.\"$TABLE\" // \"?\"" 2>/dev/null)
+    R_COUNT=$(echo "$LIVE_COUNTS" | jq -r ".counts.\"$TABLE\" // \"?\"" 2>/dev/null)
     if [[ "$L_COUNT" == "$R_COUNT" ]]; then
-      printf "%-30s %10s %10s MATCH\n" "$TABLE" "$L_COUNT" "$R_COUNT"
+      printf "%-30s %10s %10s ${GREEN}MATCH${NC}\n" "$TABLE" "$L_COUNT" "$R_COUNT"
     else
-      printf "%-30s %10s %10s MISMATCH\n" "$TABLE" "$L_COUNT" "$R_COUNT"
+      printf "%-30s %10s %10s ${RED}MISMATCH${NC}\n" "$TABLE" "$L_COUNT" "$R_COUNT"
       PASS=false
     fi
   done
@@ -431,10 +446,11 @@ fi
 
 echo ""
 if [[ "$PASS" == "true" ]]; then
-  log "DEPLOYMENT SUCCESSFUL - Railway is an exact copy of local."
+  log "DEPLOYMENT VERIFIED — Railway is an exact copy of local."
 else
-  err "DEPLOYMENT HAS MISMATCHES - check above."
-  warn "Railway backup at: $BACKUP_DIR"
+  err "DEPLOYMENT VERIFICATION FAILED — Railway may not match local."
+  err "Railway backup at: $BACKUP_DIR"
+  err "Investigate before disabling maintenance mode."
 fi
 
 # ── Re-enable maintenance mode on Railway ─────────────────────────
@@ -487,3 +503,10 @@ fi
 
 echo ""
 log "Rollback backup: $BACKUP_DIR"
+
+# ── Exit with correct status ─────────────────────────────────────
+if [[ "$PASS" != "true" ]]; then
+  echo ""
+  err "DEPLOY FINISHED WITH ERRORS — see above. Railway may need manual intervention."
+  exit 1
+fi
