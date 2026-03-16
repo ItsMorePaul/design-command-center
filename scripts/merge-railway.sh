@@ -237,26 +237,33 @@ if [[ -n "$API_PID" || -n "$VITE_PID" ]]; then
 fi
 
 # ── Merge: Railway-owned tables ──────────────────────────────────
-log "Merging Railway-owned tables into local DB..."
-for TABLE in $RAILWAY_TABLES; do
-  # Get column list from Railway DB
-  COLS=$(sqlite3 "$MERGE_TEMP" "PRAGMA table_info($TABLE);" 2>/dev/null | cut -d'|' -f2 | tr '\n' ',' | sed 's/,$//')
-  if [[ -z "$COLS" ]]; then
-    warn "Table $TABLE not found in Railway DB, skipping."
-    continue
-  fi
+# Safety: skip merge if Railway DB is empty (fresh rebuild after code push)
+RAILWAY_TOTAL=$(sqlite3 "$MERGE_TEMP" "SELECT SUM(c) FROM (SELECT COUNT(*) as c FROM projects UNION ALL SELECT COUNT(*) FROM team UNION ALL SELECT COUNT(*) FROM project_assignments);" 2>/dev/null || echo "0")
 
-  # Delete local rows, insert Railway rows using explicit columns
-  sqlite3 "$LOCAL_DB" "
-    DELETE FROM \"$TABLE\";
-    ATTACH '$MERGE_TEMP' AS railway;
-    INSERT INTO \"$TABLE\" ($COLS) SELECT $COLS FROM railway.\"$TABLE\";
-    DETACH railway;
-  "
+if [[ "$RAILWAY_TOTAL" -eq 0 ]] 2>/dev/null; then
+  warn "Railway DB is empty (fresh rebuild). SKIPPING Railway-owned table merge — local data preserved."
+else
+  log "Merging Railway-owned tables into local DB..."
+  for TABLE in $RAILWAY_TABLES; do
+    # Get column list from Railway DB
+    COLS=$(sqlite3 "$MERGE_TEMP" "PRAGMA table_info($TABLE);" 2>/dev/null | cut -d'|' -f2 | tr '\n' ',' | sed 's/,$//')
+    if [[ -z "$COLS" ]]; then
+      warn "Table $TABLE not found in Railway DB, skipping."
+      continue
+    fi
 
-  NEW_COUNT=$(sqlite3 "$LOCAL_DB" "SELECT COUNT(*) FROM \"$TABLE\";")
-  info "  $TABLE: replaced with $NEW_COUNT Railway rows"
-done
+    # Delete local rows, insert Railway rows using explicit columns
+    sqlite3 "$LOCAL_DB" "
+      DELETE FROM \"$TABLE\";
+      ATTACH '$MERGE_TEMP' AS railway;
+      INSERT INTO \"$TABLE\" ($COLS) SELECT $COLS FROM railway.\"$TABLE\";
+      DETACH railway;
+    "
+
+    NEW_COUNT=$(sqlite3 "$LOCAL_DB" "SELECT COUNT(*) FROM \"$TABLE\";")
+    info "  $TABLE: replaced with $NEW_COUNT Railway rows"
+  done
+fi
 
 # ── Merge: Notes (union + Railway hidden flags win) ──────────────
 log "Merging notes (union, Railway hidden flags win)..."

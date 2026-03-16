@@ -257,24 +257,32 @@ PRE_MERGE_BACKUP="$BACKUP_DIR/local-pre-merge.db"
 cp "$LOCAL_DB" "$PRE_MERGE_BACKUP"
 log "Local DB backed up before merge: $PRE_MERGE_BACKUP"
 
-# Railway-owned tables: Railway REPLACES local
+# Railway-owned tables: Railway REPLACES local (but ONLY if Railway has data)
+# After a code push, Railway's ephemeral DB is empty (fresh rebuild).
+# Replacing local with empty Railway tables would destroy all data.
 RAILWAY_TABLES="projects team project_assignments project_priorities business_lines brand_options users holidays app_versions activity_log"
-for TABLE in $RAILWAY_TABLES; do
-  COLS=$(sqlite3 "$RAILWAY_DB_BACKUP" "PRAGMA table_info($TABLE);" 2>/dev/null | cut -d'|' -f2 | tr '\n' ',' | sed 's/,$//')
-  if [[ -z "$COLS" ]]; then
-    warn "$TABLE: not found in Railway DB, skipping."
-    continue
-  fi
-  R_COUNT=$(sqlite3 "$RAILWAY_DB_BACKUP" "SELECT COUNT(*) FROM \"$TABLE\";" 2>/dev/null || echo "0")
-  sqlite3 "$LOCAL_DB" "
-    DELETE FROM \"$TABLE\";
-    ATTACH '$RAILWAY_DB_BACKUP' AS railway;
-    INSERT INTO \"$TABLE\" ($COLS) SELECT $COLS FROM railway.\"$TABLE\";
-    DETACH railway;
-  "
-  L_COUNT=$(sqlite3 "$LOCAL_DB" "SELECT COUNT(*) FROM \"$TABLE\";" 2>/dev/null || echo "0")
-  log "$TABLE: replaced with $R_COUNT Railway rows (local now: $L_COUNT)"
-done
+RAILWAY_TOTAL=$(sqlite3 "$RAILWAY_DB_BACKUP" "SELECT SUM(c) FROM (SELECT COUNT(*) as c FROM projects UNION ALL SELECT COUNT(*) FROM team UNION ALL SELECT COUNT(*) FROM project_assignments);" 2>/dev/null || echo "0")
+
+if [[ "$RAILWAY_TOTAL" -eq 0 ]] 2>/dev/null; then
+  warn "Railway DB is empty (fresh rebuild). SKIPPING auto-merge — local data preserved."
+else
+  for TABLE in $RAILWAY_TABLES; do
+    COLS=$(sqlite3 "$RAILWAY_DB_BACKUP" "PRAGMA table_info($TABLE);" 2>/dev/null | cut -d'|' -f2 | tr '\n' ',' | sed 's/,$//')
+    if [[ -z "$COLS" ]]; then
+      warn "$TABLE: not found in Railway DB, skipping."
+      continue
+    fi
+    R_COUNT=$(sqlite3 "$RAILWAY_DB_BACKUP" "SELECT COUNT(*) FROM \"$TABLE\";" 2>/dev/null || echo "0")
+    sqlite3 "$LOCAL_DB" "
+      DELETE FROM \"$TABLE\";
+      ATTACH '$RAILWAY_DB_BACKUP' AS railway;
+      INSERT INTO \"$TABLE\" ($COLS) SELECT $COLS FROM railway.\"$TABLE\";
+      DETACH railway;
+    "
+    L_COUNT=$(sqlite3 "$LOCAL_DB" "SELECT COUNT(*) FROM \"$TABLE\";" 2>/dev/null || echo "0")
+    log "$TABLE: replaced with $R_COUNT Railway rows (local now: $L_COUNT)"
+  done
+fi
 
 # Notes: union + Railway hidden flags win
 R_NOTE_IDS=$(sqlite3 "$RAILWAY_DB_BACKUP" "SELECT quote(id) FROM notes;" 2>/dev/null | tr '\n' ',' | sed 's/,$//')
