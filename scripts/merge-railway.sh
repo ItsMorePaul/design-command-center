@@ -262,16 +262,19 @@ done
 log "Merging notes (union, Railway hidden flags win)..."
 
 # Insert Railway-only notes into local
-sqlite3 "$MERGE_TEMP" ".mode insert notes" ".output /tmp/dcc_merge_notes_railway_only.sql" \
-  "SELECT * FROM notes WHERE id NOT IN ($(sqlite3 "$LOCAL_DB" "SELECT quote(id) FROM notes;" | tr '\n' ',' | sed 's/,$//'));"
-if [[ -s /tmp/dcc_merge_notes_railway_only.sql ]]; then
-  sqlite3 "$LOCAL_DB" < /tmp/dcc_merge_notes_railway_only.sql 2>/dev/null || true
-  INSERTED=$(wc -l < /tmp/dcc_merge_notes_railway_only.sql | tr -d ' ')
+NOTE_COLS=$(sqlite3 "$MERGE_TEMP" "PRAGMA table_info(notes);" | cut -d'|' -f2 | tr '\n' ',' | sed 's/,$//')
+L_NOTE_IDS=$(sqlite3 "$LOCAL_DB" "SELECT quote(id) FROM notes;" | tr '\n' ',' | sed 's/,$//')
+INSERTED=$(sqlite3 "$LOCAL_DB" "
+  ATTACH '$MERGE_TEMP' AS railway;
+  INSERT OR IGNORE INTO notes ($NOTE_COLS) SELECT $NOTE_COLS FROM railway.notes WHERE id NOT IN ($L_NOTE_IDS);
+  SELECT changes();
+  DETACH railway;
+")
+if [[ "$INSERTED" -gt 0 ]] 2>/dev/null; then
   info "  Notes: inserted $INSERTED Railway-only notes"
 else
   info "  Notes: no Railway-only notes to insert"
 fi
-rm -f /tmp/dcc_merge_notes_railway_only.sql
 
 # Update hidden flags from Railway (Railway wins for existing notes)
 sqlite3 "$LOCAL_DB" "
@@ -287,13 +290,21 @@ info "  Notes: hidden flags synced from Railway ($R_HIDDEN_AFTER hidden)"
 
 # ── Merge: Hidden note fingerprints (union) ──────────────────────
 log "Merging hidden_note_fingerprints (union)..."
-sqlite3 "$MERGE_TEMP" ".mode insert hidden_note_fingerprints" \
-  ".output /tmp/dcc_merge_fp.sql" \
-  "SELECT * FROM hidden_note_fingerprints WHERE fingerprint NOT IN ($(sqlite3 "$LOCAL_DB" "SELECT quote(fingerprint) FROM hidden_note_fingerprints;" | tr '\n' ',' | sed 's/,$//'));" 2>/dev/null || true
-if [[ -s /tmp/dcc_merge_fp.sql ]]; then
-  sqlite3 "$LOCAL_DB" < /tmp/dcc_merge_fp.sql 2>/dev/null || true
+FP_COLS=$(sqlite3 "$MERGE_TEMP" "PRAGMA table_info(hidden_note_fingerprints);" | cut -d'|' -f2 | tr '\n' ',' | sed 's/,$//')
+LOCAL_FPS=$(sqlite3 "$LOCAL_DB" "SELECT quote(fingerprint) FROM hidden_note_fingerprints;" | tr '\n' ',' | sed 's/,$//')
+if [[ -n "$LOCAL_FPS" ]]; then
+  sqlite3 "$LOCAL_DB" "
+    ATTACH '$MERGE_TEMP' AS railway;
+    INSERT OR IGNORE INTO hidden_note_fingerprints ($FP_COLS) SELECT $FP_COLS FROM railway.hidden_note_fingerprints WHERE fingerprint NOT IN ($LOCAL_FPS);
+    DETACH railway;
+  " 2>/dev/null || true
+else
+  sqlite3 "$LOCAL_DB" "
+    ATTACH '$MERGE_TEMP' AS railway;
+    INSERT OR IGNORE INTO hidden_note_fingerprints ($FP_COLS) SELECT $FP_COLS FROM railway.hidden_note_fingerprints;
+    DETACH railway;
+  " 2>/dev/null || true
 fi
-rm -f /tmp/dcc_merge_fp.sql
 FP_COUNT=$(sqlite3 "$LOCAL_DB" "SELECT COUNT(*) FROM hidden_note_fingerprints;")
 info "  Fingerprints: $FP_COUNT total after merge"
 
