@@ -1503,7 +1503,8 @@ const [showFilters, setShowFilters] = useState(false)
       businessLines: [],
       deckName: '', deckLink: '', prdName: '', prdLink: '', briefName: '', briefLink: '', figmaLink: '',
       customLinks: [],
-      timeline: []
+      timeline: [],
+      estimatedHours: 0
     })
     setShowProjectModal(true)
   }
