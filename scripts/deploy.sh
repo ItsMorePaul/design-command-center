@@ -266,10 +266,12 @@ for TABLE in $RAILWAY_TABLES; do
     continue
   fi
   R_COUNT=$(sqlite3 "$RAILWAY_DB_BACKUP" "SELECT COUNT(*) FROM \"$TABLE\";" 2>/dev/null || echo "0")
-  sqlite3 "$LOCAL_DB" "DELETE FROM \"$TABLE\";"
-  sqlite3 "$RAILWAY_DB_BACKUP" ".mode insert $TABLE" ".output /tmp/dcc_deploy_merge_$TABLE.sql" "SELECT * FROM \"$TABLE\";"
-  sqlite3 "$LOCAL_DB" < "/tmp/dcc_deploy_merge_$TABLE.sql" 2>/dev/null || true
-  rm -f "/tmp/dcc_deploy_merge_$TABLE.sql"
+  sqlite3 "$LOCAL_DB" "
+    DELETE FROM \"$TABLE\";
+    ATTACH '$RAILWAY_DB_BACKUP' AS railway;
+    INSERT INTO \"$TABLE\" ($COLS) SELECT $COLS FROM railway.\"$TABLE\";
+    DETACH railway;
+  "
   L_COUNT=$(sqlite3 "$LOCAL_DB" "SELECT COUNT(*) FROM \"$TABLE\";" 2>/dev/null || echo "0")
   log "$TABLE: replaced with $R_COUNT Railway rows (local now: $L_COUNT)"
 done

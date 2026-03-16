@@ -246,11 +246,13 @@ for TABLE in $RAILWAY_TABLES; do
     continue
   fi
 
-  # Delete local rows, insert Railway rows
-  sqlite3 "$LOCAL_DB" "DELETE FROM \"$TABLE\";"
-  sqlite3 "$MERGE_TEMP" ".mode insert $TABLE" ".output /tmp/dcc_merge_$TABLE.sql" "SELECT * FROM \"$TABLE\";"
-  sqlite3 "$LOCAL_DB" < "/tmp/dcc_merge_$TABLE.sql" 2>/dev/null || true
-  rm -f "/tmp/dcc_merge_$TABLE.sql"
+  # Delete local rows, insert Railway rows using explicit columns
+  sqlite3 "$LOCAL_DB" "
+    DELETE FROM \"$TABLE\";
+    ATTACH '$MERGE_TEMP' AS railway;
+    INSERT INTO \"$TABLE\" ($COLS) SELECT $COLS FROM railway.\"$TABLE\";
+    DETACH railway;
+  "
 
   NEW_COUNT=$(sqlite3 "$LOCAL_DB" "SELECT COUNT(*) FROM \"$TABLE\";")
   info "  $TABLE: replaced with $NEW_COUNT Railway rows"
