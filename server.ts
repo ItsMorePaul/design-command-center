@@ -532,7 +532,7 @@ app.get('/api/projects', async (req, res) => {
 
 app.post('/api/projects', async (req, res) => {
   try {
-    const { id, name, status, dueDate, assignee, url, description, businessLines, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinks, designers, startDate, endDate, timeline, updatedAt: clientUpdatedAt } = req.body;
+    const { id, name, status, dueDate, assignee, url, description, businessLines, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinks, designers, startDate, endDate, timeline, estimatedHours, updatedAt: clientUpdatedAt } = req.body;
     const projectId = id || Date.now().toString();
 
     // Optimistic locking: reject if another user modified this record
@@ -548,9 +548,9 @@ app.post('/api/projects', async (req, res) => {
     const designersJson = JSON.stringify(designers || []);
     const businessLinesJson = JSON.stringify(businessLines || []);
     await run(
-      `INSERT OR REPLACE INTO projects (id, name, status, dueDate, assignee, url, description, businessLine, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinks, designers, startDate, endDate, timeline, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-      [projectId, name, status || 'active', dueDate, assignee, url, description, businessLinesJson, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinksJson, designersJson, startDate, endDate, timelineJson]
+      `INSERT OR REPLACE INTO projects (id, name, status, dueDate, assignee, url, description, businessLine, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinks, designers, startDate, endDate, timeline, estimatedHours, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+      [projectId, name, status || 'active', dueDate, assignee, url, description, businessLinesJson, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinksJson, designersJson, startDate, endDate, timelineJson, estimatedHours || 0]
     );
 
     await syncProjectDesignersToAssignments(projectId, designers || [])
@@ -2005,8 +2005,12 @@ run(`CREATE TABLE IF NOT EXISTS projects (
   briefName TEXT,
   figmaLink TEXT,
   customLinks TEXT,
-  designers TEXT
+  designers TEXT,
+  estimatedHours REAL DEFAULT 0
 )`).catch(e => console.error('projects init error:', e.message))
+
+// Migration: add estimatedHours column if missing
+run(`ALTER TABLE projects ADD COLUMN estimatedHours REAL DEFAULT 0`).catch(() => {})
 
 run(`CREATE TABLE IF NOT EXISTS team (
   id TEXT PRIMARY KEY,
@@ -2268,11 +2272,18 @@ app.delete('/api/capacity/assignments/:id', async (req, res) => {
 app.put('/api/capacity/availability/:designerId', async (req, res) => {
   try {
     const { weekly_hours, excluded } = req.body
-    await run('UPDATE team SET weekly_hours = ?, excluded = ?, updatedAt = datetime("now") WHERE id = ?',
-      [weekly_hours || 35, excluded !== undefined ? (excluded ? 1 : 0) : 0, req.params.designerId])
+    const updates: string[] = []
+    const params: any[] = []
+    if (weekly_hours !== undefined) { updates.push('weekly_hours = ?'); params.push(weekly_hours) }
+    if (excluded !== undefined) { updates.push('excluded = ?'); params.push(excluded ? 1 : 0) }
+    if (updates.length === 0) return res.status(400).json({ error: 'No fields to update' })
+    updates.push('updatedAt = datetime("now")')
+    params.push(req.params.designerId)
+    await run(`UPDATE team SET ${updates.join(', ')} WHERE id = ?`, params)
     await updateDbVersion()
-    const designer = await get('SELECT name FROM team WHERE id = ?', [req.params.designerId]) as any
-    await logActivity('capacity', 'update', designer?.name || req.params.designerId, getUserEmail(req), `Weekly hours → ${weekly_hours || 35}h`)
+    const designer = await get('SELECT name, weekly_hours, excluded FROM team WHERE id = ?', [req.params.designerId]) as any
+    const detail = weekly_hours !== undefined ? `Weekly hours → ${weekly_hours}h` : `Excluded → ${excluded}`
+    await logActivity('capacity', 'update', designer?.name || req.params.designerId, getUserEmail(req), detail)
     res.json({ success: true })
   } catch (e) { res.status(500).json({error: e.message}); }
 })

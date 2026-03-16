@@ -16,7 +16,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Gauge, ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, Settings, GripVertical, Folder, StickyNote, RefreshCw, User, CheckSquare, Sun, Moon, Edit2, Bell, Loader } from 'lucide-react'
+import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Gauge, ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, Settings, GripVertical, Folder, StickyNote, RefreshCw, User, CheckSquare, Sun, Moon, Edit2, Bell, Loader, Clock } from 'lucide-react'
 import { Tooltip } from './Tooltip'
 import './App.css'
 import initialData from './data.json'
@@ -197,6 +197,7 @@ interface Project {
   customLinks?: { name: string; url: string }[]
   matchedLinks?: { name: string; url: string; type?: string }[]
   timeline: TimelineRange[]
+  estimatedHours?: number
 }
 
 interface BusinessLine {
@@ -587,7 +588,8 @@ function App() {
     briefLink: '',
     figmaLink: '',
     customLinks: [] as { name: string; url: string }[],
-    timeline: [] as TimelineRange[]
+    timeline: [] as TimelineRange[],
+    estimatedHours: 0
   })
   
   // Timeline editing state
@@ -1227,6 +1229,8 @@ const [showFilters, setShowFilters] = useState(false)
         return acc
       }, {})
       setHoursDraft(initialHours)
+      const initialExcluded = new Set<string>((data.team || []).filter((m: CapacityMember) => m.excluded).map((m: CapacityMember) => m.id))
+      setExcludedDesigners(initialExcluded)
     } catch (err) {
       console.error('Error refreshing capacity:', err)
     }
@@ -1522,7 +1526,8 @@ const [showFilters, setShowFilters] = useState(false)
       briefLink: project.briefLink || '',
       figmaLink: project.figmaLink || '',
       customLinks: project.customLinks || [],
-      timeline: project.timeline || []
+      timeline: project.timeline || [],
+      estimatedHours: project.estimatedHours || 0
     })
     setShowProjectModal(true)
   }
@@ -2558,6 +2563,12 @@ const [showFilters, setShowFilters] = useState(false)
                                 <span>{(project.designers || []).map((d: string) => d.split(' ')[0]).join(', ')}</span>
                               </span>
                             )}
+                            {(project.estimatedHours || 0) > 0 && (
+                              <span className="project-footer-hours">
+                                <Clock size={12} />
+                                <span>{project.estimatedHours}h est.</span>
+                              </span>
+                            )}
                             {project.deckLink && (
                               <a href={project.deckLink} target="_blank" rel="noopener noreferrer" className="project-footer-link">
                                 <Presentation size={12} />
@@ -3226,7 +3237,11 @@ const [showFilters, setShowFilters] = useState(false)
               const availableQuarter = activeTeam.reduce((sum: number, m: CapacityMember) => sum + (m.weekly_hours || 35) * 13, 0)
               const allocatedQuarter = activeTeam.reduce((sum: number, m: CapacityMember) => {
                 const assigned = capacityData.assignments
-                  .filter((a: CapacityAssignment) => a.designer_id === m.id)
+                  .filter((a: CapacityAssignment) => {
+                    if (a.designer_id !== m.id) return false
+                    const proj = projects.find(p => p.name === a.project_name)
+                    return !proj || (proj.status !== 'done' && proj.status !== 'blocked')
+                  })
                   .reduce((s: number, a: CapacityAssignment) => s + (a.allocation_percent || 0), 0)
                 return sum + ((m.weekly_hours || 35) * assigned / 100 * 13)
               }, 0)
@@ -3361,10 +3376,19 @@ const [showFilters, setShowFilters] = useState(false)
             <div className="designer-cards-grid">
               {capacityData.team.map((member: CapacityMember) => {
                 const memberAssignments = capacityData.assignments.filter((a: CapacityAssignment) => a.designer_id === member.id)
-                const allocated = memberAssignments.reduce((sum: number, a: CapacityAssignment) => sum + (a.allocation_percent || 0), 0)
                 const available = member.weekly_hours || 35
-                const allocatedHours = (available * allocated) / 100
-                const utilization = Math.round((allocated / 100) * 100)
+                const allocatedHours = memberAssignments
+                  .filter((a: CapacityAssignment) => {
+                    const proj = projects.find(p => p.name === a.project_name)
+                    return !proj || (proj.status !== 'done' && proj.status !== 'blocked')
+                  })
+                  .reduce((sum: number, a: CapacityAssignment) => {
+                    const allocPct = a.allocation_percent || 0
+                    const allocH = parseFloat(((available * allocPct) / 100).toFixed(1))
+                    const draftH = assignmentDraft[a.id] ?? allocH
+                    return sum + draftH
+                  }, 0)
+                const utilization = available > 0 ? Math.round((allocatedHours / available) * 100) : 0
                 const isOver = utilization > 100
                 const isExpanded = expandedDesigners.has(member.id)
 
@@ -3410,7 +3434,7 @@ const [showFilters, setShowFilters] = useState(false)
                         </div>
                         <div className="designer-col-usage">
                           <span className="usage-pct" style={{ color: getUtilColor() }}>{utilization}%</span>
-                          <span className="usage-hours">{allocatedHours.toFixed(1)}h</span>
+                          <span className="usage-hours">{parseFloat(allocatedHours.toFixed(1))}h</span>
                         </div>
                         </div>
                         <button className="expand-toggle">
@@ -3429,7 +3453,7 @@ const [showFilters, setShowFilters] = useState(false)
                         ) : (() => {
                           const activeAssignments = memberAssignments.filter((a: CapacityAssignment) => {
                             const proj = projects.find(p => p.name === a.project_name)
-                            return !proj || proj.status !== 'done'
+                            return !proj || (proj.status !== 'done' && proj.status !== 'blocked')
                           })
                           // Sort active assignments by force ranking (best rank across all business lines), then alphabetical
                           activeAssignments.sort((a, b) => {
@@ -3446,18 +3470,23 @@ const [showFilters, setShowFilters] = useState(false)
                             if (rankA !== rankB) return rankA - rankB
                             return (a.project_name || '').localeCompare(b.project_name || '')
                           })
+                          const blockedAssignments = memberAssignments.filter((a: CapacityAssignment) => {
+                            const proj = projects.find(p => p.name === a.project_name)
+                            return proj?.status === 'blocked'
+                          })
                           const doneAssignments = memberAssignments.filter((a: CapacityAssignment) => {
                             const proj = projects.find(p => p.name === a.project_name)
                             return proj?.status === 'done'
                           })
 
-                          const renderChip = (assignment: CapacityAssignment, isDone: boolean) => {
+                          const renderChip = (assignment: CapacityAssignment, isDone: boolean, isBlocked?: boolean) => {
                             const allocPct = assignment.allocation_percent || 0
                             const allocHours = parseFloat(((available * allocPct) / 100).toFixed(1))
-                            const effectiveHours = isDone ? 0 : (assignmentDraft[assignment.id] ?? allocHours)
-                            const effectivePct = isDone ? 0 : Math.round((effectiveHours / available) * 100)
+                            const paused = isDone || isBlocked
+                            const effectiveHours = paused ? 0 : (assignmentDraft[assignment.id] ?? allocHours)
+                            const effectivePct = paused ? 0 : Math.round((effectiveHours / available) * 100)
                             return (
-                              <div key={assignment.id} className={`assignment-chip${isDone ? ' chip-done' : ''}`}>
+                              <div key={assignment.id} className={`assignment-chip${isDone ? ' chip-done' : ''}${isBlocked ? ' chip-blocked' : ''}`}>
                                 <div className="chip-main">
                                   <span
                                     className="chip-project-link"
@@ -3470,25 +3499,32 @@ const [showFilters, setShowFilters] = useState(false)
                                     {assignment.project_name || 'Project'}
                                   </span>
                                   <div className="chip-edit">
+                                    <span className="chip-hours-label">{isBlocked ? `(${allocHours}h)` : `${effectiveHours}h`}</span>
                                     <input
-                                      type="number"
-                                      className="chip-input"
+                                      type="range"
+                                      className="chip-slider"
                                       min={0}
                                       max={available}
                                       step={0.5}
-                                      value={effectiveHours}
-                                      disabled={isDone}
-                                      onChange={e => !isDone && setAssignmentDraft({ ...assignmentDraft, [assignment.id]: Number(e.target.value) })}
-                                      onBlur={(e) => {
-                                        if (isDone) return
-                                        const newHours = Number(e.target.value)
+                                      value={isBlocked ? allocHours : effectiveHours}
+                                      disabled={paused}
+                                      onChange={e => !paused && setAssignmentDraft({ ...assignmentDraft, [assignment.id]: Number(e.target.value) })}
+                                      onMouseUp={(e) => {
+                                        if (paused) return
+                                        const newHours = Number((e.target as HTMLInputElement).value)
+                                        const newPct = Math.round((newHours / available) * 100)
+                                        const oldPct = allocPct
+                                        if (newPct !== oldPct) saveAssignmentAllocation(assignment, newPct)
+                                      }}
+                                      onTouchEnd={(e) => {
+                                        if (paused) return
+                                        const newHours = Number((e.target as HTMLInputElement).value)
                                         const newPct = Math.round((newHours / available) * 100)
                                         const oldPct = allocPct
                                         if (newPct !== oldPct) saveAssignmentAllocation(assignment, newPct)
                                       }}
                                       onClick={e => e.stopPropagation()}
                                     />
-                                    <span className="chip-pct">h</span>
                                     <button
                                       className="chip-delete"
                                       onClick={(e) => {
@@ -3521,6 +3557,12 @@ const [showFilters, setShowFilters] = useState(false)
                                   {activeAssignments.map((a: CapacityAssignment) => renderChip(a, false))}
                                 </div>
                               )}
+                              {blockedAssignments.length > 0 && (
+                                <div className="assignment-chips-blocked">
+                                  <div className="chips-blocked-label">Blocked</div>
+                                  {blockedAssignments.map((a: CapacityAssignment) => renderChip(a, false, true))}
+                                </div>
+                              )}
                               {doneAssignments.length > 0 && (
                                 <div className="assignment-chips-done">
                                   <div className="chips-done-label">Done</div>
@@ -3548,26 +3590,26 @@ const [showFilters, setShowFilters] = useState(false)
                             }
                           </select>
                           {assignmentForm.designer_id === member.id && assignmentForm.project_id && (
-                            <>
+                            <div className="inline-add-controls">
+                              <span className="chip-hours-label">{assignmentForm.allocation_hours || 0}h</span>
                               <input
-                                type="number"
-                                className="inline-add-input"
+                                type="range"
+                                className="chip-slider"
                                 min={0}
                                 max={available}
                                 step={0.5}
-                                placeholder="hours"
-                                value={assignmentForm.allocation_hours || ''}
+                                value={assignmentForm.allocation_hours || 0}
                                 onChange={e => setAssignmentForm({ ...assignmentForm, allocation_hours: Number(e.target.value) })}
                               />
-                              <button 
-                                className="inline-add-btn"
+                              <button
+                                className="inline-add-save"
                                 onClick={async () => {
                                   await saveCapacityAssignment()
                                 }}
                               >
-                                Add
+                                Save
                               </button>
-                            </>
+                            </div>
                           )}
                         </div>
 
@@ -4807,6 +4849,42 @@ const [showFilters, setShowFilters] = useState(false)
                       placeholder=" "
                     />
                     <label htmlFor="end-date">End Date</label>
+                  </div>
+                  <div className="estimate-group">
+                    <div className="estimate-sizes">
+                      {([
+                        ['XXS', 20, '≤1 wk'],
+                        ['XS', 40, '<2 wks'],
+                        ['S', 80, '2–4 wks'],
+                        ['M', 140, '4–6 wks'],
+                        ['L', 200, '6–8 wks'],
+                        ['XL', 350, '~quarter'],
+                        ['XXL', 600, 'multi-qtr'],
+                      ] as const).map(([label, hours, hint]) => (
+                        <button
+                          key={label}
+                          type="button"
+                          className={`estimate-size-btn${projectFormData.estimatedHours === hours ? ' active' : ''}`}
+                          onClick={() => setProjectFormData({ ...projectFormData, estimatedHours: hours })}
+                          title={`${label}: ${hint}`}
+                        >
+                          <span className="estimate-size-label">{label}</span>
+                          <span className="estimate-size-hint">{hint}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <div className={`float-field estimate-exact${projectFormData.estimatedHours ? ' has-value' : ''}`}>
+                      <input
+                        id="estimated-hours"
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={projectFormData.estimatedHours || ''}
+                        onChange={e => setProjectFormData({ ...projectFormData, estimatedHours: Number(e.target.value) || 0 })}
+                        placeholder=" "
+                      />
+                      <label htmlFor="estimated-hours">Hours</label>
+                    </div>
                   </div>
                 </div>
 
