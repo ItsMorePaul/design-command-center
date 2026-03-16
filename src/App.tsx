@@ -1283,7 +1283,7 @@ const [showFilters, setShowFilters] = useState(false)
   }
 
   const updateWeeklyHours = async (designerId: string, weeklyHours: number) => {
-    await fetch(`/api/capacity/availability/${designerId}`, {
+    await authFetch(`/api/capacity/availability/${designerId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ weekly_hours: weeklyHours })
@@ -1292,7 +1292,7 @@ const [showFilters, setShowFilters] = useState(false)
   }
 
   const updateExcludedStatus = async (designerId: string, excluded: boolean) => {
-    await fetch(`/api/capacity/availability/${designerId}`, {
+    await authFetch(`/api/capacity/availability/${designerId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ excluded })
@@ -3300,6 +3300,56 @@ const [showFilters, setShowFilters] = useState(false)
                     </div>
                   </div>
                   {(() => {
+                    const activeProjects = projects.filter(p => p.status === 'active' || p.status === 'review')
+                    const totalEstimated = activeProjects.reduce((sum, p) => sum + (p.estimatedHours || 0), 0)
+                    const now = new Date()
+                    now.setHours(0, 0, 0, 0)
+                    const totalProjected = capacityData.assignments.reduce((sum: number, a: CapacityAssignment) => {
+                      const proj = projects.find(p => p.name === a.project_name)
+                      if (!proj || proj.status === 'done' || proj.status === 'blocked') return sum
+                      if (excludedDesigners.has(a.designer_id)) return sum
+                      const designer = activeTeam.find(m => m.id === a.designer_id)
+                      const weeklyHours = designer?.weekly_hours || 35
+                      const allocHours = (weeklyHours * (a.allocation_percent || 0)) / 100
+                      const endDate = proj.endDate ? parseLocalDate(proj.endDate) : null
+                      const weeksLeft = endDate ? Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (7 * 24 * 60 * 60 * 1000))) : 13
+                      return sum + (allocHours * weeksLeft)
+                    }, 0)
+                    const delta = Math.round(totalProjected - totalEstimated)
+                    const estimatedCount = activeProjects.filter(p => (p.estimatedHours || 0) > 0).length
+                    if (totalEstimated === 0) return null
+                    return (
+                      <div className="capacity-funding-stats">
+                        <div className="funding-header">Project Funding</div>
+                        <div className="funding-row">
+                          <div className="funding-stat">
+                            <span className="funding-stat-value">{Math.round(totalEstimated).toLocaleString()}</span>
+                            <span className="funding-stat-label">Estimated hrs ({estimatedCount} projects)</span>
+                          </div>
+                          <div className="funding-stat">
+                            <span className="funding-stat-value">{Math.round(totalProjected).toLocaleString()}</span>
+                            <span className="funding-stat-label">Projected hrs</span>
+                          </div>
+                          <div className="funding-stat">
+                            <span className="funding-stat-value" style={{ color: delta >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>
+                              {delta > 0 ? '+' : ''}{delta.toLocaleString()}
+                            </span>
+                            <span className="funding-stat-label">{delta >= 0 ? 'Over-funded' : 'Under-funded'}</span>
+                          </div>
+                        </div>
+                        <div className="funding-bar-track">
+                          <div
+                            className="funding-bar-fill"
+                            style={{
+                              width: `${Math.min(totalEstimated > 0 ? (totalProjected / totalEstimated) * 100 : 0, 100)}%`,
+                              backgroundColor: delta >= 0 ? 'var(--color-success)' : delta > -totalEstimated * 0.3 ? 'var(--color-warning)' : 'var(--color-danger)'
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })()}
+                  {(() => {
                     // DJ Fiscal Year timeline: Q3/FY26 (Jan) through Q2/FY27 (Dec)
                     const fyStart = new Date(2026, 0, 1) // Jan 1 2026
                     const fyEnd = new Date(2026, 11, 31) // Dec 31 2026
@@ -4651,7 +4701,7 @@ const [showFilters, setShowFilters] = useState(false)
                     <label htmlFor="project-url">Jira Project Link</label>
                   </div>
                 </div>
-                <div className="form-group" style={{ marginTop: '1rem', marginBottom: 0 }}>
+                <div className="form-group" style={{ marginTop: '0.6rem', marginBottom: 0 }}>
                   <div className="form-section-title" style={{ marginBottom: '0.5rem' }}>Business Lines</div>
                   <div className="brand-checkboxes">
                     {brandOptions.map(brand => (
@@ -4672,12 +4722,133 @@ const [showFilters, setShowFilters] = useState(false)
                     ))}
                   </div>
                 </div>
+                <div className="form-group" style={{ marginTop: '0.6rem', marginBottom: 0 }}>
+                  <div className="form-section-title" style={{ marginBottom: '0.5rem' }}>Designers</div>
+                  <div className="designer-checkboxes">
+                    {[...team].sort((a, b) => a.name.localeCompare(b.name)).map(member => (
+                      <label key={member.id} className={`designer-checkbox ${projectFormData.designers.includes(member.name) ? 'selected' : ''}`}>
+                        <input
+                          type="checkbox"
+                          checked={projectFormData.designers.includes(member.name)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setProjectFormData({ ...projectFormData, designers: [...projectFormData.designers, member.name] })
+                            } else {
+                              setProjectFormData({ ...projectFormData, designers: projectFormData.designers.filter(d => d !== member.name) })
+                            }
+                          }}
+                        />
+                        {member.name}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Status & Schedule */}
+              <div className="form-section">
+                <div className="form-section-title">Status</div>
+                <div className="status-options" style={{ marginBottom: '0.6rem' }}>
+                  {(['active', 'review', 'done', 'blocked'] as const).map(s => (
+                    <button
+                      key={s}
+                      type="button"
+                      className={`status-option ${projectFormData.status === s ? 'active' : ''}`}
+                      onClick={() => setProjectFormData({ ...projectFormData, status: s })}
+                    >
+                      <span className={`status-dot ${s === 'active' ? 'bg-blue-500' : s === 'review' ? 'bg-yellow-500' : s === 'done' ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                      {s.charAt(0).toUpperCase() + s.slice(1)}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="form-section-title" style={{ marginBottom: '0.4rem' }}>Schedule</div>
+                <div className="form-row" style={{ marginBottom: '0.6rem' }}>
+                  <div className={`float-field${projectFormData.startDate ? ' has-value' : ''}`}>
+                    <input
+                      id="start-date"
+                      type="date"
+                      value={projectFormData.startDate}
+                      onChange={e => setProjectFormData({ ...projectFormData, startDate: e.target.value })}
+                      onClick={e => (e.target as HTMLInputElement).showPicker?.()}
+                      placeholder=" "
+                    />
+                    <label htmlFor="start-date">Start Date</label>
+                  </div>
+                  <div className={`float-field${projectFormData.endDate ? ' has-value' : ''}`}>
+                    <input
+                      id="end-date"
+                      type="date"
+                      value={projectFormData.endDate}
+                      onChange={e => setProjectFormData({ ...projectFormData, endDate: e.target.value })}
+                      onClick={e => (e.target as HTMLInputElement).showPicker?.()}
+                      placeholder=" "
+                    />
+                    <label htmlFor="end-date">End Date</label>
+                  </div>
+                </div>
+
+                <div className="form-row" style={{ marginBottom: '0.6rem' }}>
+                  <div className="float-field has-value">
+                    <select
+                      id="estimate-size"
+                      value={[35,70,105,175,280,455,910].includes(projectFormData.estimatedHours) ? String(projectFormData.estimatedHours) : ''}
+                      onChange={e => {
+                        const v = Number(e.target.value)
+                        if (v) setProjectFormData({ ...projectFormData, estimatedHours: v })
+                      }}
+                    >
+                      <option value="">Custom</option>
+                      <option value="35">XXS — ≤1 week</option>
+                      <option value="70">XS — 2 weeks</option>
+                      <option value="105">S — 3 weeks</option>
+                      <option value="175">M — 5 weeks</option>
+                      <option value="280">L — 8 weeks</option>
+                      <option value="455">XL — 13 weeks</option>
+                      <option value="910">XXL — 26 weeks</option>
+                    </select>
+                    <label htmlFor="estimate-size">Effort Size</label>
+                  </div>
+                  <div className={`float-field${projectFormData.estimatedHours ? ' has-value' : ''}`}>
+                    <input
+                      id="estimated-hours"
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={projectFormData.estimatedHours || ''}
+                      onChange={e => setProjectFormData({ ...projectFormData, estimatedHours: Number(e.target.value) || 0 })}
+                      placeholder=" "
+                    />
+                    <label htmlFor="estimated-hours">Estimated Hours</label>
+                  </div>
+                </div>
+
+                <div className="timeline-header">
+                  <span className="form-section-title" style={{ marginBottom: 0 }}>Timeline Ranges</span>
+                  <button type="button" className="add-timeline-btn" onClick={handleAddTimeline}>+ Add Range</button>
+                </div>
+                {projectFormData.timeline.length > 0 && (
+                  <DndContext sensors={timelineSensors} collisionDetection={closestCenter} onDragEnd={handleTimelineDragEnd}>
+                    <SortableContext items={projectFormData.timeline.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                      <div className="timeline-list" style={{ marginTop: '0.5rem' }}>
+                        {projectFormData.timeline.map(range => (
+                          <SortableTimelineItem
+                            key={range.id}
+                            range={range}
+                            onEdit={handleEditTimeline}
+                            onDelete={handleDeleteTimeline}
+                          />
+                        ))}
+                      </div>
+                    </SortableContext>
+                  </DndContext>
+                )}
               </div>
 
               {/* Design Artifacts */}
               <div className="form-section">
                 <div className="form-section-title">Design Artifacts</div>
-                <div className="form-row" style={{ marginBottom: '0.75rem' }}>
+                <div className="form-row" style={{ marginBottom: '0.5rem' }}>
                   <div className={`float-field${projectFormData.deckName ? ' has-value' : ''}`}>
                     <input
                       id="deck-name"
@@ -4699,7 +4870,7 @@ const [showFilters, setShowFilters] = useState(false)
                     <label htmlFor="deck-link">Design Deck Link</label>
                   </div>
                 </div>
-                <div className="form-row" style={{ marginBottom: '0.75rem' }}>
+                <div className="form-row" style={{ marginBottom: '0.5rem' }}>
                   <div className={`float-field${projectFormData.prdName ? ' has-value' : ''}`}>
                     <input
                       id="prd-name"
@@ -4721,7 +4892,7 @@ const [showFilters, setShowFilters] = useState(false)
                     <label htmlFor="prd-link">PRD Link</label>
                   </div>
                 </div>
-                <div className="form-row" style={{ marginBottom: '0.75rem' }}>
+                <div className="form-row" style={{ marginBottom: '0.5rem' }}>
                   <div className={`float-field${projectFormData.briefName ? ' has-value' : ''}`}>
                     <input
                       id="brief-name"
@@ -4759,7 +4930,7 @@ const [showFilters, setShowFilters] = useState(false)
               <div className="form-section">
                 <div className="form-section-title">Custom Links</div>
                 {projectFormData.customLinks?.map((link, idx) => (
-                  <div key={idx} className="custom-link-row" style={{ marginBottom: '0.75rem' }}>
+                  <div key={idx} className="custom-link-row" style={{ marginBottom: '0.5rem' }}>
                     <div className={`float-field${link.name ? ' has-value' : ''}`}>
                       <input
                         type="text"
@@ -4809,130 +4980,6 @@ const [showFilters, setShowFilters] = useState(false)
                 )}
               </div>
 
-              {/* Status & Schedule */}
-              <div className="form-section">
-                <div className="form-section-title">Status</div>
-                <div className="status-options" style={{ marginBottom: '1rem' }}>
-                  {(['active', 'review', 'done', 'blocked'] as const).map(s => (
-                    <button
-                      key={s}
-                      type="button"
-                      className={`status-option ${projectFormData.status === s ? 'active' : ''}`}
-                      onClick={() => setProjectFormData({ ...projectFormData, status: s })}
-                    >
-                      <span className={`status-dot ${s === 'active' ? 'bg-blue-500' : s === 'review' ? 'bg-yellow-500' : s === 'done' ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                      {s.charAt(0).toUpperCase() + s.slice(1)}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="form-section-title" style={{ marginBottom: '0.5rem' }}>Schedule</div>
-                <div className="form-row" style={{ marginBottom: '1rem' }}>
-                  <div className={`float-field${projectFormData.startDate ? ' has-value' : ''}`}>
-                    <input
-                      id="start-date"
-                      type="date"
-                      value={projectFormData.startDate}
-                      onChange={e => setProjectFormData({ ...projectFormData, startDate: e.target.value })}
-                      onClick={e => (e.target as HTMLInputElement).showPicker?.()}
-                      placeholder=" "
-                    />
-                    <label htmlFor="start-date">Start Date</label>
-                  </div>
-                  <div className={`float-field${projectFormData.endDate ? ' has-value' : ''}`}>
-                    <input
-                      id="end-date"
-                      type="date"
-                      value={projectFormData.endDate}
-                      onChange={e => setProjectFormData({ ...projectFormData, endDate: e.target.value })}
-                      onClick={e => (e.target as HTMLInputElement).showPicker?.()}
-                      placeholder=" "
-                    />
-                    <label htmlFor="end-date">End Date</label>
-                  </div>
-                  <div className="estimate-group">
-                    <div className="estimate-sizes">
-                      {([
-                        ['XXS', 20, '≤1 wk'],
-                        ['XS', 40, '<2 wks'],
-                        ['S', 80, '2–4 wks'],
-                        ['M', 140, '4–6 wks'],
-                        ['L', 200, '6–8 wks'],
-                        ['XL', 350, '~quarter'],
-                        ['XXL', 600, 'multi-qtr'],
-                      ] as const).map(([label, hours, hint]) => (
-                        <button
-                          key={label}
-                          type="button"
-                          className={`estimate-size-btn${projectFormData.estimatedHours === hours ? ' active' : ''}`}
-                          onClick={() => setProjectFormData({ ...projectFormData, estimatedHours: hours })}
-                          title={`${label}: ${hint}`}
-                        >
-                          <span className="estimate-size-label">{label}</span>
-                          <span className="estimate-size-hint">{hint}</span>
-                        </button>
-                      ))}
-                    </div>
-                    <div className={`float-field estimate-exact${projectFormData.estimatedHours ? ' has-value' : ''}`}>
-                      <input
-                        id="estimated-hours"
-                        type="number"
-                        min={0}
-                        step={1}
-                        value={projectFormData.estimatedHours || ''}
-                        onChange={e => setProjectFormData({ ...projectFormData, estimatedHours: Number(e.target.value) || 0 })}
-                        placeholder=" "
-                      />
-                      <label htmlFor="estimated-hours">Hours</label>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="timeline-header">
-                  <span className="form-section-title" style={{ marginBottom: 0 }}>Timeline Ranges</span>
-                  <button type="button" className="add-timeline-btn" onClick={handleAddTimeline}>+ Add Range</button>
-                </div>
-                {projectFormData.timeline.length > 0 && (
-                  <DndContext sensors={timelineSensors} collisionDetection={closestCenter} onDragEnd={handleTimelineDragEnd}>
-                    <SortableContext items={projectFormData.timeline.map(t => t.id)} strategy={verticalListSortingStrategy}>
-                      <div className="timeline-list" style={{ marginTop: '0.5rem' }}>
-                        {projectFormData.timeline.map(range => (
-                          <SortableTimelineItem
-                            key={range.id}
-                            range={range}
-                            onEdit={handleEditTimeline}
-                            onDelete={handleDeleteTimeline}
-                          />
-                        ))}
-                      </div>
-                    </SortableContext>
-                  </DndContext>
-                )}
-              </div>
-
-              {/* Team */}
-              <div className="form-section">
-                <div className="form-section-title">Designers</div>
-                <div className="designer-checkboxes">
-                  {[...team].sort((a, b) => a.name.localeCompare(b.name)).map(member => (
-                    <label key={member.id} className={`designer-checkbox ${projectFormData.designers.includes(member.name) ? 'selected' : ''}`}>
-                      <input
-                        type="checkbox"
-                        checked={projectFormData.designers.includes(member.name)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setProjectFormData({ ...projectFormData, designers: [...projectFormData.designers, member.name] })
-                          } else {
-                            setProjectFormData({ ...projectFormData, designers: projectFormData.designers.filter(d => d !== member.name) })
-                          }
-                        }}
-                      />
-                      {member.name}
-                    </label>
-                  ))}
-                </div>
-              </div>
-
             </div>
 
             <div className="modal-footer">
@@ -4952,7 +4999,7 @@ const [showFilters, setShowFilters] = useState(false)
               <h2>{editingTimeline ? 'Edit Timeline Range' : 'Add Timeline Range'}</h2>
             </div>
             <div className="modal-body">
-              <div className={`float-field${timelineFormData.name ? ' has-value' : ''}`} style={{ marginBottom: '0.75rem' }}>
+              <div className={`float-field${timelineFormData.name ? ' has-value' : ''}`} style={{ marginBottom: '0.5rem' }}>
                 <input
                   id="timeline-name"
                   type="text"
@@ -5002,7 +5049,7 @@ const [showFilters, setShowFilters] = useState(false)
               <h2>Add Special Day</h2>
             </div>
             <div className="modal-body">
-              <div className={`float-field${holidayForm.name ? ' has-value' : ''}`} style={{ marginBottom: '0.75rem' }}>
+              <div className={`float-field${holidayForm.name ? ' has-value' : ''}`} style={{ marginBottom: '0.5rem' }}>
                 <input
                   type="text"
                   value={holidayForm.name}
@@ -5041,7 +5088,7 @@ const [showFilters, setShowFilters] = useState(false)
               <h2>{editingTimeOff ? 'Edit Time Off' : 'Add Time Off'}</h2>
             </div>
             <div className="modal-body">
-              <div className={`float-field${timeOffFormData.name ? ' has-value' : ''}`} style={{ marginBottom: '0.75rem' }}>
+              <div className={`float-field${timeOffFormData.name ? ' has-value' : ''}`} style={{ marginBottom: '0.5rem' }}>
                 <input
                   id="timeoff-name"
                   type="text"
