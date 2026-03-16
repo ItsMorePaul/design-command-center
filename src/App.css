@@ -1940,6 +1940,11 @@
   font-size: 0.7rem;
 }
 
+.project-footer-warning {
+  color: #ef4444;
+  font-weight: 600;
+}
+
 .project-footer-link {
   display: inline-flex;
   align-items: center;

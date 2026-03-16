@@ -1712,6 +1712,14 @@ const [showFilters, setShowFilters] = useState(false)
       alert('End date must be after start date')
       return
     }
+    if (!projectFormData.estimatedHours || projectFormData.estimatedHours <= 0) {
+      alert('Please set estimated design hours')
+      return
+    }
+    if (!projectFormData.designers || projectFormData.designers.length === 0) {
+      alert('Please assign at least one designer')
+      return
+    }
 
     // Validate required links when names are populated
     if (projectFormData.deckName && !projectFormData.deckLink.trim()) {
@@ -2563,10 +2571,21 @@ const [showFilters, setShowFilters] = useState(false)
                                 <span>{(project.designers || []).map((d: string) => d.split(' ')[0]).join(', ')}</span>
                               </span>
                             )}
-                            {(project.estimatedHours || 0) > 0 && (
+                            {(project.estimatedHours || 0) > 0 ? (
                               <span className="project-footer-hours">
                                 <Clock size={12} />
                                 <span>{project.estimatedHours}h est.</span>
+                              </span>
+                            ) : project.status !== 'done' ? (
+                              <span className="project-footer-hours project-footer-warning">
+                                <Clock size={12} />
+                                <span>No estimate</span>
+                              </span>
+                            ) : null}
+                            {(project.designers || []).length === 0 && project.status !== 'done' && (
+                              <span className="project-footer-hours project-footer-warning">
+                                <User size={12} />
+                                <span>No designer</span>
                               </span>
                             )}
                             {project.deckLink && (
