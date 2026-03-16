@@ -6192,9 +6192,6 @@ select:focus {
 .update-banner:hover {
   background: linear-gradient(90deg, #2563eb, #1d4ed8);
 }
-.update-banner.data-stale {
-  background: linear-gradient(90deg, #6366f1, #4f46e5);
-}
 
 /* Lockout screen (non-admin) */
 .maintenance-lockout {

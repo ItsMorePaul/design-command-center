@@ -958,7 +958,6 @@ const [showFilters, setShowFilters] = useState(false)
   const [maintenanceForm, setMaintenanceForm] = useState({ bannerMessage: 'Save your work. Wandi Hub maintenance about to begin in 5 minutes.', lockoutMessage: 'Wandi Hub will be back soon.', countdownMinutes: 5 })
   const [countdownDisplay, setCountdownDisplay] = useState('')
   const [updateAvailable, setUpdateAvailable] = useState(false)
-  const [dataStale, setDataStale] = useState(false)
   const [copiedReport, setCopiedReport] = useState<number | null>(null)
 
   // Server-Sent Events — live updates from server
@@ -984,7 +983,7 @@ const [showFilters, setShowFilters] = useState(false)
     })
 
     es.addEventListener('data-change', () => {
-      setDataStale(true)
+      fetchActivity()
     })
 
     es.addEventListener('reload', () => {
@@ -1066,28 +1065,6 @@ const [showFilters, setShowFilters] = useState(false)
     }
     init()
   }, [])
-
-  // Auto-refresh data when tab becomes visible and data is stale
-  useEffect(() => {
-    const onFocus = async () => {
-      if (!dataStale) return
-      try {
-        const data = await loadDataFromAPI()
-        if (data) {
-          setTeam(data.team || [])
-          setProjects(data.projects || [])
-          if (data.brandOptions) setBrandOptions(data.brandOptions.sort())
-        }
-        const blRes = await authFetch('/api/business-lines')
-        setBusinessLines(await blRes.json())
-        setDataStale(false)
-      } catch {}
-    }
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') onFocus()
-    })
-    return () => document.removeEventListener('visibilitychange', onFocus)
-  }, [dataStale])
 
   // Initialize calendar filters with all designers selected once team data is loaded
   useEffect(() => {
@@ -2194,21 +2171,7 @@ const [showFilters, setShowFilters] = useState(false)
           A new version of Wandi Hub is available. Click to refresh.
         </div>
       )}
-      {/* Data stale banner */}
-      {dataStale && !updateAvailable && (
-        <div className="update-banner data-stale" onClick={async () => {
-          try {
-            const data = await loadDataFromAPI()
-            if (data) { setTeam(data.team || []); setProjects(data.projects || []); if (data.brandOptions) setBrandOptions(data.brandOptions.sort()) }
-            const blRes = await authFetch('/api/business-lines')
-            setBusinessLines(await blRes.json())
-            setDataStale(false)
-          } catch {}
-        }}>
-          Data has been updated. Click to refresh.
-        </div>
-      )}
-    <div className={`app${showMaintenanceBanner || updateAvailable || dataStale ? ' has-maintenance-banner' : ''}`}>
+    <div className={`app${showMaintenanceBanner || updateAvailable ? ' has-maintenance-banner' : ''}`}>
       {/* Sidebar */}
       <aside className={`sidebar ${navCollapsed ? 'sidebar-collapsed' : ''}`}>
         <div className="logo">
