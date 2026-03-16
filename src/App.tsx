@@ -3490,7 +3490,7 @@ const [showFilters, setShowFilters] = useState(false)
                               <span className="last-name">{member.name.split(' ').slice(1).join(' ')}</span>
                             )}
                           </span>
-                          <span className="designer-hours">{available}h/week</span>
+                          <span className="designer-hours">{memberAssignments.filter((a: CapacityAssignment) => { const proj = projects.find(p => p.name === a.project_name); return !proj || proj.status !== 'done' }).length} active projects</span>
                         </div>
                         <div className="designer-col-bar">
                           <div 
