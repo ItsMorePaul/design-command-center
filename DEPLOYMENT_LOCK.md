@@ -8,6 +8,16 @@ Technical Enforcement:
 - Pre-push hook blocks all pushes without `DCC_DEPLOY_OK=1`
 - Wilson must NEVER set this env var himself
 
+## ⛔ MAINTENANCE MODE — PAUL ONLY
+
+**Wilson must NEVER disable maintenance mode.** Only Paul runs `maintenance.sh off`.
+
+- `maintenance.sh on` — Wilson may run this (or deploy.sh runs it automatically)
+- `maintenance.sh off` — **PAUL ONLY.** Wilson must not run this under any circumstances.
+- `maintenance.sh status` — Wilson may check status
+
+After every deploy, maintenance is re-enabled automatically. Paul verifies the site works, then disables maintenance himself. This is the quality gate that prevents designers from hitting a broken production site.
+
 ---
 
 ## Why Railway DB Safety Matters
@@ -97,9 +107,12 @@ DCC_DEPLOY_OK=1 ./scripts/deploy.sh --data
 4. [optional] notes sync         ← curl -X POST localhost:3001/api/notes/sync
 5. Bump SITE_VERSION in server.ts
 6. git commit
-7. DCC_DEPLOY_OK=1 deploy.sh    ← Backup, containment check, push, upload
-8. maintenance.sh off            ← Unblock designers
+7. DCC_DEPLOY_OK=1 deploy.sh    ← Backup, containment check, push, upload, verify
+8. Report deploy status to Paul  ← PASS or FAIL, with table count comparison
+9. ⛔ WAIT FOR PAUL             ← Paul verifies site, then runs maintenance.sh off
 ```
+
+**Wilson must NEVER run step 9.** Only Paul disables maintenance after verifying the site.
 
 **If you already have local changes before merging:**
 ```
@@ -108,7 +121,8 @@ DCC_DEPLOY_OK=1 ./scripts/deploy.sh --data
 3. Test locally                  ← Verify nothing broke
 4. [optional] notes sync
 5. deploy.sh                     ← Containment check ensures Railway data is in local
-6. maintenance.sh off
+6. Report deploy status to Paul
+7. ⛔ WAIT FOR PAUL to verify and run maintenance.sh off
 ```
 
 **merge-railway.sh can be run with `--dry` to preview without changing anything.**

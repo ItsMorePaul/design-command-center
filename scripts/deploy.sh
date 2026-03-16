@@ -464,9 +464,8 @@ MAINT_RESULT=$(curl -s -X POST "$RAILWAY_URL/api/maintenance" \
 
 MAINT_OK=$(echo "$MAINT_RESULT" | jq -r '.enabled // false' 2>/dev/null)
 if [[ "$MAINT_OK" == "true" ]]; then
-  log "Maintenance mode ON — site locked until you disable it."
-  log "Test via admin login on the maintenance page, then run:"
-  echo "  ./scripts/maintenance.sh off"
+  log "Maintenance mode ON — site locked for Paul to verify."
+  warn "DO NOT disable maintenance. Only Paul runs: ./scripts/maintenance.sh off"
 else
   warn "Failed to re-enable maintenance. Check manually."
   echo "$MAINT_RESULT"
@@ -504,9 +503,24 @@ fi
 echo ""
 log "Rollback backup: $BACKUP_DIR"
 
-# ── Exit with correct status ─────────────────────────────────────
-if [[ "$PASS" != "true" ]]; then
+# ── Final status ──────────────────────────────────────────────────
+echo ""
+if [[ "$PASS" == "true" ]]; then
+  echo -e "${GREEN}══════════════════════════════════════════════════${NC}"
+  echo -e "${GREEN}  DEPLOY COMPLETE — ALL VERIFICATIONS PASSED      ${NC}"
+  echo -e "${GREEN}══════════════════════════════════════════════════${NC}"
   echo ""
-  err "DEPLOY FINISHED WITH ERRORS — see above. Railway may need manual intervention."
+  echo "  Maintenance mode is ON. Site is locked."
+  echo "  Report to Paul: deploy succeeded, all table counts match."
+  echo "  Paul will verify and run: ./scripts/maintenance.sh off"
+else
+  echo -e "${RED}══════════════════════════════════════════════════${NC}"
+  echo -e "${RED}  DEPLOY FAILED — VERIFICATION ERRORS ABOVE       ${NC}"
+  echo -e "${RED}══════════════════════════════════════════════════${NC}"
+  echo ""
+  echo "  Maintenance mode is ON. Site is locked."
+  echo "  Report to Paul: deploy FAILED. See errors above."
+  echo "  Rollback: cp $BACKUP_DIR/shared.db data/shared.db"
+  echo "            DCC_DEPLOY_OK=1 ./scripts/deploy.sh --data"
   exit 1
 fi
