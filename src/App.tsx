@@ -16,7 +16,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Gauge, ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, Settings, GripVertical, Folder, StickyNote, RefreshCw, User, CheckSquare, Sun, Moon, Edit2, Bell, Loader, Clock } from 'lucide-react'
+import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Gauge, ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, Settings, GripVertical, Folder, StickyNote, RefreshCw, User, CheckSquare, Sun, Moon, Edit2, Bell, Loader, Clock, ClipboardCopy, BarChart3, FileBarChart, ListChecks, Palette } from 'lucide-react'
 import { Tooltip } from './Tooltip'
 import './App.css'
 import initialData from './data.json'
@@ -56,12 +56,6 @@ const getDjFiscalLabel = (monthNumber: number, year: number) => {
 }
 
 const DAY_MS = 1000 * 60 * 60 * 24
-
-// Nickname mappings for team members
-const NICKNAME_MAP: Record<string, string> = {
-  'Andy Nelson': 'Andrew Nelson',
-  'Andrew Nelson': 'Andy Nelson',
-}
 
 // Parse date safely in local time (avoids UTC/date-shift bugs)
 const parseLocalDate = (dateStr: string): Date | null => {
@@ -248,23 +242,6 @@ interface Note {
 }
 
 // Parse Gemini note content_preview to extract structured sections
-function parseNoteContent(content: string | undefined | null): { summary: string | null; attendees: string | null; fullText: string | null } {
-  if (!content) return { summary: null, attendees: null, fullText: null }
-
-  // Content sections are marked by \u200B (zero-width space) delimiters
-  // Format: Date \u200BTitle\u200B \u200BInvited\u200B attendees \u200BAttachments\u200B ... \u200BSummary\u200B actual summary
-  const summaryMatch = content.match(/\u200BSummary\u200B\s*([\s\S]+)/)
-  const invitedMatch = content.match(/\u200BInvited\u200B\s*([\s\S]+?)(?=\u200BAttachments\u200B|\u200BSummary\u200B|$)/)
-
-  const cleanText = (t: string) => t.replace(/\u200B/g, '').replace(/\s+/g, ' ').trim()
-
-  return {
-    summary: summaryMatch ? cleanText(summaryMatch[1]) : null,
-    attendees: invitedMatch ? cleanText(invitedMatch[1]) : null,
-    fullText: content.replace(/\u200B/g, '').trim()
-  }
-}
-
 // Highlight projects and people in text with clickable + buttons to add links
 function highlightTextWithLinks(
   text: string,
@@ -957,8 +934,6 @@ const [showFilters, setShowFilters] = useState(false)
   
   // Notes state
   const [notes, setNotes] = useState<Note[]>([])
-  const [notesSyncing, setNotesSyncing] = useState(false)
-  const [notesFilter, setNotesFilter] = useState<{ project: string | null; person: string | null; search: string; id: string | null }>({ project: null, person: null, search: '', id: null })
   const [selectedNote, setSelectedNote] = useState<Note | null>(null)
   const [noteDetailOpen, setNoteDetailOpen] = useState(false)
   const [editingNote, setEditingNote] = useState<Note | null>(null) // note being edited in modal
@@ -984,6 +959,7 @@ const [showFilters, setShowFilters] = useState(false)
   const [countdownDisplay, setCountdownDisplay] = useState('')
   const [updateAvailable, setUpdateAvailable] = useState(false)
   const [dataStale, setDataStale] = useState(false)
+  const [copiedReport, setCopiedReport] = useState<number | null>(null)
 
   // Server-Sent Events — live updates from server
   useEffect(() => {
@@ -1182,13 +1158,6 @@ const [showFilters, setShowFilters] = useState(false)
     }
   }, [activeTab, calendarData])
 
-  // Reset notes filter to all (null) on mount and when team loads
-  useEffect(() => {
-    if (team.length > 0) {
-      setNotesFilter({ project: null, person: null, search: '', id: null })
-    }
-  }, [team.length])
-
   // Load capacity data when capacity tab is active
   useEffect(() => {
     if (activeTab === 'capacity') {
@@ -1231,24 +1200,6 @@ const [showFilters, setShowFilters] = useState(false)
       loadNotes()
     }
   }, [activeTab])
-
-  const syncNotes = async () => {
-    setNotesSyncing(true)
-    try {
-      const res = await authFetch('/api/notes/sync', { method: 'POST' })
-      const data = await res.json()
-      if (data.success) {
-        // Reload notes after sync
-        const notesRes = await authFetch('/api/notes')
-        const notesData = await notesRes.json()
-        setNotes(notesData)
-      }
-    } catch (err) {
-      console.error('Error syncing notes:', err)
-    } finally {
-      setNotesSyncing(false)
-    }
-  }
 
   // Refresh calendar data when projects or team change
   const refreshCalendar = async () => {
@@ -2301,11 +2252,10 @@ const [showFilters, setShowFilters] = useState(false)
           <button
             className={`nav-item ${activeTab === 'notes' ? 'active' : ''}`}
             onClick={() => { setActiveTab('notes') }}
-            aria-label="Notes"
+            aria-label="Reports"
           >
-            <span className="nav-icon"><StickyNote size={18} /></span>
-            <span className="nav-label">Notes</span>
-            <span className="nav-badge-beta">beta</span>
+            <span className="nav-icon"><FileBarChart size={18} /></span>
+            <span className="nav-label">Reports</span>
           </button>
         </nav>
 
@@ -2334,7 +2284,7 @@ const [showFilters, setShowFilters] = useState(false)
               {activeTab === 'team' && 'Team'}
               {activeTab === 'calendar' && 'Calendar'}
               {activeTab === 'capacity' && 'Capacity'}
-              {activeTab === 'notes' && 'Notes'}
+              {activeTab === 'notes' && 'Reports'}
               {activeTab === 'settings' && 'Settings'}
             </h1>
             <p className="date">{getTodayFormatted()}</p>
@@ -2639,7 +2589,7 @@ const [showFilters, setShowFilters] = useState(false)
                             {(project.estimatedHours || 0) > 0 ? (
                               <span className="project-footer-hours">
                                 <Clock size={12} />
-                                <span>{project.estimatedHours}h est.</span>
+                                <span>{project.estimatedHours} hrs ({Math.round((project.estimatedHours || 0) / 35 * 10) / 10} weeks)</span>
                               </span>
                             ) : project.status !== 'done' ? (
                               <span className="project-footer-hours project-footer-warning">
@@ -3798,192 +3748,286 @@ const [showFilters, setShowFilters] = useState(false)
       )}
 
       {/* Notes View */}
-      {activeTab === 'notes' && (
-        <div className="notes-page">
-          <div className="notes-header">
-            <div className="notes-stats">
-              <div className="stat-card notes-stat-card">
-                <span className="stat-value">{notes.length}</span>
-                <span className="stat-label">Total Notes</span>
-              </div>
-              <div className="stat-card notes-stat-card">
-                <span className="stat-value">{notes.filter(n => n.linkedProjectIds.length > 0).length}</span>
-                <span className="stat-label">Linked to Projects</span>
-              </div>
-              <div className="stat-card notes-stat-card">
-                <span className="stat-value">{notes.filter(n => n.linkedTeamIds.length > 0).length}</span>
-                <span className="stat-label">Linked to People</span>
-              </div>
-            </div>
-            <div className="notes-actions">
-              <button className="secondary-btn" onClick={syncNotes} disabled={true} title="Gemini sync disabled">
-                <RefreshCw size={14} className={notesSyncing ? 'spin' : ''} />
-                {notesSyncing ? 'Syncing...' : 'Sync from Gemini'}
-              </button>
-            </div>
-          </div>
+      {activeTab === 'notes' && (() => {
+        const today = new Date()
+        const todayStr = today.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+        const activeProjects = projects.filter(p => p.status === 'active')
+        const reviewProjects = projects.filter(p => p.status === 'review')
+        const blockedProjects = projects.filter(p => p.status === 'blocked')
+        const doneProjects = projects.filter(p => p.status === 'done')
+        const overdueProjects = projects.filter(p => {
+          if (!p.endDate || p.status === 'done') return false
+          const end = parseLocalDate(p.endDate)
+          return end ? end < today : false
+        })
+        const noEstimate = projects.filter(p => p.status !== 'done' && (!p.estimatedHours || p.estimatedHours <= 0))
+        const noDesigner = projects.filter(p => p.status !== 'done' && (!p.designers || p.designers.length === 0))
 
-          <div className="notes-filters">
-            <div className="notes-search-bar">
-              <Search size={14} />
-              <input
-                type="text"
-                placeholder="Search notes..."
-                value={notesFilter.search}
-                onChange={e => setNotesFilter({ ...notesFilter, search: e.target.value })}
-              />
-            </div>
-            <select
-              value={notesFilter.project || ''}
-              onChange={e => setNotesFilter({ ...notesFilter, project: e.target.value || null })}
-              className="notes-filter-select"
-            >
-              <option value="">All Projects</option>
-              {projects.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-            <select
-              value={notesFilter.person || ''}
-              onChange={e => setNotesFilter({ ...notesFilter, person: e.target.value || null })}
-              className="notes-filter-select"
-            >
-              <option value="">All People</option>
-              {team.map(m => (
-                <option key={m.id} value={m.id}>{m.name}</option>
-              ))}
-            </select>
-            {(notesFilter.search || notesFilter.project || notesFilter.person || notesFilter.id) && (
-              <button className="text-btn" onClick={() => setNotesFilter({ project: null, person: null, search: '', id: null })}>
-                Clear filters
-              </button>
-            )}
-          </div>
+        const copyToClipboard = (text: string) => {
+          navigator.clipboard.writeText(text).then(() => {
+            setCopiedReport(Date.now())
+            setTimeout(() => setCopiedReport(null), 2000)
+          })
+        }
 
-          {/* Active Note Filter (from search) */}
-          {notesFilter.id && (
-            <div className="notes-filter-row">
-              <span className="filter-label">Showing:</span>
-              <button
-                className="filter-pill active"
-                onClick={() => setNotesFilter({ ...notesFilter, id: null })}
-              >
-                {(() => {
-                  const note = notes.find(n => n.id === notesFilter.id)
-                  return note?.title || 'Note'
-                })()} ×
-              </button>
-            </div>
+        const generateWeeklyStatus = () => {
+          const lines = [
+            `DESIGN WEEKLY STATUS — ${todayStr}`,
+            '',
+            `ACTIVE (${activeProjects.length})`,
+            ...activeProjects.map(p => {
+              const designers = (p.designers || []).map(d => d.split(' ')[0]).join(', ')
+              const hours = p.estimatedHours ? `${p.estimatedHours} hrs` : 'no estimate'
+              const due = p.endDate ? formatShortDate(p.endDate) : 'no due date'
+              return `  • ${p.name} — ${designers || 'unassigned'} — ${hours} — due ${due}`
+            }),
+            '',
+            `IN REVIEW (${reviewProjects.length})`,
+            ...reviewProjects.map(p => `  • ${p.name} — ${(p.designers || []).map(d => d.split(' ')[0]).join(', ') || 'unassigned'}`),
+            '',
+            ...(blockedProjects.length > 0 ? [
+              `BLOCKED (${blockedProjects.length})`,
+              ...blockedProjects.map(p => `  • ${p.name} — ${(p.designers || []).map(d => d.split(' ')[0]).join(', ') || 'unassigned'}`),
+              '',
+            ] : []),
+            ...(overdueProjects.length > 0 ? [
+              `OVERDUE (${overdueProjects.length})`,
+              ...overdueProjects.map(p => `  • ${p.name} — due ${p.endDate ? formatShortDate(p.endDate) : '?'}`),
+              '',
+            ] : []),
+            `COMPLETED THIS PERIOD (${doneProjects.length})`,
+            ...doneProjects.map(p => `  • ${p.name}`),
+            '',
+            `Total: ${projects.length} projects (${activeProjects.length} active, ${reviewProjects.length} review, ${blockedProjects.length} blocked, ${doneProjects.length} done)`,
+          ]
+          copyToClipboard(lines.join('\n'))
+        }
+
+        const generateOpenCrits = () => {
+          // W&I projects that are active or in review
+          const wiProjects = projects.filter(p =>
+            (p.status === 'active' || p.status === 'review') &&
+            (p.businessLines || []).some(bl => bl.toLowerCase().includes('w&i') || bl.toLowerCase().includes('wealth'))
+          )
+          const lines = [
+            `W&I OPEN CRITS — ${todayStr}`,
+            '',
+            ...wiProjects.map(p => {
+              const designers = (p.designers || []).map(d => d.split(' ')[0]).join(', ')
+              const status = p.status === 'review' ? ' [IN REVIEW]' : ''
+              return `• ${p.name}${status}\n  Designer: ${designers || 'unassigned'}\n  Figma: ${p.figmaLink || '—'}`
+            }),
+            '',
+            ...(wiProjects.length === 0 ? ['No active W&I projects.'] : []),
+            `${wiProjects.length} project${wiProjects.length !== 1 ? 's' : ''} for review`,
+          ]
+          copyToClipboard(lines.join('\n'))
+        }
+
+        const generateProjectReview = () => {
+          const blGroups: Record<string, Project[]> = {}
+          for (const p of projects.filter(pr => pr.status !== 'done')) {
+            for (const bl of (p.businessLines || ['Unassigned'])) {
+              if (!blGroups[bl]) blGroups[bl] = []
+              blGroups[bl].push(p)
+            }
+          }
+          const lines = [
+            `PROJECT REVIEW — ${todayStr}`,
+            '',
+            ...Object.entries(blGroups).flatMap(([bl, projs]) => [
+              bl.toUpperCase(),
+              ...projs.map(p => {
+                const designers = (p.designers || []).map(d => d.split(' ')[0]).join(', ')
+                const status = p.status.toUpperCase()
+                const hours = p.estimatedHours ? `${p.estimatedHours} hrs (${Math.round((p.estimatedHours / 35) * 10) / 10} wks)` : 'no estimate'
+                const due = p.endDate ? formatShortDate(p.endDate) : 'no due date'
+                return `  • [${status}] ${p.name}\n    Designer: ${designers || 'unassigned'} | Estimate: ${hours} | Due: ${due}`
+              }),
+              '',
+            ]),
+            ...(noEstimate.length > 0 ? [
+              'MISSING ESTIMATES',
+              ...noEstimate.map(p => `  • ${p.name}`),
+              '',
+            ] : []),
+            ...(noDesigner.length > 0 ? [
+              'MISSING DESIGNERS',
+              ...noDesigner.map(p => `  • ${p.name}`),
+              '',
+            ] : []),
+          ]
+          copyToClipboard(lines.join('\n'))
+        }
+
+        const generateCapacityStats = () => {
+          const capTeam = capacityData?.team || []
+          const capAssignments = capacityData?.assignments || []
+          const lines = [
+            `CAPACITY REPORT — ${todayStr}`,
+            '',
+            'DESIGNER UTILIZATION',
+            ...capTeam.filter(m => !excludedDesigners.has(m.id)).map(m => {
+              const available = m.weekly_hours || 35
+              const assignments = capAssignments.filter(a => a.designer_id === m.id)
+              const activeAssignments = assignments.filter(a => {
+                const proj = projects.find(p => p.name === a.project_name)
+                return !proj || (proj.status !== 'done' && proj.status !== 'blocked')
+              })
+              const allocatedHours = activeAssignments.reduce((sum, a) => {
+                return sum + parseFloat(((available * (a.allocation_percent || 0)) / 100).toFixed(1))
+              }, 0)
+              const util = available > 0 ? Math.round((allocatedHours / available) * 100) : 0
+              return `  ${m.name}: ${allocatedHours}h / ${available}h (${util}%) — ${activeAssignments.length} projects`
+            }),
+            '',
+            'PROJECT FUNDING',
+            ...(() => {
+              const totalEstimated = activeProjects.reduce((sum, p) => sum + (p.estimatedHours || 0), 0)
+              const now = new Date()
+              const totalProjected = capAssignments.reduce((sum, a) => {
+                const proj = projects.find(p => p.name === a.project_name)
+                if (!proj || proj.status === 'done' || proj.status === 'blocked') return sum
+                const designer = capTeam.find(m => m.id === a.designer_id)
+                if (!designer || excludedDesigners.has(designer.id)) return sum
+                const available = designer.weekly_hours || 35
+                const allocH = parseFloat(((available * (a.allocation_percent || 0)) / 100).toFixed(1))
+                const endDate = proj.endDate ? parseLocalDate(proj.endDate) : null
+                const weeksLeft = endDate ? Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (7 * 24 * 60 * 60 * 1000))) : 13
+                return sum + (allocH * weeksLeft)
+              }, 0)
+              const delta = Math.round(totalProjected - totalEstimated)
+              return [
+                `  Estimated: ${totalEstimated} hrs total across ${activeProjects.length} active projects`,
+                `  Projected: ${Math.round(totalProjected)} hrs (based on current allocations × weeks remaining)`,
+                `  Delta: ${delta >= 0 ? '+' : ''}${delta} hrs (${delta >= 0 ? 'overfunded' : 'UNDERFUNDED'})`,
+              ]
+            })(),
+            '',
+            ...(blockedProjects.length > 0 ? [
+              'BLOCKED (capacity paused)',
+              ...blockedProjects.map(p => `  • ${p.name} — ${(p.designers || []).map(d => d.split(' ')[0]).join(', ')}`),
+              '',
+            ] : []),
+          ]
+          copyToClipboard(lines.join('\n'))
+        }
+
+        const generateProjectStats = () => {
+          const totalHours = projects.reduce((sum, p) => sum + (p.estimatedHours || 0), 0)
+          const avgHours = projects.filter(p => p.estimatedHours && p.estimatedHours > 0).length > 0
+            ? Math.round(totalHours / projects.filter(p => p.estimatedHours && p.estimatedHours > 0).length)
+            : 0
+          const blCounts: Record<string, number> = {}
+          for (const p of projects) {
+            for (const bl of (p.businessLines || ['Unassigned'])) {
+              blCounts[bl] = (blCounts[bl] || 0) + 1
+            }
+          }
+          const designerCounts: Record<string, number> = {}
+          for (const p of projects.filter(pr => pr.status !== 'done')) {
+            for (const d of (p.designers || [])) {
+              designerCounts[d] = (designerCounts[d] || 0) + 1
+            }
+          }
+          const lines = [
+            `PROJECT STATISTICS — ${todayStr}`,
+            '',
+            'OVERVIEW',
+            `  Total: ${projects.length}`,
+            `  Active: ${activeProjects.length} | Review: ${reviewProjects.length} | Blocked: ${blockedProjects.length} | Done: ${doneProjects.length}`,
+            `  Overdue: ${overdueProjects.length}`,
+            `  Missing estimates: ${noEstimate.length} | Missing designers: ${noDesigner.length}`,
+            '',
+            'HOURS',
+            `  Total estimated: ${totalHours} hrs (${Math.round(totalHours / 35 * 10) / 10} weeks)`,
+            `  Average per project: ${avgHours} hrs`,
+            '',
+            'BY BUSINESS LINE',
+            ...Object.entries(blCounts).sort((a, b) => b[1] - a[1]).map(([bl, count]) => `  ${bl}: ${count}`),
+            '',
+            'ACTIVE PROJECTS PER DESIGNER',
+            ...Object.entries(designerCounts).sort((a, b) => b[1] - a[1]).map(([d, count]) => `  ${d}: ${count}`),
+          ]
+          copyToClipboard(lines.join('\n'))
+        }
+
+        const totalEstimatedHours = projects.reduce((sum, p) => sum + (p.estimatedHours || 0), 0)
+
+        const reports = [
+          {
+            id: 'weekly-status',
+            title: 'Weekly Status Update',
+            description: 'Project status summary by active, review, blocked, and done. Includes designers, hours, and due dates.',
+            icon: <ListChecks size={24} />,
+            color: '#3b82f6',
+            stats: `${activeProjects.length} active, ${reviewProjects.length} review, ${blockedProjects.length} blocked`,
+            generate: generateWeeklyStatus,
+          },
+          {
+            id: 'open-crits',
+            title: 'W&I Open Crits',
+            description: 'Active and in-review projects for W&I business line with designer assignments and Figma links.',
+            icon: <Palette size={24} />,
+            color: '#8b5cf6',
+            stats: `${projects.filter(p => (p.status === 'active' || p.status === 'review') && (p.businessLines || []).some(bl => bl.toLowerCase().includes('w&i') || bl.toLowerCase().includes('wealth'))).length} projects`,
+            generate: generateOpenCrits,
+          },
+          {
+            id: 'project-review',
+            title: 'Project Review',
+            description: 'All active projects grouped by business line with status, designer, estimate, and due date.',
+            icon: <FileBarChart size={24} />,
+            color: '#f59e0b',
+            stats: `${projects.filter(p => p.status !== 'done').length} in progress, ${noEstimate.length} missing estimates`,
+            generate: generateProjectReview,
+          },
+          {
+            id: 'capacity-stats',
+            title: 'Capacity Report',
+            description: 'Per-designer utilization, project funding analysis (projected vs estimated hours), and blocked projects.',
+            icon: <Gauge size={24} />,
+            color: '#10b981',
+            stats: `${(capacityData?.team || []).filter(m => !excludedDesigners.has(m.id)).length} designers tracked`,
+            generate: generateCapacityStats,
+          },
+          {
+            id: 'project-stats',
+            title: 'Project Statistics',
+            description: 'Aggregate stats: totals by status, hours, business line distribution, and per-designer project counts.',
+            icon: <BarChart3 size={24} />,
+            color: '#ef4444',
+            stats: `${projects.length} total, ${totalEstimatedHours} hrs estimated`,
+            generate: generateProjectStats,
+          },
+        ]
+
+        return (
+        <div className="reports-page">
+          <div className="reports-grid">
+            {reports.map(report => (
+              <div key={report.id} className="report-card">
+                <div className="report-card-icon" style={{ color: report.color }}>
+                  {report.icon}
+                </div>
+                <div className="report-card-body">
+                  <h3 className="report-card-title">{report.title}</h3>
+                  <p className="report-card-desc">{report.description}</p>
+                  <span className="report-card-stats">{report.stats}</span>
+                </div>
+                <button className="report-generate-btn" onClick={report.generate} style={{ borderColor: report.color, color: report.color }}>
+                  <ClipboardCopy size={14} />
+                  {copiedReport ? 'Copied!' : 'Copy Report'}
+                </button>
+              </div>
+            ))}
+          </div>
+          {copiedReport && (
+            <div className="report-copied-toast">Report copied to clipboard — paste into Google Docs</div>
           )}
-
-          <div className="notes-list">
-            {notes.length === 0 ? (
-              <div className="notes-empty">
-                <StickyNote size={48} />
-                <p>No notes yet. Click "Sync from Gemini" to import your meeting notes.</p>
-              </div>
-            ) : (
-              (() => {
-                const filtered = notes.filter(note => {
-                  if (notesFilter.id && note.id !== notesFilter.id) return false
-                  if (notesFilter.project && !note.linkedProjectIds.includes(notesFilter.project)) return false
-                  if (notesFilter.person) {
-                    // Check if the selected person is linked OR if their nickname matches someone linked
-                    const person = team.find(m => m.id === notesFilter.person)
-                    const personName = person?.name || ''
-                    const nickname = NICKNAME_MAP[personName] || ''
-                    const linkedNames = note.linkedTeamIds.map(id => {
-                      const m = team.find(tm => tm.id === id)
-                      return m?.name || ''
-                    })
-                    const hasMatch = linkedNames.includes(personName) || linkedNames.includes(nickname)
-                    if (!hasMatch) return false
-                  }
-                  if (notesFilter.search) {
-                    const q = notesFilter.search.toLowerCase()
-                    // Expand search to include nicknames
-                    const allPersonNames = team.flatMap(m => {
-                      const names = [m.name.toLowerCase()]
-                      if (NICKNAME_MAP[m.name]) names.push(NICKNAME_MAP[m.name].toLowerCase())
-                      return names
-                    })
-                    const searchable = `${note.title} ${note.projects_raw || ''} ${note.people_raw || ''} ${note.content_preview || ''}`.toLowerCase()
-                    // Check if search term matches a person name (or their nickname)
-                    const matchesPerson = allPersonNames.some(pn => q.includes(pn) || pn.includes(q))
-                    // If searching for a person, check both direct match and nickname match
-                    if (matchesPerson) {
-                      const matchedMember = team.find(m => 
-                        allPersonNames.some(pn => pn.includes(m.name.toLowerCase()))
-                      )
-                      if (matchedMember && !note.linkedTeamIds.includes(matchedMember.id)) {
-                        // Person found but not linked - don't filter out (show with highlight)
-                        // Actually, let's filter it IN so user can see it needs linking
-                      } else if (!matchedMember) {
-                        // No team member match - use default behavior
-                      }
-                    }
-                    if (!searchable.includes(q)) return false
-                  }
-                  return true
-                })
-                if (filtered.length === 0) {
-                  return <div className="notes-empty"><p>No notes match your filters.</p></div>
-                }
-                return filtered.map(note => (
-                  <div key={note.id} className="note-card" onClick={() => {
-                    setSelectedNote(note)
-                    setNoteDetailOpen(false)
-                  }}>
-                    <div className="note-card-header">
-                      <h3 className="note-card-title">{note.title || 'Untitled Note'}</h3>
-                      {note.date && (
-                        <span className="note-card-date">
-                          {formatFullDate(note.date)}
-                        </span>
-                      )}
-                    </div>
-                    {(() => {
-                      const parsed = parseNoteContent(note.content_preview)
-                      const previewText = parsed.summary || note.content_preview
-                      return previewText ? (
-                        <p className="note-card-preview">{previewText.replace(/\u200B/g, '').slice(0, 200)}{previewText.length > 200 ? '...' : ''}</p>
-                      ) : null
-                    })()}
-                    <div className="note-card-meta">
-                      {note.linkedProjectIds.length > 0 && (
-                        <div className="note-card-tags">
-                          <FileText size={12} />
-                          {note.linkedProjectIds.map(pid => {
-                            const proj = projects.find(p => p.id === pid)
-                            return proj ? (
-                              <span key={pid} className="note-tag project-tag">
-                                {proj.name}
-                              </span>
-                            ) : null
-                          })}
-                        </div>
-                      )}
-                      {note.linkedTeamIds.length > 0 && (
-                        <div className="note-card-tags">
-                          <User size={12} />
-                          {note.linkedTeamIds.map(tid => {
-                            const member = team.find(m => m.id === tid)
-                            return member ? (
-                              <span key={tid} className="note-tag person-tag">
-                                {member.name}
-                              </span>
-                            ) : null
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))
-              })()
-            )}
-          </div>
         </div>
-      )}
+        )
+      })()}
 
       {/* Note Detail Modal */}
       {selectedNote && (
@@ -5469,7 +5513,6 @@ const [showFilters, setShowFilters] = useState(false)
                             }
                             // Find the matching note from loaded notes (has full data)
                             const fullNote = loadedNotes.find((n: Note) => n.id === note.id) || note
-                            setNotesFilter({ project: null, person: null, search: '', id: note.id })
                             setSelectedNote(fullNote)
                           }}
                         >

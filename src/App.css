@@ -232,13 +232,14 @@
 
 .notif-dot {
   position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 8px;
-  height: 8px;
+  top: 4px;
+  right: 4px;
+  width: 12px;
+  height: 12px;
   background: #ef4444;
   border-radius: 50%;
   border: 2px solid var(--color-bg-secondary);
+  animation: pulse-red 1.5s ease-in-out infinite;
 }
 
 .notif-panel {
@@ -4062,6 +4063,114 @@ input:checked + .slider:before {
   max-width: 1400px;
   margin: 0 auto;
 }
+
+/* ============ REPORTS PAGE ============ */
+.reports-page {
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.reports-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.report-card {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.report-card:hover {
+  border-color: var(--color-text-muted);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.report-card-icon {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: var(--color-bg-primary);
+}
+
+.report-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.report-card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 0.25rem;
+  color: var(--color-text);
+}
+
+.report-card-desc {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  margin: 0 0 0.35rem;
+  line-height: 1.4;
+}
+
+.report-card-stats {
+  font-size: 0.7rem;
+  color: var(--color-accent);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.report-generate-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border: 1.5px solid;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  white-space: nowrap;
+}
+.report-generate-btn:hover {
+  background: var(--color-bg-primary);
+}
+
+.report-copied-toast {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1a1a2e;
+  color: #fff;
+  padding: 0.75rem 1.5rem;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  z-index: 9999;
+  animation: toast-in 0.3s ease;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ============ END REPORTS PAGE ============ */
 
 /* Consistent surface treatment for primary cards/panels */
 .team-card,
