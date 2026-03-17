@@ -3781,7 +3781,7 @@ input:checked + .slider:before {
 .assignment-chips {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 1.2rem;
   padding-top: 1rem;
 }
 
@@ -3996,8 +3996,9 @@ input:checked + .slider:before {
 .chip-phases {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem 0.5rem;
-  padding: 0.3rem 0 0;
+  gap: 0.1rem 0.5rem;
+  padding: 0 0 0;
+  margin-bottom: -0.1rem;
 }
 .chip-phase {
   font-size: 0.6rem;

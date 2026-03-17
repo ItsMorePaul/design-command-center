@@ -355,7 +355,7 @@ if [[ "$DATA_ONLY" == "false" ]]; then
   fi
 
   log "Pushing code to Railway..."
-  git push origin main
+  DCC_DEPLOY_ACTIVE=1 git push origin main
 
   # Capture current Railway version so we can detect when the new build is live
   OLD_VERSION=$(curl -sf "$RAILWAY_URL/api/versions" 2>/dev/null | jq -r '.site_version // "unknown"' 2>/dev/null || echo "unknown")

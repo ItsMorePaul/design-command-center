@@ -3739,13 +3739,6 @@ const [showFilters, setShowFilters] = useState(false)
                                     </button>
                                   </div>
                                 </div>
-                                <div
-                                  className="chip-bar"
-                                  style={{
-                                    width: `${Math.min(effectivePct, 100)}%`,
-                                    backgroundColor: effectivePct > 50 ? 'var(--color-warning, #f59e0b)' : effectivePct > 0 ? 'var(--color-success, #22c55e)' : 'var(--color-bg-primary)'
-                                  }}
-                                />
                                 {hasTimeline && (
                                   <div className="chip-phases">
                                     {proj.timeline.map((r: TimelineRange) => (
@@ -3753,6 +3746,13 @@ const [showFilters, setShowFilters] = useState(false)
                                     ))}
                                   </div>
                                 )}
+                                <div
+                                  className="chip-bar"
+                                  style={{
+                                    width: `${Math.min(effectivePct, 100)}%`,
+                                    backgroundColor: effectivePct > 50 ? 'var(--color-warning, #f59e0b)' : effectivePct > 0 ? 'var(--color-success, #22c55e)' : 'var(--color-bg-primary)'
+                                  }}
+                                />
                               </div>
                             )
                           }

@@ -1,7 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Enforce DCC deploy version policy:
+# ── GATE 1: Block raw git push ──────────────────────────────────
+# Only deploy.sh sets DCC_DEPLOY_ACTIVE=1. Any other caller is blocked.
+# This prevents Railway rebuilds that destroy the ephemeral DB without
+# first downloading a backup.
+if [[ "${DCC_DEPLOY_ACTIVE:-}" != "1" ]]; then
+  echo ""
+  echo "❌ Push blocked: raw git push is not allowed."
+  echo ""
+  echo "Railway uses an ephemeral filesystem. A code push triggers a"
+  echo "rebuild that DESTROYS the production database. deploy.sh backs"
+  echo "up the DB before pushing. Raw git push does not."
+  echo ""
+  echo "Use:  DCC_DEPLOY_OK=1 ./scripts/deploy.sh"
+  echo ""
+  exit 1
+fi
+
+# ── GATE 2: Enforce version bump ────────────────────────────────
 # Before pushing, SITE_VERSION and SITE_TIME in server.ts must differ from origin/main.
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
