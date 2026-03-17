@@ -99,6 +99,21 @@ const formatFullDate = (dateStr: string): string => {
   return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
 }
 
+// Calculate business days between two date strings, return hours at 7hrs/day
+const calcRangeHours = (startStr: string, endStr: string): number => {
+  const s = parseLocalDate(startStr)
+  const e = parseLocalDate(endStr)
+  if (!s || !e || e < s) return 0
+  let days = 0
+  const cur = new Date(s)
+  while (cur <= e) {
+    const dow = cur.getDay()
+    if (dow !== 0 && dow !== 6) days++
+    cur.setDate(cur.getDate() + 1)
+  }
+  return days * 7
+}
+
 // Find the closest time off date to today
 const getClosestTimeOff = (timeOff: { name: string; startDate: string; endDate: string; id: string }[]): { name: string; date: string; isStart: boolean } | null => {
   if (!timeOff || timeOff.length === 0) return null
@@ -486,7 +501,7 @@ function SortableTimelineItem({
       </button>
       <div className="timeline-info">
         <span className="timeline-name">{range.name}</span>
-        <span className="timeline-dates">{formatShortDate(range.startDate)} → {formatShortDate(range.endDate)}</span>
+        <span className="timeline-dates">{formatShortDate(range.startDate)} → {formatShortDate(range.endDate)} · {calcRangeHours(range.startDate, range.endDate)} hrs</span>
       </div>
       <div className="timeline-actions">
         <button type="button" className="action-btn" onClick={() => onEdit(range)}><Pencil size={14} /></button>
@@ -2527,9 +2542,9 @@ const [showFilters, setShowFilters] = useState(false)
                                             <div
                                               className={`gantt-bar bar-${(idx % 5) + 1}`}
                                               style={getGanttBarStyle(range, ganttRange)}
-                                              title={`${range.name}: ${formatMonthDay(range.startDate)} → ${formatMonthDay(range.endDate)}`}
+                                              title={`${range.name}: ${formatMonthDay(range.startDate)} → ${formatMonthDay(range.endDate)} · ${calcRangeHours(range.startDate, range.endDate)} hrs`}
                                             >
-                                              <span className="gantt-label">{formatMonthDay(range.startDate)} <span className="gantt-arrow">→</span> {formatMonthDay(range.endDate)}</span>
+                                              <span className="gantt-label">{formatMonthDay(range.startDate)} <span className="gantt-arrow">→</span> {formatMonthDay(range.endDate)} · {calcRangeHours(range.startDate, range.endDate)}h</span>
                                             </div>
                                           </div>
                                         </div>
@@ -2572,6 +2587,13 @@ const [showFilters, setShowFilters] = useState(false)
                                 <span>No estimate</span>
                               </span>
                             ) : null}
+                            {project.timeline && project.timeline.length > 0 && (
+                              <div className="project-footer-phases">
+                                {project.timeline.map((r: TimelineRange) => (
+                                  <span key={r.id} className="chip-phase">{r.name} <span className="chip-phase-hrs">{calcRangeHours(r.startDate, r.endDate)}h</span></span>
+                                ))}
+                              </div>
+                            )}
                             {(project.designers || []).length === 0 && project.status !== 'done' && (
                               <span className="project-footer-hours project-footer-warning">
                                 <User size={12} />
@@ -3507,6 +3529,119 @@ const [showFilters, setShowFilters] = useState(false)
                     {/* Expanded Content */}
                     {isExpanded && (
                       <div className="designer-card-body">
+                        {/* Weekly Load Heatmap */}
+                        {(() => {
+                          const now = new Date()
+                          const month = now.getMonth() + 1 // 1-12
+                          const year = now.getFullYear()
+
+                          // DJ fiscal quarters: Q1=Jul-Sep, Q2=Oct-Dec, Q3=Jan-Mar, Q4=Apr-Jun
+                          let qStart: Date, qEnd: Date, qLabel: string
+                          const fy = month >= 7 ? year + 1 : year
+                          if (month >= 7 && month <= 9) {
+                            qStart = new Date(year, 6, 1); qEnd = new Date(year, 8, 30); qLabel = `Q1-FY${String(fy).slice(-2)}`
+                          } else if (month >= 10 && month <= 12) {
+                            qStart = new Date(year, 9, 1); qEnd = new Date(year, 11, 31); qLabel = `Q2-FY${String(fy).slice(-2)}`
+                          } else if (month >= 1 && month <= 3) {
+                            qStart = new Date(year, 0, 1); qEnd = new Date(year, 2, 31); qLabel = `Q3-FY${String(fy).slice(-2)}`
+                          } else {
+                            qStart = new Date(year, 3, 1); qEnd = new Date(year, 5, 30); qLabel = `Q4-FY${String(fy).slice(-2)}`
+                          }
+
+                          // Build weeks from quarter start to quarter end
+                          const firstMonday = new Date(qStart)
+                          const fmDay = (firstMonday.getDay() + 6) % 7
+                          firstMonday.setDate(firstMonday.getDate() - fmDay)
+                          firstMonday.setHours(0, 0, 0, 0)
+
+                          const weeks: { start: Date; end: Date }[] = []
+                          const cursor = new Date(firstMonday)
+                          while (cursor <= qEnd) {
+                            const weekStart = new Date(cursor)
+                            const weekEnd = new Date(cursor)
+                            weekEnd.setDate(cursor.getDate() + 4)
+                            weeks.push({ start: weekStart, end: weekEnd })
+                            cursor.setDate(cursor.getDate() + 7)
+                          }
+
+                          // Which week index is the current week?
+                          const todayMonday = new Date(now)
+                          const todayOffset = (todayMonday.getDay() + 6) % 7
+                          todayMonday.setDate(now.getDate() - todayOffset)
+                          todayMonday.setHours(0, 0, 0, 0)
+                          const currentWeekIdx = weeks.findIndex(w => w.start.getTime() === todayMonday.getTime())
+
+                          const weekLoads = weeks.map(week => {
+                            let hours = 0
+                            let endingProjects = 0
+                            for (const a of memberAssignments) {
+                              const proj = projects.find(p => p.name === a.project_name)
+                              if (!proj || proj.status === 'done' || proj.status === 'blocked') continue
+                              const pStart = proj.startDate ? parseLocalDate(proj.startDate) : null
+                              const pEnd = proj.endDate ? parseLocalDate(proj.endDate) : null
+                              let overlaps = false
+                              if (proj.timeline && proj.timeline.length > 0) {
+                                for (const r of proj.timeline) {
+                                  const rStart = parseLocalDate(r.startDate)
+                                  const rEnd = parseLocalDate(r.endDate)
+                                  if (rStart && rEnd && rStart <= week.end && rEnd >= week.start) { overlaps = true; break }
+                                }
+                              } else if (pStart && pEnd) {
+                                overlaps = pStart <= week.end && pEnd >= week.start
+                              } else {
+                                overlaps = true
+                              }
+                              if (overlaps) {
+                                const allocPct = a.allocation_percent || 0
+                                hours += parseFloat(((available * allocPct) / 100).toFixed(1))
+                              }
+                              if (pEnd && pEnd >= week.start && pEnd <= week.end) endingProjects++
+                            }
+                            return { hours, endingProjects, pct: available > 0 ? Math.round((hours / available) * 100) : 0 }
+                          })
+
+                          const hasAnyLoad = weekLoads.some(w => w.hours > 0)
+                          if (!hasAnyLoad) return null
+
+                          const getWeekColor = (pct: number) => {
+                            if (pct === 0) return 'var(--color-bg-primary)'
+                            if (pct <= 60) return '#22c55e'
+                            if (pct <= 80) return '#86efac'
+                            if (pct <= 100) return '#f59e0b'
+                            return '#ef4444'
+                          }
+
+                          return (
+                            <div className="load-heatmap">
+                              <div className="load-heatmap-label">{qLabel} load</div>
+                              <div className="load-heatmap-weeks">
+                                {weekLoads.map((w, i) => {
+                                  const weekDate = weeks[i].start
+                                  const label = weekDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                                  const isCurrentWeek = i === currentWeekIdx
+                                  return (
+                                    <div
+                                      key={i}
+                                      className={`load-week${isCurrentWeek ? ' load-week-current' : ''}${w.endingProjects > 0 ? ' load-week-ending' : ''}`}
+                                      title={`${label}: ${w.hours}h / ${available}h (${w.pct}%)${w.endingProjects > 0 ? ` · ${w.endingProjects} ending` : ''}`}
+                                    >
+                                      <div
+                                        className="load-week-fill"
+                                        style={{ height: `${Math.min(w.pct, 120)}%`, backgroundColor: getWeekColor(w.pct) }}
+                                      />
+                                      {w.endingProjects > 0 && <span className="load-week-dot" />}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                              <div className="load-heatmap-axis">
+                                <span>{weeks[0].start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                                <span>{weeks[weeks.length - 1].start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                              </div>
+                            </div>
+                          )
+                        })()}
+
                         {memberAssignments.length === 0 ? (
                           <div className="no-assignments">No projects assigned</div>
                         ) : (() => {
@@ -3544,6 +3679,9 @@ const [showFilters, setShowFilters] = useState(false)
                             const paused = isDone || isBlocked
                             const effectiveHours = paused ? 0 : (assignmentDraft[assignment.id] ?? allocHours)
                             const effectivePct = paused ? 0 : Math.round((effectiveHours / available) * 100)
+                            const proj = projects.find(p => p.name === assignment.project_name)
+                            const hasTimeline = proj?.timeline && proj.timeline.length > 0
+                            const timelineTotal = hasTimeline ? proj.timeline.reduce((s, r) => s + calcRangeHours(r.startDate, r.endDate), 0) : 0
                             return (
                               <div key={assignment.id} className={`assignment-chip${isDone ? ' chip-done' : ''}${isBlocked ? ' chip-blocked' : ''}`}>
                                 <div className="chip-main">
@@ -3556,6 +3694,9 @@ const [showFilters, setShowFilters] = useState(false)
                                     }}
                                   >
                                     {assignment.project_name || 'Project'}
+                                    {proj && (proj.estimatedHours || timelineTotal > 0) && (
+                                      <span className="chip-est">{proj.estimatedHours ? `${proj.estimatedHours}h est` : `${timelineTotal}h timeline`}</span>
+                                    )}
                                   </span>
                                   <div className="chip-edit">
                                     <span className="chip-hours-label">{isBlocked ? `(${allocHours}h)` : `${effectiveHours}h`}</span>
@@ -3602,9 +3743,16 @@ const [showFilters, setShowFilters] = useState(false)
                                   className="chip-bar"
                                   style={{
                                     width: `${Math.min(effectivePct, 100)}%`,
-                                    backgroundColor: getUtilColor()
+                                    backgroundColor: effectivePct > 50 ? 'var(--color-warning, #f59e0b)' : effectivePct > 0 ? 'var(--color-success, #22c55e)' : 'var(--color-bg-primary)'
                                   }}
                                 />
+                                {hasTimeline && (
+                                  <div className="chip-phases">
+                                    {proj.timeline.map((r: TimelineRange) => (
+                                      <span key={r.id} className="chip-phase">{r.name} <span className="chip-phase-hrs">{calcRangeHours(r.startDate, r.endDate)}h</span></span>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             )
                           }
