@@ -3694,9 +3694,6 @@ const [showFilters, setShowFilters] = useState(false)
                                     }}
                                   >
                                     {assignment.project_name || 'Project'}
-                                    {proj && (proj.estimatedHours || timelineTotal > 0) && (
-                                      <span className="chip-est">{proj.estimatedHours ? `${proj.estimatedHours}h est` : `${timelineTotal}h timeline`}</span>
-                                    )}
                                   </span>
                                   <div className="chip-edit">
                                     <span className="chip-hours-label">{isBlocked ? `(${allocHours}h)` : `${effectiveHours}h`}</span>
@@ -3739,6 +3736,11 @@ const [showFilters, setShowFilters] = useState(false)
                                     </button>
                                   </div>
                                 </div>
+                                {proj && (proj.estimatedHours || timelineTotal > 0) && (() => {
+                                  const hrs = proj.estimatedHours || timelineTotal
+                                  const weeks = Math.round((hrs / 35) * 10) / 10
+                                  return <span className="chip-est">{hrs} hrs ({weeks % 1 === 0 ? weeks.toFixed(0) : weeks.toFixed(1)} weeks)</span>
+                                })()}
                                 {hasTimeline && (
                                   <div className="chip-phases">
                                     {proj.timeline.map((r: TimelineRange) => (
@@ -3761,6 +3763,7 @@ const [showFilters, setShowFilters] = useState(false)
                             <>
                               {activeAssignments.length > 0 && (
                                 <div className="assignment-chips">
+                                  <div className="load-heatmap-label">Estimated hours per week</div>
                                   {activeAssignments.map((a: CapacityAssignment) => renderChip(a, false))}
                                 </div>
                               )}
