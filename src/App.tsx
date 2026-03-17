@@ -3738,8 +3738,36 @@ const [showFilters, setShowFilters] = useState(false)
                                 </div>
                                 {proj && (proj.estimatedHours || timelineTotal > 0) && (() => {
                                   const hrs = proj.estimatedHours || timelineTotal
+                                  const sizeMap: Record<number, string> = { 35: 'XXS', 70: 'XS', 105: 'S', 175: 'M', 280: 'L', 455: 'XL', 910: 'XXL' }
+                                  const size = sizeMap[hrs] || ''
                                   const weeks = Math.round((hrs / 35) * 10) / 10
-                                  return <span className="chip-est">{hrs} hrs ({weeks % 1 === 0 ? weeks.toFixed(0) : weeks.toFixed(1)} weeks)</span>
+                                  const weeksStr = weeks % 1 === 0 ? weeks.toFixed(0) : weeks.toFixed(1)
+                                  return <span className="chip-est"><Clock size={10} /> {size ? `${size} · ` : ''}{hrs} hrs ({weeksStr} weeks)</span>
+                                })()}
+                                {proj && capacityData && (() => {
+                                  const projAssignments = capacityData.assignments.filter(a => a.project_id === proj.id && a.project_status !== 'done' && a.project_status !== 'blocked')
+                                  if (projAssignments.length === 0) return null
+                                  const totalWeeklyHrs = projAssignments.reduce((s, a) => {
+                                    const pct = a.allocation_percent || 0
+                                    const designerMember = capacityData.team.find(m => m.id === a.designer_id)
+                                    const dAvail = designerMember ? (designerMember.available_hours ?? 35) : 35
+                                    return s + parseFloat(((dAvail * pct) / 100).toFixed(1))
+                                  }, 0)
+                                  const projCapacity = (proj.startDate && proj.endDate) ? calcRangeHours(proj.startDate, proj.endDate) : 0
+                                  const projWeeks = projCapacity > 0 ? Math.round((projCapacity / 35) * 10) / 10 : 0
+                                  const totalEffort = totalWeeklyHrs * (projWeeks || 1)
+                                  const estHrs = proj.estimatedHours || timelineTotal || 0
+                                  const overAllocated = estHrs > 0 && totalEffort > estHrs * 1.2
+                                  const underAllocated = estHrs > 0 && projWeeks > 0 && totalEffort < estHrs * 0.5
+                                  const designerCount = projAssignments.length
+                                  const flag = overAllocated ? 'over' : underAllocated ? 'under' : ''
+                                  return (
+                                    <span className={`chip-allocation-summary${flag ? ` chip-alloc-${flag}` : ''}`}>
+                                      {designerCount} designer{designerCount > 1 ? 's' : ''} · {parseFloat(totalWeeklyHrs.toFixed(1))}h/wk{projWeeks > 0 ? ` · ${projWeeks % 1 === 0 ? projWeeks.toFixed(0) : projWeeks.toFixed(1)} wk project` : ''}
+                                      {flag === 'over' && ' ⚠ over-allocated'}
+                                      {flag === 'under' && ' ⚠ under-allocated'}
+                                    </span>
+                                  )
                                 })()}
                                 {hasTimeline && (
                                   <div className="chip-phases">
