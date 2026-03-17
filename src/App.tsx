@@ -3750,7 +3750,7 @@ const [showFilters, setShowFilters] = useState(false)
                                   const totalWeeklyHrs = projAssignments.reduce((s, a) => {
                                     const pct = a.allocation_percent || 0
                                     const designerMember = capacityData.team.find(m => m.id === a.designer_id)
-                                    const dAvail = designerMember ? (designerMember.available_hours ?? 35) : 35
+                                    const dAvail = designerMember ? (designerMember.weekly_hours ?? 35) : 35
                                     return s + parseFloat(((dAvail * pct) / 100).toFixed(1))
                                   }, 0)
                                   const projCapacity = (proj.startDate && proj.endDate) ? calcRangeHours(proj.startDate, proj.endDate) : 0

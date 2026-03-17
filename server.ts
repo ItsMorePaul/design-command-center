@@ -1955,8 +1955,8 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 // Format: YYYY.MM.DD.hhmm (e.g., 2026.02.26.2059) → displays as "2026.02.26 2059"
 
-const SITE_VERSION = '2026.03.17.1523'
-const SITE_TIME = '1523'
+const SITE_VERSION = '2026.03.17.1531'
+const SITE_TIME = '1531'
 
 const VERSION_KEY = 'dcc_versions'
 
