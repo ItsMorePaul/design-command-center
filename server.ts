@@ -2374,6 +2374,81 @@ app.get('/api/activity', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
+// ============ GOOGLE DOCS INTEGRATION ============
+const WI_OPEN_CRITS_DOC_ID = process.env.WI_OPEN_CRITS_DOC_ID || '1QTw96d8wjB4UyrPwb6gXYpwpnLOBBrZuo7xoB48Z08k'
+const OPEN_CRITS_SCRIPT_URL = process.env.DCC_OPEN_CRITS_SCRIPT_URL || ''
+
+app.get('/api/reports/open-crits/doc-url', (_req, res) => {
+  res.json({ url: `https://docs.google.com/document/d/${WI_OPEN_CRITS_DOC_ID}/edit` })
+})
+
+app.post('/api/reports/open-crits/sync', requireAdmin, async (req, res) => {
+  try {
+    if (!OPEN_CRITS_SCRIPT_URL) return res.status(500).json({ error: 'Apps Script web app URL not configured (DCC_OPEN_CRITS_SCRIPT_URL)' })
+
+    // Gather project data from DB
+    const projects = await all(`SELECT p.*, GROUP_CONCAT(t.name, '||') as designer_names
+      FROM projects p
+      LEFT JOIN project_assignments pa ON pa.project_id = p.id
+      LEFT JOIN team t ON pa.designer_id = t.id
+      WHERE p.status IN ('active', 'review')
+      GROUP BY p.id
+      ORDER BY p.businessLine, p.name`)
+
+    // Group by business line
+    const blGroups: Record<string, Array<{ name: string; designers: string; figmaLink: string; deckLink: string; prdLink: string }>> = {}
+    for (const p of projects) {
+      let bls: string[]
+      try { bls = JSON.parse(p.businessLine) } catch { bls = p.businessLine ? [p.businessLine] : ['Other'] }
+      const designers = p.designer_names ? p.designer_names.split('||').filter(Boolean).join('') : ''
+      const entry = { name: p.name, designers, figmaLink: p.figmaLink || '', deckLink: p.deckLink || '', prdLink: p.prdLink || '' }
+      for (const bl of bls) {
+        if (!blGroups[bl]) blGroups[bl] = []
+        blGroups[bl].push(entry)
+      }
+    }
+
+    // Calculate next Wednesday for the tab title
+    const today = new Date()
+    const dayOfWeek = today.getDay() // 0=Sun, 3=Wed
+    const daysUntilWed = (3 - dayOfWeek + 7) % 7 || 7 // next Wednesday (or 7 if today is Wednesday)
+    const nextWed = new Date(today)
+    nextWed.setDate(today.getDate() + daysUntilWed)
+    const tabTitle = nextWed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+
+    // POST to Apps Script web app
+    const scriptResp = await fetch(OPEN_CRITS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        secret: SEED_SECRET,
+        tabTitle,
+        dateStr: tabTitle,
+        businessLines: blGroups,
+      }),
+    })
+
+    // Apps Script web apps redirect — follow through to get the response
+    const scriptResult = await scriptResp.json().catch(() => ({ error: `HTTP ${scriptResp.status}` }))
+
+    if (scriptResult.error) {
+      console.error('Apps Script error:', scriptResult.error)
+      return res.status(500).json({ error: scriptResult.error })
+    }
+
+    res.json({
+      success: true,
+      tabTitle,
+      projectCount: projects.length,
+      businessLines: Object.keys(blGroups).length,
+      docUrl: `https://docs.google.com/document/d/${WI_OPEN_CRITS_DOC_ID}/edit`,
+    })
+  } catch (e) {
+    console.error('Open Crits sync error:', e)
+    res.status(500).json({ error: e.message })
+  }
+})
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`API server running on http://localhost:${PORT}`);
   console.log(`Database: ${DB_PATH}`);

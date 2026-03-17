@@ -586,6 +586,7 @@ function App() {
   // Calendar day modal state
   const [selectedDay, setSelectedDay] = useState<{ date: string; events: CalendarEvent[]; dayName: string } | null>(null)
   const contentRef = useRef<HTMLDivElement>(null)
+  const onDataChangeRef = useRef<() => void>(() => {})
 
   const [isLoaded, setIsLoaded] = useState(false)
   const [projectSortBy, setProjectSortBy] = useState<'name' | 'businessLine' | 'designer' | 'dueDate' | 'status'>(() => { try { return (localStorage.getItem('dcc_projectSortBy') as any) || 'businessLine' } catch { return 'businessLine' } })
@@ -983,7 +984,7 @@ const [showFilters, setShowFilters] = useState(false)
     })
 
     es.addEventListener('data-change', () => {
-      fetchActivity()
+      onDataChangeRef.current()
     })
 
     es.addEventListener('reload', () => {
@@ -1452,6 +1453,16 @@ const [showFilters, setShowFilters] = useState(false)
       console.error('Error refreshing projects:', err)
     }
   }
+
+  // Keep SSE data-change handler current with latest refresh functions
+  useEffect(() => {
+    onDataChangeRef.current = () => {
+      fetchActivity()
+      refreshProjects()
+      refreshCalendar()
+      refreshCapacity()
+    }
+  })
 
   const deleteBusinessLine = async (id: string) => {
     await fetch(`/api/business-lines/${id}`, { method: 'DELETE' })
@@ -3767,25 +3778,27 @@ const [showFilters, setShowFilters] = useState(false)
           copyToClipboard(lines.join('\n'))
         }
 
-        const generateOpenCrits = () => {
-          // W&I projects that are active or in review
-          const wiProjects = projects.filter(p =>
-            (p.status === 'active' || p.status === 'review') &&
-            (p.businessLines || []).some(bl => bl.toLowerCase().includes('w&i') || bl.toLowerCase().includes('wealth'))
-          )
-          const lines = [
-            `W&I OPEN CRITS — ${todayStr}`,
-            '',
-            ...wiProjects.map(p => {
-              const designers = (p.designers || []).map(d => d.split(' ')[0]).join(', ')
-              const status = p.status === 'review' ? ' [IN REVIEW]' : ''
-              return `• ${p.name}${status}\n  Designer: ${designers || 'unassigned'}\n  Figma: ${p.figmaLink || '—'}`
-            }),
-            '',
-            ...(wiProjects.length === 0 ? ['No active W&I projects.'] : []),
-            `${wiProjects.length} project${wiProjects.length !== 1 ? 's' : ''} for review`,
-          ]
-          copyToClipboard(lines.join('\n'))
+        const [openCritsSyncing, setOpenCritsSyncing] = useState(false)
+        const syncOpenCritsDoc = async () => {
+          setOpenCritsSyncing(true)
+          try {
+            const baseUrl = import.meta.env.DEV ? 'http://localhost:3001' : ''
+            const resp = await fetch(`${baseUrl}/api/reports/open-crits/sync`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-session-id': getSessionId() || '' },
+              body: JSON.stringify({}),
+            })
+            const data = await resp.json()
+            if (data.success) {
+              window.open(data.docUrl, '_blank')
+            } else {
+              alert(`Sync failed: ${data.error}`)
+            }
+          } catch (e) {
+            alert(`Sync failed: ${e}`)
+          } finally {
+            setOpenCritsSyncing(false)
+          }
         }
 
         const generateProjectReview = () => {
@@ -3931,11 +3944,13 @@ const [showFilters, setShowFilters] = useState(false)
           {
             id: 'open-crits',
             title: 'W&I Open Crits',
-            description: 'Active and in-review projects for W&I business line with designer assignments and Figma links.',
+            description: 'Creates a new dated tab in the shared Google Doc with the full project list, links, and designer assignments for Wednesday crits.',
             icon: <Palette size={24} />,
             color: '#8b5cf6',
-            stats: `${projects.filter(p => (p.status === 'active' || p.status === 'review') && (p.businessLines || []).some(bl => bl.toLowerCase().includes('w&i') || bl.toLowerCase().includes('wealth'))).length} projects`,
-            generate: generateOpenCrits,
+            stats: `${projects.filter(p => p.status === 'active' || p.status === 'review').length} active projects across ${new Set(projects.flatMap(p => p.businessLines || [])).size} business lines`,
+            docUrl: `https://docs.google.com/document/d/1QTw96d8wjB4UyrPwb6gXYpwpnLOBBrZuo7xoB48Z08k/edit`,
+            syncDoc: syncOpenCritsDoc,
+            syncing: openCritsSyncing,
           },
           {
             id: 'project-review',
@@ -3985,12 +4000,23 @@ const [showFilters, setShowFilters] = useState(false)
                   <p className="report-card-desc">{report.description}</p>
                   <span className="report-card-stats">{report.stats}</span>
                 </div>
-                {isAdmin && (
+                {isAdmin && report.docUrl ? (
+                  <div className="report-doc-actions">
+                    <button className="report-generate-btn" onClick={report.syncDoc} disabled={report.syncing} style={{ borderColor: report.color, color: report.color }}>
+                      {report.syncing ? <Loader size={14} className="spin" /> : <RefreshCw size={14} />}
+                      {report.syncing ? 'Syncing...' : 'Update Doc'}
+                    </button>
+                    <a className="report-generate-btn report-view-btn" href={report.docUrl} target="_blank" rel="noopener noreferrer" style={{ borderColor: report.color, color: report.color }}>
+                      <LinkIcon size={14} />
+                      View Doc
+                    </a>
+                  </div>
+                ) : isAdmin && report.generate ? (
                   <button className="report-generate-btn" onClick={report.generate} style={{ borderColor: report.color, color: report.color }}>
                     <ClipboardCopy size={14} />
                     {copiedReport ? 'Copied!' : 'Copy Report'}
                   </button>
-                )}
+                ) : null}
               </div>
             ))}
           </div>

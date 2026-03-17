@@ -4170,6 +4170,20 @@ input:checked + .slider:before {
 .report-generate-btn:hover {
   background: var(--color-bg-primary);
 }
+.report-generate-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.report-doc-actions {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+a.report-view-btn {
+  text-decoration: none;
+  justify-content: center;
+}
 
 .report-copied-toast {
   position: fixed;
