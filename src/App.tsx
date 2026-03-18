@@ -16,7 +16,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Gauge, ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, Settings, GripVertical, Folder, StickyNote, RefreshCw, User, CheckSquare, Sun, Moon, Edit2, Bell, Loader, Clock, ClipboardCopy, BarChart3, FileBarChart, ListChecks, Palette } from 'lucide-react'
+import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Gauge, ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, Settings, GripVertical, Folder, StickyNote, RefreshCw, User, CheckSquare, Sun, Moon, Edit2, Bell, Loader, Clock, ClipboardCopy, BarChart3, FileBarChart, ListChecks, Palette, HelpCircle } from 'lucide-react'
 import { Tooltip } from './Tooltip'
 import './App.css'
 import initialData from './data.json'
@@ -649,6 +649,7 @@ const [showFilters, setShowFilters] = useState(false)
   useEffect(() => {
     try { localStorage.setItem('dcc_capacityDesignerFilter', JSON.stringify([...capacityDesignerFilter])) } catch {}
   }, [capacityDesignerFilter])
+  const [showCapacityHelp, setShowCapacityHelp] = useState(false)
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; title: string; message: string; onConfirm: (() => Promise<void> | void) | null }>({
     open: false,
     title: '',
@@ -3483,6 +3484,9 @@ const [showFilters, setShowFilters] = useState(false)
                   {member.name.split(' ')[0]}
                 </button>
               ))}
+              <button className="capacity-help-btn" onClick={() => setShowCapacityHelp(true)} title="How calculations work">
+                <HelpCircle size={16} />
+              </button>
             </div>
 
             {/* Designer Cards */}
@@ -5548,6 +5552,63 @@ const [showFilters, setShowFilters] = useState(false)
               >
                 Delete
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Capacity Help Modal */}
+      {showCapacityHelp && (
+        <div className="modal-overlay" onClick={() => setShowCapacityHelp(false)}>
+          <div className="modal capacity-help-modal" onClick={e => e.stopPropagation()}>
+            <div className="capacity-help-header">
+              <h2>How Capacity Calculations Work</h2>
+              <button className="capacity-help-close" onClick={() => setShowCapacityHelp(false)}>×</button>
+            </div>
+            <div className="capacity-help-content">
+              <h3>Utilization Gauge</h3>
+              <p>Shows what percentage of the team's total quarterly hours are allocated to active projects.</p>
+              <ul>
+                <li><strong>Available hrs</strong> — Each designer's weekly hours (default 35h) × 13 weeks in the quarter. Excluded designers are omitted.</li>
+                <li><strong>Allocated hrs</strong> — Sum of each designer's allocation percentages × their weekly hours × 13 weeks. Only active and in-review projects count.</li>
+                <li><strong>Remaining hrs</strong> — Available minus allocated. Red if negative (over-capacity).</li>
+              </ul>
+              <p>Gauge color: green ≤ 85%, amber 85–100%, red &gt; 100%.</p>
+
+              <h3>Project Funding</h3>
+              <p>Compares the team's projected output against project estimates to see if work is over- or under-funded.</p>
+              <ul>
+                <li><strong>Estimated hrs</strong> — Sum of T-shirt size estimates (XXS=35h through XXL=910h) across all active/in-review projects.</li>
+                <li><strong>Projected hrs</strong> — For each assignment: designer's allocated hours/week × weeks remaining until project end date. If no end date, defaults to 13 weeks.</li>
+                <li><strong>Delta</strong> — Projected minus estimated. Positive = over-funded (more capacity than needed). Negative = under-funded.</li>
+              </ul>
+              <p>Bar color: green if over-funded, amber if under-funded by &lt; 30%, red if under-funded by &gt; 30%.</p>
+
+              <h3>Weekly Load Heatmap</h3>
+              <p>Shows each designer's allocated hours per week across the current DJ fiscal quarter.</p>
+              <ul>
+                <li><strong>Quarter</strong> — DJ fiscal year: Q1 Jul–Sep, Q2 Oct–Dec, Q3 Jan–Mar, Q4 Apr–Jun.</li>
+                <li><strong>Week hours</strong> — For each week, sums the allocated hours from all active projects whose date range (or timeline phases) overlaps that week.</li>
+                <li><strong>Colors</strong> — Green ≤ 60%, light green 61–80%, amber 81–100%, red &gt; 100% of the designer's weekly hours.</li>
+                <li><strong>Current week</strong> — Highlighted with a black outline.</li>
+                <li><strong>Dot marker</strong> — A small dot below a week cell indicates a project ending that week.</li>
+              </ul>
+
+              <h3>Per-Project Allocation Summary</h3>
+              <p>Shown below each project chip, compares assigned effort to the T-shirt estimate.</p>
+              <ul>
+                <li><strong>Designers × hrs/wk × project weeks</strong> — Total effort the assigned team will produce over the project duration.</li>
+                <li><strong>Over-allocated</strong> — Total effort exceeds estimate by &gt; 20%.</li>
+                <li><strong>Under-allocated</strong> — Total effort is less than 50% of estimate.</li>
+              </ul>
+
+              <h3>Designer Chip Sections</h3>
+              <ul>
+                <li><strong>Active</strong> — Projects being worked on. Hours count toward utilization.</li>
+                <li><strong>In Review</strong> — Projects in review. Hours still count toward utilization but chips are grouped separately.</li>
+                <li><strong>Blocked</strong> — Hours set to 0, do not count toward utilization.</li>
+                <li><strong>Done</strong> — Completed. Hours set to 0, do not count.</li>
+              </ul>
             </div>
           </div>
         </div>
