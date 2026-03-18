@@ -601,7 +601,9 @@ function App() {
   // Calendar day modal state
   const [selectedDay, setSelectedDay] = useState<{ date: string; events: CalendarEvent[]; dayName: string } | null>(null)
   const contentRef = useRef<HTMLDivElement>(null)
+  const overlayMouseDownTarget = useRef<EventTarget | null>(null)
   const onDataChangeRef = useRef<() => void>(() => {})
+  const pendingRefreshRef = useRef(false)
 
   const [isLoaded, setIsLoaded] = useState(false)
   const [projectSortBy, setProjectSortBy] = useState<'name' | 'businessLine' | 'designer' | 'dueDate' | 'status'>(() => { try { return (localStorage.getItem('dcc_projectSortBy') as any) || 'businessLine' } catch { return 'businessLine' } })
@@ -1251,7 +1253,7 @@ const [showFilters, setShowFilters] = useState(false)
   }
 
   const removeCapacityAssignment = async (id: string) => {
-    await fetch(`/api/capacity/assignments/${id}`, { method: 'DELETE' })
+    await authFetch(`/api/capacity/assignments/${id}`, { method: 'DELETE' })
     await refreshCapacity()
   }
 
@@ -1465,12 +1467,27 @@ const [showFilters, setShowFilters] = useState(false)
   // Keep SSE data-change handler current with latest refresh functions
   useEffect(() => {
     onDataChangeRef.current = () => {
+      if (showProjectModal || showTimelineModal || showTimeOffModal || showModal) {
+        pendingRefreshRef.current = true
+        return
+      }
       fetchActivity()
       refreshProjects()
       refreshCalendar()
       refreshCapacity()
     }
   })
+
+  // Flush pending SSE refresh when all editing modals close
+  useEffect(() => {
+    if (!showProjectModal && !showTimelineModal && !showTimeOffModal && !showModal && pendingRefreshRef.current) {
+      pendingRefreshRef.current = false
+      fetchActivity()
+      refreshProjects()
+      refreshCalendar()
+      refreshCapacity()
+    }
+  }, [showProjectModal, showTimelineModal, showTimeOffModal, showModal])
 
   const deleteBusinessLine = async (id: string) => {
     await fetch(`/api/business-lines/${id}`, { method: 'DELETE' })
@@ -4263,7 +4280,7 @@ const [showFilters, setShowFilters] = useState(false)
 
       {/* Note Detail Modal */}
       {selectedNote && (
-        <div className="modal-overlay" onClick={() => setSelectedNote(null)}>
+        <div className="modal-overlay" onMouseDown={e => { overlayMouseDownTarget.current = e.target }} onClick={e => { if (e.target === e.currentTarget && overlayMouseDownTarget.current === e.currentTarget) setSelectedNote(null) }}>
           <div className="modal note-detail-modal" onClick={e => e.stopPropagation()}>
             <div className="note-detail-header">
               <h2>{selectedNote.title || 'Untitled Note'}</h2>
@@ -4421,7 +4438,7 @@ const [showFilters, setShowFilters] = useState(false)
 
       {/* Note Edit Modal */}
       {editingNote && (
-        <div className="modal-overlay" onClick={() => setEditingNote(null)}>
+        <div className="modal-overlay" onMouseDown={e => { overlayMouseDownTarget.current = e.target }} onClick={e => { if (e.target === e.currentTarget && overlayMouseDownTarget.current === e.currentTarget) setEditingNote(null) }}>
           <div className="modal note-edit-modal" onClick={e => e.stopPropagation()}>
             <div className="note-edit-header">
               <h2>Edit Note</h2>
@@ -4909,7 +4926,7 @@ const [showFilters, setShowFilters] = useState(false)
 
       {/* Modal */}
       {showModal && (
-        <div className="modal-overlay" onClick={() => { setShowModal(false) }}>
+        <div className="modal-overlay" onMouseDown={e => { overlayMouseDownTarget.current = e.target }} onClick={e => { if (e.target === e.currentTarget && overlayMouseDownTarget.current === e.currentTarget) setShowModal(false) }}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2>{editingMember ? 'Edit Team Member' : 'Add Team Member'}</h2>
@@ -5028,7 +5045,7 @@ const [showFilters, setShowFilters] = useState(false)
       )}
 
       {showProjectModal && (
-        <div className="modal-overlay" onClick={() => setShowProjectModal(false)}>
+        <div className="modal-overlay" onMouseDown={e => { overlayMouseDownTarget.current = e.target }} onClick={e => { if (e.target === e.currentTarget && overlayMouseDownTarget.current === e.currentTarget) setShowProjectModal(false) }}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2>{editingProject ? 'Edit Project' : 'New Project'}</h2>
@@ -5493,7 +5510,7 @@ const [showFilters, setShowFilters] = useState(false)
 
       {/* Calendar Day Modal */}
       {selectedDay && (
-        <div className="modal-overlay" onClick={() => setSelectedDay(null)}>
+        <div className="modal-overlay" onMouseDown={e => { overlayMouseDownTarget.current = e.target }} onClick={e => { if (e.target === e.currentTarget && overlayMouseDownTarget.current === e.currentTarget) setSelectedDay(null) }}>
           <div className="modal day-modal" onClick={e => e.stopPropagation()}>
             <div className="day-modal-header">
               <h2>
@@ -5536,7 +5553,7 @@ const [showFilters, setShowFilters] = useState(false)
       )}
 
       {confirmModal.open && (
-        <div className="modal-overlay" onClick={closeConfirmModal}>
+        <div className="modal-overlay" onMouseDown={e => { overlayMouseDownTarget.current = e.target }} onClick={e => { if (e.target === e.currentTarget && overlayMouseDownTarget.current === e.currentTarget) closeConfirmModal() }}>
           <div className="modal confirm-modal" onClick={e => e.stopPropagation()}>
             <h2>{confirmModal.title}</h2>
             <p className="confirm-message">{confirmModal.message}</p>
@@ -5559,7 +5576,7 @@ const [showFilters, setShowFilters] = useState(false)
 
       {/* Capacity Help Modal */}
       {showCapacityHelp && (
-        <div className="modal-overlay" onClick={() => setShowCapacityHelp(false)}>
+        <div className="modal-overlay" onMouseDown={e => { overlayMouseDownTarget.current = e.target }} onClick={e => { if (e.target === e.currentTarget && overlayMouseDownTarget.current === e.currentTarget) setShowCapacityHelp(false) }}>
           <div className="modal capacity-help-modal" onClick={e => e.stopPropagation()}>
             <div className="capacity-help-header">
               <h2>How Capacity Calculations Work</h2>
@@ -5616,7 +5633,7 @@ const [showFilters, setShowFilters] = useState(false)
 
       {/* Search Modal */}
       {showSearch && (
-        <div className="modal-overlay" onClick={() => { setShowSearch(false); setSearchQuery(''); setSearchResults({ projects: [], team: [], businessLines: [], notes: [] }); }}>
+        <div className="modal-overlay" onMouseDown={e => { overlayMouseDownTarget.current = e.target }} onClick={e => { if (e.target === e.currentTarget && overlayMouseDownTarget.current === e.currentTarget) { setShowSearch(false); setSearchQuery(''); setSearchResults({ projects: [], team: [], businessLines: [], notes: [] }); } }}>
           <div className="modal search-modal search-modal-v2" onClick={e => e.stopPropagation()}>
             {/* Search Header with Close */}
             <div className="search-modal-header">
@@ -5827,7 +5844,7 @@ const [showFilters, setShowFilters] = useState(false)
 
       {/* Business Line Modal */}
       {showBusinessLineModal && (
-        <div className="modal-overlay" onClick={() => setShowBusinessLineModal(false)}>
+        <div className="modal-overlay" onMouseDown={e => { overlayMouseDownTarget.current = e.target }} onClick={e => { if (e.target === e.currentTarget && overlayMouseDownTarget.current === e.currentTarget) setShowBusinessLineModal(false) }}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2>{editingBusinessLine ? 'Edit Business Line' : 'Add Business Line'}</h2>
@@ -5917,7 +5934,7 @@ const [showFilters, setShowFilters] = useState(false)
 
       {/* User Modal */}
       {showUserModal && (
-        <div className="modal-overlay" onClick={() => setShowUserModal(false)}>
+        <div className="modal-overlay" onMouseDown={e => { overlayMouseDownTarget.current = e.target }} onClick={e => { if (e.target === e.currentTarget && overlayMouseDownTarget.current === e.currentTarget) setShowUserModal(false) }}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2>Add User</h2>
@@ -5971,7 +5988,7 @@ const [showFilters, setShowFilters] = useState(false)
 
       {/* Hide Note PIN Modal */}
       {showHideNotePinModal && (
-        <div className="modal-overlay" onClick={() => setShowHideNotePinModal(false)}>
+        <div className="modal-overlay" onMouseDown={e => { overlayMouseDownTarget.current = e.target }} onClick={e => { if (e.target === e.currentTarget && overlayMouseDownTarget.current === e.currentTarget) setShowHideNotePinModal(false) }}>
           <div className="modal confirm-modal" onClick={e => e.stopPropagation()}>
             <h2>Hide Note</h2>
             <div className="pin-input-container">
@@ -6063,7 +6080,7 @@ const [showFilters, setShowFilters] = useState(false)
 
       {/* Hidden Notes Unlock PIN Modal */}
       {showHiddenNotesPinModal && (
-        <div className="modal-overlay" onClick={() => { setShowHiddenNotesPinModal(false); setHiddenNotesPin(''); }}>
+        <div className="modal-overlay" onMouseDown={e => { overlayMouseDownTarget.current = e.target }} onClick={e => { if (e.target === e.currentTarget && overlayMouseDownTarget.current === e.currentTarget) { setShowHiddenNotesPinModal(false); setHiddenNotesPin(''); } }}>
           <div className="modal confirm-modal" onClick={e => e.stopPropagation()}>
             <h2>Unlock Hidden Notes</h2>
             <div className="pin-input-container">
