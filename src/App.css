@@ -1984,6 +1984,7 @@
   background: #ef4444;
   padding: 0.1rem 0.3rem;
   border-radius: 3px;
+  vertical-align: middle;
   animation: pulse-red 1.5s ease-in-out infinite;
 }
 
