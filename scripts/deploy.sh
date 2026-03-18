@@ -17,7 +17,7 @@
 #   4. Pushes code to Railway (if not --data)
 #   5. Uploads the merged local DB to Railway
 #   6. Verifies all table counts match
-#   7. Re-enables maintenance mode for admin testing
+#   7. Clears maintenance state (Paul manages via UI)
 #
 # This means even if you forget to run merge-railway.sh first,
 # Railway production edits are automatically preserved.
@@ -340,6 +340,10 @@ log "hidden_note_fingerprints: $FP_COUNT total after merge"
 # Local-computed tables (note_people_links, note_project_links): kept as-is
 log "Local-computed tables kept as-is."
 
+# Clear maintenance state — Paul manages this via UI, deploys should not carry it over
+sqlite3 "$LOCAL_DB" "DELETE FROM app_versions WHERE key = 'maintenance';"
+log "Maintenance state cleared (Paul manages via UI)."
+
 # Update DB size after merge
 DB_SIZE=$(wc -c < "$LOCAL_DB" | tr -d ' ')
 log "Local DB after merge: $DB_SIZE bytes"
@@ -458,7 +462,7 @@ if [[ "$PASS" == "true" ]]; then
 else
   err "DEPLOYMENT VERIFICATION FAILED — Railway may not match local."
   err "Railway backup at: $BACKUP_DIR"
-  err "Investigate before disabling maintenance mode."
+  err "Investigate before proceeding."
 fi
 
 # ── Restart local servers ──────────────────────────────────────────
