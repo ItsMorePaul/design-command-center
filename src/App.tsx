@@ -3662,7 +3662,7 @@ const [showFilters, setShowFilters] = useState(false)
 
                           const renderChip = (assignment: CapacityAssignment, isDone: boolean, isBlocked?: boolean) => {
                             const allocPct = assignment.allocation_percent || 0
-                            const allocHours = parseFloat(((available * allocPct) / 100).toFixed(1))
+                            const allocHours = Math.round((available * allocPct) / 100 * 2) / 2
                             const paused = isDone || isBlocked
                             const effectiveHours = paused ? 0 : (assignmentDraft[assignment.id] ?? allocHours)
                             const effectivePct = paused ? 0 : Math.round((effectiveHours / available) * 100)
@@ -3738,7 +3738,7 @@ const [showFilters, setShowFilters] = useState(false)
                                     const pct = a.allocation_percent || 0
                                     const designerMember = capacityData.team.find(m => m.id === a.designer_id)
                                     const dAvail = designerMember ? (designerMember.weekly_hours ?? 35) : 35
-                                    return s + parseFloat(((dAvail * pct) / 100).toFixed(1))
+                                    return s + Math.round((dAvail * pct) / 100 * 2) / 2
                                   }, 0)
                                   const projCapacity = (proj.startDate && proj.endDate) ? calcRangeHours(proj.startDate, proj.endDate) : 0
                                   const projWeeks = projCapacity > 0 ? Math.round((projCapacity / 35) * 10) / 10 : 0
