@@ -539,7 +539,7 @@ function DoneDropZone({ children, id = 'done-drop-zone' }: { children?: React.Re
 }
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'projects' | 'team' | 'calendar' | 'capacity' | 'notes' | 'settings'>('projects')
+  const [activeTab, setActiveTab] = useState<'projects' | 'team' | 'calendar' | 'capacity' | 'reports' | 'settings'>('projects')
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('dcc-theme')
     return (saved === 'dark') ? 'dark' : 'light'
@@ -975,6 +975,7 @@ const [showFilters, setShowFilters] = useState(false)
   const [countdownDisplay, setCountdownDisplay] = useState('')
   const [updateAvailable, setUpdateAvailable] = useState(false)
   const [copiedReport, setCopiedReport] = useState<number | null>(null)
+  const [openCritsSyncing, setOpenCritsSyncing] = useState(false)
 
   // Server-Sent Events — live updates from server
   useEffect(() => {
@@ -1003,8 +1004,8 @@ const [showFilters, setShowFilters] = useState(false)
     })
 
     es.addEventListener('reload', () => {
-      // Full DB replacement — reload the page
-      window.location.reload()
+      // Full DB replacement — refresh all data without losing session
+      onDataChangeRef.current()
     })
 
     return () => es.close()
@@ -1178,21 +1179,7 @@ const [showFilters, setShowFilters] = useState(false)
     }
   }, [activeTab])
 
-  // Load notes when switching to notes tab
-  useEffect(() => {
-    if (activeTab === 'notes' && notes.length === 0) {
-      const loadNotes = async () => {
-        try {
-          const res = await authFetch('/api/notes')
-          const data = await res.json()
-          setNotes(data)
-        } catch (err) {
-          console.error('Error loading notes:', err)
-        }
-      }
-      loadNotes()
-    }
-  }, [activeTab])
+  // Notes are loaded on-demand by settings/hidden-notes, not on tab switch
 
   // Refresh calendar data when projects or team change
   const refreshCalendar = async () => {
@@ -2239,8 +2226,8 @@ const [showFilters, setShowFilters] = useState(false)
             <span className="nav-label">Calendar</span>
           </button>
           <button
-            className={`nav-item ${activeTab === 'notes' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('notes') }}
+            className={`nav-item ${activeTab === 'reports' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('reports') }}
             aria-label="Reports"
           >
             <span className="nav-icon"><FileBarChart size={18} /></span>
@@ -2274,7 +2261,7 @@ const [showFilters, setShowFilters] = useState(false)
               {activeTab === 'team' && 'Team'}
               {activeTab === 'calendar' && 'Calendar'}
               {activeTab === 'capacity' && 'Capacity'}
-              {activeTab === 'notes' && 'Reports'}
+              {activeTab === 'reports' && 'Reports'}
               {activeTab === 'settings' && 'Settings'}
             </h1>
             <p className="date">{getTodayFormatted()}</p>
@@ -3902,7 +3889,7 @@ const [showFilters, setShowFilters] = useState(false)
       )}
 
       {/* Notes View */}
-      {activeTab === 'notes' && (() => {
+      {activeTab === 'reports' && (() => {
         const today = new Date()
         const todayStr = today.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
         const activeProjects = projects.filter(p => p.status === 'active')
@@ -3957,7 +3944,6 @@ const [showFilters, setShowFilters] = useState(false)
           copyToClipboard(lines.join('\n'))
         }
 
-        const [openCritsSyncing, setOpenCritsSyncing] = useState(false)
         const syncOpenCritsDoc = async () => {
           setOpenCritsSyncing(true)
           try {
@@ -5673,7 +5659,7 @@ const [showFilters, setShowFilters] = useState(false)
                       {filteredResults.notes.map(note => (
                         <div key={note.id} className="search-result-card"
                           onClick={async () => {
-                            setActiveTab('notes')
+                            setActiveTab('reports')
                             setShowSearch(false)
                             setSearchQuery('')
                             // Ensure notes are loaded first (need full note data with linkedProjectIds/linkedTeamIds)
