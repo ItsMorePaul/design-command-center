@@ -461,24 +461,6 @@ else
   err "Investigate before disabling maintenance mode."
 fi
 
-# ── Re-enable maintenance mode on Railway ─────────────────────────
-# Railway rebuild resets in-memory state. Re-lock so admin can test
-# before going live. Disable via: ./scripts/maintenance.sh off
-log "Re-enabling maintenance mode on Railway..."
-MAINT_RESULT=$(curl -s -X POST "$RAILWAY_URL/api/maintenance" \
-  -H "Content-Type: application/json" \
-  -H "X-Seed-Secret: $DCC_SEED_SECRET" \
-  -d '{"enabled": true, "lockoutMessage": "Wandi Hub will be back soon."}')
-
-MAINT_OK=$(echo "$MAINT_RESULT" | jq -r '.enabled // false' 2>/dev/null)
-if [[ "$MAINT_OK" == "true" ]]; then
-  log "Maintenance mode ON — site locked for Paul to verify."
-  warn "DO NOT disable maintenance. Only Paul runs: ./scripts/maintenance.sh off"
-else
-  warn "Failed to re-enable maintenance. Check manually."
-  echo "$MAINT_RESULT"
-fi
-
 # ── Restart local servers ──────────────────────────────────────────
 cd "$DCC_DIR"
 
@@ -518,16 +500,13 @@ if [[ "$PASS" == "true" ]]; then
   echo -e "${GREEN}  DEPLOY COMPLETE — ALL VERIFICATIONS PASSED      ${NC}"
   echo -e "${GREEN}══════════════════════════════════════════════════${NC}"
   echo ""
-  echo "  Maintenance mode is ON. Site is locked."
-  echo "  Report to Paul: deploy succeeded, all table counts match."
-  echo "  Paul will verify and run: ./scripts/maintenance.sh off"
+  echo "  Deploy succeeded, all table counts match."
 else
   echo -e "${RED}══════════════════════════════════════════════════${NC}"
   echo -e "${RED}  DEPLOY FAILED — VERIFICATION ERRORS ABOVE       ${NC}"
   echo -e "${RED}══════════════════════════════════════════════════${NC}"
   echo ""
-  echo "  Maintenance mode is ON. Site is locked."
-  echo "  Report to Paul: deploy FAILED. See errors above."
+  echo "  Deploy FAILED. See errors above."
   echo "  Rollback: cp $BACKUP_DIR/shared.db data/shared.db"
   echo "            DCC_DEPLOY_OK=1 ./scripts/deploy.sh --data"
   exit 1
