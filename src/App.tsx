@@ -538,8 +538,19 @@ function DoneDropZone({ children, id = 'done-drop-zone' }: { children?: React.Re
   )
 }
 
+const VALID_TABS = ['projects', 'team', 'calendar', 'capacity', 'reports', 'settings'] as const
+type TabId = typeof VALID_TABS[number]
+
+function parseHash(): { tab: TabId; params: URLSearchParams } {
+  const hash = window.location.hash.replace(/^#\/?/, '')
+  const [path, query] = hash.split('?')
+  const tab = VALID_TABS.includes(path as TabId) ? (path as TabId) : 'projects'
+  return { tab, params: new URLSearchParams(query || '') }
+}
+
 function App() {
-  const [activeTab, setActiveTab] = useState<'projects' | 'team' | 'calendar' | 'capacity' | 'reports' | 'settings'>('projects')
+  const initialHash = parseHash()
+  const [activeTab, setActiveTab] = useState<TabId>(initialHash.tab)
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('dcc-theme')
     return (saved === 'dark') ? 'dark' : 'light'
@@ -608,6 +619,16 @@ function App() {
   const [isLoaded, setIsLoaded] = useState(false)
   const [projectSortBy, setProjectSortBy] = useState<'name' | 'businessLine' | 'designer' | 'dueDate' | 'status'>(() => { try { return (localStorage.getItem('dcc_projectSortBy') as any) || 'businessLine' } catch { return 'businessLine' } })
   const [projectFilters, setProjectFilters] = useState<{businessLines:string[],designers:string[],statuses:string[],project:string|null}>(() => {
+  // Hash params take priority over localStorage
+  if (initialHash.tab === 'projects' && initialHash.params.toString()) {
+    const p = initialHash.params
+    return {
+      project: p.get('project') || null,
+      businessLines: p.getAll('bl'),
+      designers: p.getAll('designer'),
+      statuses: p.getAll('status')
+    }
+  }
   try {
     const s = localStorage.getItem('dcc_projectFilters')
     if (s) return JSON.parse(s)
@@ -646,12 +667,57 @@ const [showFilters, setShowFilters] = useState(false)
   const [assignmentDraft, setAssignmentDraft] = useState<Record<string, number>>({})
   const [excludedDesigners, setExcludedDesigners] = useState<Set<string>>(new Set())
   const [capacityDesignerFilter, setCapacityDesignerFilter] = useState<Set<string>>(() => {
+    if (initialHash.tab === 'capacity' && initialHash.params.has('designer')) {
+      return new Set(initialHash.params.getAll('designer'))
+    }
     try { const s = localStorage.getItem('dcc_capacityDesignerFilter'); return s ? new Set(JSON.parse(s)) : new Set() } catch { return new Set() }
   })
   useEffect(() => {
     try { localStorage.setItem('dcc_capacityDesignerFilter', JSON.stringify([...capacityDesignerFilter])) } catch {}
   }, [capacityDesignerFilter])
   const [showCapacityHelp, setShowCapacityHelp] = useState(false)
+
+  // Deep linking: sync URL hash with tab + filters
+  const hashUpdateRef = useRef(false)
+  useEffect(() => {
+    const params = new URLSearchParams()
+    if (activeTab === 'projects') {
+      if (projectFilters.project) params.set('project', projectFilters.project)
+      projectFilters.businessLines.forEach(bl => params.append('bl', bl))
+      projectFilters.designers.forEach(d => params.append('designer', d))
+      projectFilters.statuses.forEach(s => params.append('status', s))
+    } else if (activeTab === 'capacity' && capacityDesignerFilter.size > 0) {
+      capacityDesignerFilter.forEach(id => params.append('designer', id))
+    }
+    const qs = params.toString()
+    const newHash = `#/${activeTab}${qs ? '?' + qs : ''}`
+    if (window.location.hash !== newHash) {
+      hashUpdateRef.current = true
+      window.history.replaceState(null, '', newHash)
+    }
+  }, [activeTab, projectFilters, capacityDesignerFilter])
+
+  // Handle browser back/forward
+  useEffect(() => {
+    const onHashChange = () => {
+      if (hashUpdateRef.current) { hashUpdateRef.current = false; return }
+      const { tab, params } = parseHash()
+      setActiveTab(tab)
+      if (tab === 'projects' && params.toString()) {
+        setProjectFilters({
+          project: params.get('project') || null,
+          businessLines: params.getAll('bl'),
+          designers: params.getAll('designer'),
+          statuses: params.getAll('status')
+        })
+      }
+      if (tab === 'capacity' && params.has('designer')) {
+        setCapacityDesignerFilter(new Set(params.getAll('designer')))
+      }
+    }
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
+  }, [])
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; title: string; message: string; onConfirm: (() => Promise<void> | void) | null }>({
     open: false,
     title: '',
