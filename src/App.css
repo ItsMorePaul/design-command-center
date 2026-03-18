@@ -1978,12 +1978,12 @@
 }
 
 .overdue-label {
-  font-size: 0.65rem;
+  font-size: 0.5rem;
   font-weight: 600;
   color: white;
   background: #ef4444;
-  padding: 0.15rem 0.4rem;
-  border-radius: 4px;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
   animation: pulse-red 1.5s ease-in-out infinite;
 }
 
@@ -3596,6 +3596,20 @@ input:checked + .slider:before {
   width: 60px;
 }
 
+.capacity-designer-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.capacity-filter-label {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin-right: 0.25rem;
+}
+
 .designer-cards-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -3609,7 +3623,6 @@ input:checked + .slider:before {
 }
 
 .designer-expandable-card {
-  background: var(--color-bg-subtle);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   overflow: hidden;
@@ -3618,7 +3631,6 @@ input:checked + .slider:before {
 
 .designer-expandable-card.over-capacity {
   border-color: #ef4444;
-  background: rgba(239, 68, 68, 0.05);
 }
 
 .designer-expandable-card.excluded {
@@ -3630,12 +3642,6 @@ input:checked + .slider:before {
   align-items: center;
   gap: 0;
   padding: 1rem;
-  cursor: pointer;
-  user-select: none;
-}
-
-.designer-card-header:hover {
-  background: var(--color-bg-tertiary);
 }
 
 .designer-card-header-content {
@@ -3745,26 +3751,7 @@ input:checked + .slider:before {
   white-space: nowrap;
 }
 
-.expand-toggle {
-  background: none;
-  border: none;
-  padding: 0.25rem;
-  cursor: pointer;
-  color: var(--color-text-muted);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.expand-icon {
-  transition: transform 0.2s ease;
-}
-
-.expand-icon.expanded {
-  transform: rotate(180deg);
-}
-
-/* Expanded Body */
+/* Card Body */
 .designer-card-body {
   padding: 0 1rem 1rem 1rem;
   border-top: 1px solid var(--color-border);
@@ -3790,7 +3777,7 @@ input:checked + .slider:before {
   flex-direction: column;
   gap: 0.5rem;
   padding-top: 1rem;
-  margin-top: 0.25rem;
+  margin-top: 1rem;
   border-top: 1px dashed #ef4444;
 }
 
@@ -3800,18 +3787,36 @@ input:checked + .slider:before {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #ef4444;
-  opacity: 0.7;
 }
 
 .assignment-chip.chip-blocked {
-  opacity: 0.55;
-  border-left: 3px solid #ef4444;
 }
 
 .assignment-chip.chip-blocked .chip-hours-label {
   color: var(--color-text-muted);
   font-style: italic;
 }
+
+.assignment-chips-review {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-top: 1rem;
+  margin-top: 1rem;
+  border-top: 1px dashed #f59e0b;
+}
+
+.chips-review-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #f59e0b;
+}
+
+.assignment-chip.chip-review {
+}
+
 
 .assignment-chips-done {
   display: flex;
@@ -3844,6 +3849,22 @@ input:checked + .slider:before {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+}
+
+.chips-column-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-right: 1.8rem;
+}
+
+.chips-column-label {
+  font-size: 0.55rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  opacity: 0.6;
 }
 
 .chip-main {

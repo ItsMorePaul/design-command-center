@@ -642,8 +642,13 @@ const [showFilters, setShowFilters] = useState(false)
   const [assignmentForm, setAssignmentForm] = useState({ project_id: '', designer_id: '', allocation_hours: 0 })
   const [hoursDraft, setHoursDraft] = useState<Record<string, number>>({})
   const [assignmentDraft, setAssignmentDraft] = useState<Record<string, number>>({})
-  const [expandedDesigners, setExpandedDesigners] = useState<Set<string>>(new Set())
   const [excludedDesigners, setExcludedDesigners] = useState<Set<string>>(new Set())
+  const [capacityDesignerFilter, setCapacityDesignerFilter] = useState<Set<string>>(() => {
+    try { const s = localStorage.getItem('dcc_capacityDesignerFilter'); return s ? new Set(JSON.parse(s)) : new Set() } catch { return new Set() }
+  })
+  useEffect(() => {
+    try { localStorage.setItem('dcc_capacityDesignerFilter', JSON.stringify([...capacityDesignerFilter])) } catch {}
+  }, [capacityDesignerFilter])
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; title: string; message: string; onConfirm: (() => Promise<void> | void) | null }>({
     open: false,
     title: '',
@@ -3461,9 +3466,30 @@ const [showFilters, setShowFilters] = useState(false)
               <button className="primary-btn" onClick={saveCapacityAssignment}>Assign</button>
             </div>
 
-            {/* Designer Cards - Expandable */}
+            {/* Designer Filter */}
+            <div className="capacity-designer-filter">
+              <span className="capacity-filter-label">Filter by:</span>
+              {capacityData.team.map((member: CapacityMember) => (
+                <button
+                  key={member.id}
+                  className={`filter-pill${capacityDesignerFilter.has(member.id) ? ' active' : ''}`}
+                  onClick={() => {
+                    const next = new Set(capacityDesignerFilter)
+                    if (next.has(member.id)) next.delete(member.id)
+                    else next.add(member.id)
+                    setCapacityDesignerFilter(next)
+                  }}
+                >
+                  {member.name.split(' ')[0]}
+                </button>
+              ))}
+            </div>
+
+            {/* Designer Cards */}
             <div className="designer-cards-grid">
-              {capacityData.team.map((member: CapacityMember) => {
+              {capacityData.team
+                .filter((member: CapacityMember) => capacityDesignerFilter.size === 0 || capacityDesignerFilter.has(member.id))
+                .map((member: CapacityMember) => {
                 const memberAssignments = capacityData.assignments.filter((a: CapacityAssignment) => a.designer_id === member.id)
                 const available = member.weekly_hours || 35
                 const allocatedHours = memberAssignments
@@ -3479,8 +3505,6 @@ const [showFilters, setShowFilters] = useState(false)
                   }, 0)
                 const utilization = available > 0 ? Math.round((allocatedHours / available) * 100) : 0
                 const isOver = utilization > 100
-                const isExpanded = expandedDesigners.has(member.id)
-
                 const getUtilColor = () => {
                   if (utilization > 100) return 'var(--color-danger, #ef4444)'
                   if (utilization > 80) return 'var(--color-warning, #f59e0b)'
@@ -3489,19 +3513,7 @@ const [showFilters, setShowFilters] = useState(false)
 
                 return (
                   <div key={member.id} className={`designer-expandable-card ${isOver ? 'over-capacity' : ''} ${excludedDesigners.has(member.id) ? 'excluded' : ''}`}>
-                    {/* Card Header - Always Visible */}
-                    <div 
-                      className="designer-card-header"
-                      onClick={() => {
-                        const newExpanded = new Set(expandedDesigners)
-                        if (isExpanded) {
-                          newExpanded.delete(member.id)
-                        } else {
-                          newExpanded.add(member.id)
-                        }
-                        setExpandedDesigners(newExpanded)
-                      }}
-                    >
+                    <div className="designer-card-header">
                       <div className="designer-card-header-content">
                         <div className="designer-col-info">
                           <span className="designer-name">
@@ -3526,17 +3538,9 @@ const [showFilters, setShowFilters] = useState(false)
                           <span className="usage-hours">{parseFloat(allocatedHours.toFixed(1))}h</span>
                         </div>
                         </div>
-                        <button className="expand-toggle">
-                        <ChevronDown 
-                          size={18} 
-                          className={`expand-icon ${isExpanded ? 'expanded' : ''}`}
-                        />
-                      </button>
                     </div>
 
-                    {/* Expanded Content */}
-                    {isExpanded && (
-                      <div className="designer-card-body">
+                    <div className="designer-card-body">
                         {/* Weekly Load Heatmap */}
                         {(() => {
                           const now = new Date()
@@ -3674,7 +3678,7 @@ const [showFilters, setShowFilters] = useState(false)
                         ) : (() => {
                           const activeAssignments = memberAssignments.filter((a: CapacityAssignment) => {
                             const proj = projects.find(p => p.name === a.project_name)
-                            return !proj || (proj.status !== 'done' && proj.status !== 'blocked')
+                            return !proj || (proj.status !== 'done' && proj.status !== 'blocked' && proj.status !== 'review')
                           })
                           // Sort active assignments by force ranking (best rank across all business lines), then alphabetical
                           activeAssignments.sort((a, b) => {
@@ -3691,6 +3695,10 @@ const [showFilters, setShowFilters] = useState(false)
                             if (rankA !== rankB) return rankA - rankB
                             return (a.project_name || '').localeCompare(b.project_name || '')
                           })
+                          const reviewAssignments = memberAssignments.filter((a: CapacityAssignment) => {
+                            const proj = projects.find(p => p.name === a.project_name)
+                            return proj?.status === 'review'
+                          })
                           const blockedAssignments = memberAssignments.filter((a: CapacityAssignment) => {
                             const proj = projects.find(p => p.name === a.project_name)
                             return proj?.status === 'blocked'
@@ -3700,7 +3708,7 @@ const [showFilters, setShowFilters] = useState(false)
                             return proj?.status === 'done'
                           })
 
-                          const renderChip = (assignment: CapacityAssignment, isDone: boolean, isBlocked?: boolean) => {
+                          const renderChip = (assignment: CapacityAssignment, isDone: boolean, isBlocked?: boolean, isReview?: boolean) => {
                             const allocPct = assignment.allocation_percent || 0
                             const allocHours = Math.round((available * allocPct) / 100 * 2) / 2
                             const paused = isDone || isBlocked
@@ -3709,8 +3717,16 @@ const [showFilters, setShowFilters] = useState(false)
                             const proj = projects.find(p => p.name === assignment.project_name)
                             const hasTimeline = proj?.timeline && proj.timeline.length > 0
                             const timelineTotal = hasTimeline ? proj.timeline.reduce((s, r) => s + calcRangeHours(r.startDate, r.endDate), 0) : 0
+                            const isOverdue = (() => {
+                              if (!proj?.endDate || proj.status === 'done') return false
+                              const end = parseLocalDate(proj.endDate)
+                              if (!end) return false
+                              const today = new Date()
+                              today.setHours(12, 0, 0, 0)
+                              return end < today
+                            })()
                             return (
-                              <div key={assignment.id} className={`assignment-chip${isDone ? ' chip-done' : ''}${isBlocked ? ' chip-blocked' : ''}`}>
+                              <div key={assignment.id} className={`assignment-chip${isDone ? ' chip-done' : ''}${isBlocked ? ' chip-blocked' : ''}${isReview ? ' chip-review' : ''}`}>
                                 <div className="chip-main">
                                   <span
                                     className="chip-project-link"
@@ -3720,6 +3736,7 @@ const [showFilters, setShowFilters] = useState(false)
                                       setProjectSortBy('name')
                                     }}
                                   >
+                                    {isOverdue && <span className="overdue-label">Overdue</span>}{isOverdue && ' '}
                                     {assignment.project_name || 'Project'}
                                   </span>
                                   <div className="chip-edit">
@@ -3818,8 +3835,17 @@ const [showFilters, setShowFilters] = useState(false)
                             <>
                               {activeAssignments.length > 0 && (
                                 <div className="assignment-chips">
-                                  <div className="load-heatmap-label">Estimated hours per week</div>
+                                  <div className="chips-column-header">
+                                    <span></span>
+                                    <span className="chips-column-label">Hrs/week</span>
+                                  </div>
                                   {activeAssignments.map((a: CapacityAssignment) => renderChip(a, false))}
+                                </div>
+                              )}
+                              {reviewAssignments.length > 0 && (
+                                <div className="assignment-chips-review">
+                                  <div className="chips-review-label">In Review</div>
+                                  {reviewAssignments.map((a: CapacityAssignment) => renderChip(a, false, false, true))}
                                 </div>
                               )}
                               {blockedAssignments.length > 0 && (
@@ -3919,7 +3945,6 @@ const [showFilters, setShowFilters] = useState(false)
                           </div>
                         </div>
                       </div>
-                    )}
                   </div>
                 )
               })}
