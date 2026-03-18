@@ -1721,6 +1721,22 @@ const [showFilters, setShowFilters] = useState(false)
       return
     }
 
+    // Warn if estimated hours exceed available capacity in date range (adjusted for designer count)
+    if (projectFormData.startDate && projectFormData.endDate && projectFormData.estimatedHours) {
+      const availablePerDesigner = calcRangeHours(projectFormData.startDate, projectFormData.endDate)
+      const designerCount = (projectFormData.designers || []).length || 1
+      const totalAvailable = availablePerDesigner * designerCount
+      if (availablePerDesigner > 0 && projectFormData.estimatedHours > totalAvailable) {
+        const sizeMap: Record<number, string> = {35:'XXS',70:'XS',105:'S',175:'M',280:'L',455:'XL',910:'XXL'}
+        const size = sizeMap[projectFormData.estimatedHours]
+        const estLabel = size ? `${size} (${projectFormData.estimatedHours}h)` : `${projectFormData.estimatedHours}h`
+        const capacityLabel = designerCount > 1 ? `${totalAvailable}h available across ${designerCount} designers` : `${totalAvailable}h available in the date range`
+        if (!confirm(`Estimated effort ${estLabel} exceeds the ${capacityLabel}. Save anyway?`)) {
+          return
+        }
+      }
+    }
+
     if (editingProject) {
       const updated = { ...editingProject, ...projectFormData }
       const success = await saveProject(updated)
@@ -2566,7 +2582,12 @@ const [showFilters, setShowFilters] = useState(false)
                             {(project.estimatedHours || 0) > 0 ? (
                               <span className="project-footer-hours">
                                 <Clock size={12} />
-                                <span>{project.estimatedHours} hrs ({Math.round((project.estimatedHours || 0) / 35 * 10) / 10} weeks)</span>
+                                {(() => {
+                                  const sizeMap: Record<number, string> = {35:'XXS',70:'XS',105:'S',175:'M',280:'L',455:'XL',910:'XXL'}
+                                  const size = sizeMap[project.estimatedHours || 0]
+                                  const weeks = Math.round((project.estimatedHours || 0) / 35 * 10) / 10
+                                  return <span>{size ? `${size} · ` : ''}{project.estimatedHours} hrs ({weeks} weeks)</span>
+                                })()}
                               </span>
                             ) : project.status !== 'done' ? (
                               <span className="project-footer-hours project-footer-warning">
@@ -3622,8 +3643,27 @@ const [showFilters, setShowFilters] = useState(false)
                                 })}
                               </div>
                               <div className="load-heatmap-axis">
-                                <span>{weeks[0].start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                                <span>{weeks[weeks.length - 1].start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                                {(() => {
+                                  const months: { label: string; position: number }[] = []
+                                  let prevMonth = -1
+                                  for (let i = 0; i < weeks.length; i++) {
+                                    const m = weeks[i].start.getMonth()
+                                    if (m !== prevMonth) {
+                                      months.push({ label: weeks[i].start.toLocaleDateString('en-US', { month: 'short' }), position: i })
+                                      prevMonth = m
+                                    }
+                                  }
+                                  // Add the month after the last week if it's a new month
+                                  const lastEnd = weeks[weeks.length - 1].end
+                                  const nextMonth = new Date(lastEnd)
+                                  nextMonth.setDate(nextMonth.getDate() + 3)
+                                  if (nextMonth.getMonth() !== prevMonth) {
+                                    months.push({ label: nextMonth.toLocaleDateString('en-US', { month: 'short' }), position: weeks.length })
+                                  }
+                                  return months.map((m, i) => (
+                                    <span key={i} style={{ position: 'absolute', left: `${(m.position / weeks.length) * 100}%` }}>{m.label}</span>
+                                  ))
+                                })()}
                               </div>
                             </div>
                           )

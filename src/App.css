@@ -4077,8 +4077,8 @@ input:checked + .slider:before {
   border: 1px solid var(--color-bg-secondary);
 }
 .load-heatmap-axis {
-  display: flex;
-  justify-content: space-between;
+  position: relative;
+  height: 0.8rem;
   font-size: 0.55rem;
   color: var(--color-text-muted);
   margin-top: 0.2rem;
