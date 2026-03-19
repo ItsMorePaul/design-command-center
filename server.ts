@@ -241,14 +241,15 @@ const requireAdmin = (req: express.Request, res: express.Response, next: express
 };
 
 // Version guard — reject writes from stale client bundles
+// Rejects if header is missing (old bundle) OR mismatched (stale bundle)
 const requireCurrentVersion = (req: express.Request, res: express.Response, next: express.NextFunction) => {
   const clientVersion = req.headers['x-client-version'] as string
-  if (clientVersion && clientVersion !== SITE_VERSION) {
+  if (!clientVersion || clientVersion !== SITE_VERSION) {
     return res.status(409).json({
       error: 'Version mismatch',
       message: 'A new version has been deployed. Please refresh the page.',
       server_version: SITE_VERSION,
-      client_version: clientVersion,
+      client_version: clientVersion || 'none',
     })
   }
   next()
@@ -1980,8 +1981,8 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 // Format: YYYY.MM.DD.hhmm (e.g., 2026.02.26.2059) → displays as "2026.02.26 2059"
 
-const SITE_VERSION = '2026.03.19.1300'
-const SITE_TIME = '1300'
+const SITE_VERSION = '2026.03.19.1320'
+const SITE_TIME = '1320'
 
 const VERSION_KEY = 'dcc_versions'
 
