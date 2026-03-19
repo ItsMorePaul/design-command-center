@@ -3740,7 +3740,6 @@ const [showFilters, setShowFilters] = useState(false)
                             const allocHours = Math.round((available * allocPct) / 100 * 2) / 2
                             const paused = isDone || isBlocked
                             const effectiveHours = paused ? 0 : (assignmentDraft[assignment.id] ?? allocHours)
-                            const effectivePct = paused ? 0 : Math.round((effectiveHours / available) * 100)
                             const proj = projects.find(p => p.name === assignment.project_name)
                             const hasTimeline = proj?.timeline && proj.timeline.length > 0
                             const timelineTotal = hasTimeline ? proj.timeline.reduce((s, r) => s + calcRangeHours(r.startDate, r.endDate), 0) : 0
