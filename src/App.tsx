@@ -37,9 +37,10 @@ const defaultHolidays = [
 
 // Recent updates shown on login screen
 const CHANGELOG = [
-  'Version guard prevents data loss from stale pages after deploys',
-  'Project risk warnings surface overdue, missing estimates, and ending-soon items',
-  'Clickable risk details with project links',
+  'Centralized DB write functions with startup schema validation — prevents silent data loss',
+  'Version guard blocks stale pages from writing to the database after deploys',
+  'Project risk warnings surface overdue, missing estimates, ending-soon, and multi-designer items',
+  'Clickable risk details with project links and human-readable dates',
   'Capacity mini arc gauges on designer cards',
   'Responsive fiscal year timeline in capacity view',
   'Unified project summary bar with status counts and risks',
