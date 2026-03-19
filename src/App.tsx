@@ -977,9 +977,7 @@ const [showFilters, setShowFilters] = useState(false)
   // Fetch users (admin only)
   const fetchUsers = async () => {
     try {
-      const res = await fetch('/api/users', {
-        headers: { 'x-session-id': getSessionId() || '' }
-      })
+      const res = await authFetch('/api/users')
       if (res.ok) {
         const data = await res.json()
         setUsers(data)
@@ -1000,12 +998,8 @@ const [showFilters, setShowFilters] = useState(false)
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      const res = await fetch('/api/users', {
+      const res = await authFetch('/api/users', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'x-session-id': getSessionId() || ''
-        },
         body: JSON.stringify({ ...userFormData, password: 'dj_wandihub!' })
       })
       if (res.ok) {
@@ -1025,9 +1019,8 @@ const [showFilters, setShowFilters] = useState(false)
   const handleDeleteUser = (userId: number) => {
     openConfirmModal('Delete user?', 'This will permanently remove this user account.', async () => {
       try {
-        const res = await fetch(`/api/users/${userId}`, {
+        const res = await authFetch(`/api/users/${userId}`, {
           method: 'DELETE',
-          headers: { 'x-session-id': getSessionId() || '' }
         })
         if (res.ok) {
           fetchUsers()
@@ -1399,7 +1392,7 @@ const [showFilters, setShowFilters] = useState(false)
   }
 
   const deleteTeamMember = async (id: string) => {
-    await fetch(`/api/team/${id}`, { method: 'DELETE' })
+    await authFetch(`/api/team/${id}`, { method: 'DELETE' })
   }
 
   const saveProject = async (project: Project): Promise<boolean> => {
@@ -1429,7 +1422,7 @@ const [showFilters, setShowFilters] = useState(false)
   }
 
   const deleteProject = async (id: string) => {
-    await fetch(`/api/projects/${id}`, { method: 'DELETE' })
+    await authFetch(`/api/projects/${id}`, { method: 'DELETE' })
   }
 
 // Search
@@ -1590,7 +1583,7 @@ const [showFilters, setShowFilters] = useState(false)
   }, [showProjectModal, showTimelineModal, showTimeOffModal, showModal])
 
   const deleteBusinessLine = async (id: string) => {
-    await fetch(`/api/business-lines/${id}`, { method: 'DELETE' })
+    await authFetch(`/api/business-lines/${id}`, { method: 'DELETE' })
     setBusinessLines(businessLines.filter(bl => bl.id !== id))
   }
 
@@ -1777,7 +1770,7 @@ const [showFilters, setShowFilters] = useState(false)
     const newRankedIds = currentRankedIds.filter(id => id !== projectId)
     savePriorities(blId, newRankedIds)
     // Persist to backend
-    await fetch(`/api/projects/${projectId}/done`, { method: 'PUT' })
+    await authFetch(`/api/projects/${projectId}/done`, { method: 'PUT' })
   }
 
   const markProjectUndone = async (projectId: string, blId: string, currentRankedIds: string[], insertIndex: number) => {
@@ -1797,7 +1790,7 @@ const [showFilters, setShowFilters] = useState(false)
     newRankedIds.splice(insertIndex, 0, projectId)
     savePriorities(blId, newRankedIds)
     // Persist to backend
-    await fetch(`/api/projects/${projectId}/undone`, { method: 'PUT' })
+    await authFetch(`/api/projects/${projectId}/undone`, { method: 'PUT' })
   }
 
   const handleSaveProject = async () => {
@@ -4165,10 +4158,8 @@ const [showFilters, setShowFilters] = useState(false)
         const syncOpenCritsDoc = async () => {
           setOpenCritsSyncing(true)
           try {
-            const baseUrl = import.meta.env.DEV ? 'http://localhost:3001' : ''
-            const resp = await fetch(`${baseUrl}/api/reports/open-crits/sync`, {
+            const resp = await authFetch('/api/reports/open-crits/sync', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'x-session-id': getSessionId() || '' },
               body: JSON.stringify({}),
             })
             const data = await resp.json()
@@ -4666,14 +4657,10 @@ const [showFilters, setShowFilters] = useState(false)
               <div className="button-group">
                 <button className="secondary-btn" onClick={() => setEditingNote(null)}>Cancel</button>
                 <button className="primary-btn" onClick={async () => {
-                const sessionId = localStorage.getItem('dcc-session-id')
                 try {
-                  const res = await fetch(`/api/notes/${editingNote.id}`, {
+                  const res = await authFetch(`/api/notes/${editingNote.id}`, {
                     method: 'PUT',
-                    headers: { 
-                      'Content-Type': 'application/json',
-                      ...(sessionId ? { 'x-session-id': sessionId } : {})
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                       title: editingNote.title,
                       date: editingNote.date,
@@ -5012,7 +4999,7 @@ const [showFilters, setShowFilters] = useState(false)
                           className="action-btn"
                           onClick={async () => {
                             try {
-                              const res = await fetch(`/api/notes/${note.id}/restore`, { method: 'PUT' })
+                              const res = await authFetch(`/api/notes/${note.id}/restore`, { method: 'PUT' })
                               if (res.ok) {
                                 setHiddenNotes(hiddenNotes.filter(n => n.id !== note.id))
                                 const notesRes = await authFetch('/api/notes')
@@ -5030,7 +5017,7 @@ const [showFilters, setShowFilters] = useState(false)
                           className="action-btn delete"
                           onClick={() => openConfirmModal('Delete note?', `This will permanently delete "${note.title || 'Untitled Note'}".`, async () => {
                             try {
-                              const res = await fetch(`/api/notes/${note.id}`, { method: 'DELETE' })
+                              const res = await authFetch(`/api/notes/${note.id}`, { method: 'DELETE' })
                               if (res.ok) {
                                 setHiddenNotes(hiddenNotes.filter(n => n.id !== note.id))
                               }
@@ -6165,15 +6152,11 @@ const [showFilters, setShowFilters] = useState(false)
                 autoFocus
                 onKeyDown={async (e) => {
                   if (e.key === 'Enter' && hideNotePin === '8432') {
-                    const sessionId = localStorage.getItem('dcc-session-id')
                     if (noteToHide) {
                       try {
-                        const res = await fetch(`/api/notes/${noteToHide.id}/hide`, {
+                        const res = await authFetch(`/api/notes/${noteToHide.id}/hide`, {
                           method: 'PUT',
-                          headers: { 
-                            'Content-Type': 'application/json',
-                            ...(sessionId ? { 'x-session-id': sessionId } : {})
-                          },
+                          headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ pin: hideNotePin })
                         })
                         if (res.ok) {
@@ -6206,15 +6189,11 @@ const [showFilters, setShowFilters] = useState(false)
                     alert('Invalid PIN')
                     return
                   }
-                  const sessionId = localStorage.getItem('dcc-session-id')
                   if (noteToHide) {
                     try {
-                      const res = await fetch(`/api/notes/${noteToHide.id}/hide`, {
+                      const res = await authFetch(`/api/notes/${noteToHide.id}/hide`, {
                         method: 'PUT',
-                        headers: { 
-                          'Content-Type': 'application/json',
-                          ...(sessionId ? { 'x-session-id': sessionId } : {})
-                        },
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ pin: hideNotePin })
                       })
                       if (res.ok) {
