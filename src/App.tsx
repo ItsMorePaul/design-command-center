@@ -37,6 +37,7 @@ const defaultHolidays = [
 
 // Recent updates shown on login screen
 const CHANGELOG = [
+  'Fixed missing estimates risk showing 0 designers when designers are assigned via project form',
   'Centralized DB write functions with startup schema validation — prevents silent data loss',
   'Version guard blocks stale pages from writing to the database after deploys',
   'Project risk warnings surface overdue, missing estimates, ending-soon, and multi-designer items',
@@ -44,7 +45,6 @@ const CHANGELOG = [
   'Capacity mini arc gauges on designer cards',
   'Responsive fiscal year timeline in capacity view',
   'Unified project summary bar with status counts and risks',
-  'Normalized hover states across all filter components',
 ]
 
 // Get today's date string for comparison
@@ -2531,7 +2531,7 @@ const [showFilters, setShowFilters] = useState(false)
                 if (noEstimate.length > 0) warnings.push({
                   icon: <FileBarChart size={12} />, text: `${noEstimate.length} missing estimates`, severity: 'warn',
                   detail: { title: 'Projects Missing Estimates', items: noEstimate.map(p => {
-                    const designerCount = activeAssignments.filter((a: CapacityAssignment) => a.project_name === p.name).length
+                    const designerCount = (p.designers || []).length
                     return { name: p.name, detail: `${designerCount} designer${designerCount !== 1 ? 's' : ''}, no hours estimated`, projectName: p.name }
                   })}
                 })
