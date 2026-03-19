@@ -2311,14 +2311,6 @@ const [showFilters, setShowFilters] = useState(false)
             <span className="nav-label">Projects</span>
           </button>
           <button
-            className={`nav-item ${activeTab === 'team' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('team') }}
-            aria-label="Team"
-          >
-            <span className="nav-icon"><Users size={18} /></span>
-            <span className="nav-label">Team</span>
-          </button>
-          <button
             className={`nav-item ${activeTab === 'capacity' ? 'active' : ''}`}
             onClick={() => { setActiveTab('capacity') }}
             aria-label="Capacity"
@@ -2333,6 +2325,14 @@ const [showFilters, setShowFilters] = useState(false)
           >
             <span className="nav-icon"><Calendar size={18} /></span>
             <span className="nav-label">Calendar</span>
+          </button>
+          <button
+            className={`nav-item ${activeTab === 'team' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('team') }}
+            aria-label="Team"
+          >
+            <span className="nav-icon"><Users size={18} /></span>
+            <span className="nav-label">Team</span>
           </button>
           <button
             className={`nav-item ${activeTab === 'reports' ? 'active' : ''}`}
@@ -3388,135 +3388,77 @@ const [showFilters, setShowFilters] = useState(false)
               
               return (
                 <div className="capacity-gauge-container">
-                  <div className="gauge-header">
-                    <span className="gauge-quarter">Q3 / FY26</span>
-                  </div>
-                  <div className="capacity-gauge">
-                    <svg viewBox="0 0 200 120" className="gauge-svg">
-                      {/* Background arc */}
-                      <path
-                        d="M 20 100 A 80 80 0 0 1 180 100"
-                        fill="none"
-                        stroke="var(--color-border)"
-                        strokeWidth="12"
-                        strokeLinecap="round"
-                      />
-                      {/* Filled arc */}
-                      <path
-                        d="M 20 100 A 80 80 0 0 1 180 100"
-                        fill="none"
-                        stroke={getGaugeColor()}
-                        strokeWidth="12"
-                        strokeLinecap="round"
-                        strokeDasharray={`${(pct / 100) * 251.2} 251.2`}
-                        style={{ transition: 'stroke-dasharray 0.5s ease' }}
-                      />
-                    </svg>
-                    <div className="gauge-center">
-                      <span className="gauge-pct" style={{ color: getGaugeColor() }}>{pct}%</span>
-                      <span className="gauge-label">Utilized</span>
+                  <div className="gauge-left">
+                    <div className="capacity-gauge">
+                      <svg viewBox="0 0 200 120" className="gauge-svg">
+                        <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="var(--color-border)" strokeWidth="12" strokeLinecap="round" />
+                        <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke={getGaugeColor()} strokeWidth="12" strokeLinecap="round" strokeDasharray={`${(pct / 100) * 251.2} 251.2`} style={{ transition: 'stroke-dasharray 0.5s ease' }} />
+                      </svg>
+                      <div className="gauge-center">
+                        <span className="gauge-pct" style={{ color: getGaugeColor() }}>{pct}%</span>
+                        <span className="gauge-label">Utilized</span>
+                      </div>
+                    </div>
+                    <div className="gauge-stats-row">
+                      <div className="gauge-stat">
+                        <span className="gauge-stat-value">{Math.round(allocatedQuarter).toLocaleString()}</span>
+                        <span className="gauge-stat-label">Allocated hrs</span>
+                      </div>
+                      <div className="gauge-stat">
+                        <span className="gauge-stat-value">{Math.round(availableQuarter).toLocaleString()}</span>
+                        <span className="gauge-stat-label">Quarter hrs</span>
+                      </div>
+                      <div className="gauge-stat">
+                        <span className="gauge-stat-value" style={{ color: remaining < 0 ? 'var(--color-danger)' : 'var(--color-success)' }}>{remaining.toLocaleString()}</span>
+                        <span className="gauge-stat-label">Remaining</span>
+                      </div>
                     </div>
                   </div>
-                  <div className="capacity-gauge-stats">
-                    <div className="gauge-stat">
-                      <span className="gauge-stat-value">{Math.round(availableQuarter).toLocaleString()}</span>
-                      <span className="gauge-stat-label">Available hrs</span>
-                    </div>
-                    <div className="gauge-stat">
-                      <span className="gauge-stat-value">{Math.round(allocatedQuarter).toLocaleString()}</span>
-                      <span className="gauge-stat-label">Allocated hrs</span>
-                    </div>
-                    <div className="gauge-stat">
-                      <span className="gauge-stat-value" style={{ color: remaining < 0 ? 'var(--color-danger)' : 'var(--color-success)' }}>{remaining.toLocaleString()}</span>
-                      <span className="gauge-stat-label">Remaining hrs</span>
-                    </div>
-                  </div>
-                  {(() => {
-                    const activeProjects = projects.filter(p => p.status === 'active' || p.status === 'review')
-                    const totalEstimated = activeProjects.reduce((sum, p) => sum + (p.estimatedHours || 0), 0)
-                    const estimatedCount = activeProjects.filter(p => (p.estimatedHours || 0) > 0).length
-                    // Calculate total allocated hours over full project lifetime (start→end)
-                    const totalAllocated = capacityData.assignments.reduce((sum: number, a: CapacityAssignment) => {
-                      const proj = projects.find(p => p.name === a.project_name)
-                      if (!proj || proj.status === 'done' || proj.status === 'blocked') return sum
-                      if (excludedDesigners.has(a.designer_id)) return sum
-                      if (!proj.startDate || !proj.endDate) return sum
-                      const designer = activeTeam.find(m => m.id === a.designer_id)
-                      const weeklyHours = designer?.weekly_hours || 35
-                      const allocHours = (weeklyHours * (a.allocation_percent || 0)) / 100
-                      const start = parseLocalDate(proj.startDate)
-                      const end = parseLocalDate(proj.endDate)
-                      if (!start || !end) return sum
-                      const totalWeeks = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000)))
-                      return sum + (allocHours * totalWeeks)
-                    }, 0)
-                    const fundedPct = totalEstimated > 0 ? Math.round((totalAllocated / totalEstimated) * 100) : 0
-                    if (totalEstimated === 0) return null
-                    const barColor = fundedPct >= 90 ? 'var(--color-success)' : fundedPct >= 60 ? 'var(--color-warning)' : 'var(--color-danger)'
-                    return (
-                      <div className="capacity-funding-stats">
-                        <div className="funding-header">Project Funding</div>
-                        <div className="funding-row">
-                          <div className="funding-stat">
-                            <span className="funding-stat-value">{Math.round(totalEstimated).toLocaleString()}</span>
-                            <span className="funding-stat-label">Estimated hrs ({estimatedCount} projects)</span>
-                          </div>
-                          <div className="funding-stat">
-                            <span className="funding-stat-value">{Math.round(totalAllocated).toLocaleString()}</span>
-                            <span className="funding-stat-label">Allocated hrs</span>
-                          </div>
-                          <div className="funding-stat">
-                            <span className="funding-stat-value" style={{ color: barColor }}>
-                              {fundedPct}%
-                            </span>
-                            <span className="funding-stat-label">Funded</span>
-                          </div>
+                  <div className="gauge-right">
+                    <div className="gauge-right-section">
+                      <div className="gauge-right-header">Quarter Allocation</div>
+                      <div className="gauge-alloc-bar">
+                        <div className="gauge-alloc-bar-track">
+                          <div className="gauge-alloc-bar-fill" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: getGaugeColor() }} />
                         </div>
-                        <div className="funding-bar-track">
-                          <div
-                            className="funding-bar-fill"
-                            style={{
-                              width: `${Math.min(fundedPct, 100)}%`,
-                              backgroundColor: barColor
-                            }}
-                          />
+                        <div className="gauge-alloc-bar-labels">
+                          <span>{Math.round(allocatedQuarter).toLocaleString()} hrs allocated</span>
+                          <span>{Math.round(availableQuarter).toLocaleString()} hrs available</span>
                         </div>
                       </div>
-                    )
-                  })()}
-                  {(() => {
-                    // DJ Fiscal Year timeline: Q3/FY26 (Jan) through Q2/FY27 (Dec)
-                    const fyStart = new Date(2026, 0, 1) // Jan 1 2026
-                    const fyEnd = new Date(2026, 11, 31) // Dec 31 2026
-                    const now = new Date()
-                    const totalMs = fyEnd.getTime() - fyStart.getTime()
-                    const elapsed = Math.max(0, Math.min(now.getTime() - fyStart.getTime(), totalMs))
-                    const todayPct = (elapsed / totalMs) * 100
-                    const quarters = [
-                      { label: 'Q3/FY26', month: 'January 2026', pct: 0 },
-                      { label: 'Q4/FY26', month: 'April', pct: 25 },
-                      { label: 'Q1/FY27', month: 'July', pct: 50 },
-                      { label: 'Q2/FY27', month: 'October', pct: 75 },
-                      { label: 'Q3/FY27', month: 'January 2027', pct: 100 },
-                    ]
-                    return (
-                      <div className="fy-timeline">
-                        <div className="fy-timeline-track">
-                          <div className="fy-timeline-fill" style={{ width: `${todayPct}%` }} />
-                          {quarters.map(q => (
-                            <div key={q.label} className="fy-quarter-mark" style={{ left: `${q.pct}%` }}>
-                              <div className="fy-quarter-tick" />
-                              <span className="fy-quarter-label">{q.label}</span>
-                              <span className="fy-quarter-month">{q.month}</span>
-                            </div>
-                          ))}
-                          <div className="fy-today-marker" style={{ left: `${todayPct}%` }}>
-                            <div className="fy-today-flag">Today</div>
+                    </div>
+                    <div className="gauge-right-section">
+                      <div className="gauge-right-header">Fiscal Year Progress</div>
+                      {(() => {
+                        const quarters = [
+                          { label: 'Q3 FY26', start: new Date(2026, 0, 1), end: new Date(2026, 3, 1) },
+                          { label: 'Q4 FY26', start: new Date(2026, 3, 1), end: new Date(2026, 6, 1) },
+                          { label: 'Q1 FY27', start: new Date(2026, 6, 1), end: new Date(2026, 9, 1) },
+                          { label: 'Q2 FY27', start: new Date(2026, 9, 1), end: new Date(2027, 0, 1) },
+                        ]
+                        const now = new Date()
+                        return (
+                          <div className="fy-timeline">
+                            {quarters.map(q => {
+                              const qMs = q.end.getTime() - q.start.getTime()
+                              const elapsed = Math.max(0, Math.min(now.getTime() - q.start.getTime(), qMs))
+                              const fillPct = (elapsed / qMs) * 100
+                              const isCurrent = now >= q.start && now < q.end
+                              const isPast = now >= q.end
+                              return (
+                                <div key={q.label} className={`fy-quarter${isCurrent ? ' fy-quarter-current' : ''}`}>
+                                  <span className="fy-label">{q.label}</span>
+                                  <div className="fy-quarter-track">
+                                    <div className="fy-quarter-fill" style={{ width: `${isPast ? 100 : fillPct}%` }} />
+                                  </div>
+                                </div>
+                              )
+                            })}
                           </div>
-                        </div>
-                      </div>
-                    )
-                  })()}
+                        )
+                      })()}
+                    </div>
+                  </div>
                 </div>
               )
             })()}
@@ -3608,30 +3550,25 @@ const [showFilters, setShowFilters] = useState(false)
                 return (
                   <div key={member.id} className={`designer-expandable-card ${isOver ? 'over-capacity' : ''} ${excludedDesigners.has(member.id) ? 'excluded' : ''}`}>
                     <div className="designer-card-header">
-                      <div className="designer-card-header-content">
-                        <div className="designer-col-info">
-                          <span className="designer-name">
-                            <span className="first-name">{member.name.split(' ')[0]}</span>
-                            {member.name.includes(' ') && (
-                              <span className="last-name">{member.name.split(' ').slice(1).join(' ')}</span>
-                            )}
-                          </span>
-                          <span className="designer-hours">{memberAssignments.filter((a: CapacityAssignment) => { const proj = projects.find(p => p.name === a.project_name); return !proj || proj.status !== 'done' }).length} active projects</span>
+                      <div className="designer-col-info">
+                        <span className="designer-name">
+                          <span className="first-name">{member.name.split(' ')[0]}</span>
+                          {member.name.includes(' ') && (
+                            <span className="last-name">{member.name.split(' ').slice(1).join(' ')}</span>
+                          )}
+                        </span>
+                        <span className="designer-hours">{memberAssignments.filter((a: CapacityAssignment) => { const proj = projects.find(p => p.name === a.project_name); return !proj || proj.status !== 'done' }).length} projects</span>
+                      </div>
+                      <div className="designer-mini-gauge">
+                        <svg viewBox="0 0 80 50" className="mini-gauge-svg">
+                          <path d="M 8 42 A 32 32 0 0 1 72 42" fill="none" stroke="var(--color-border)" strokeWidth="5" strokeLinecap="round" />
+                          <path d="M 8 42 A 32 32 0 0 1 72 42" fill="none" stroke={getUtilColor()} strokeWidth="5" strokeLinecap="round" strokeDasharray={`${(Math.min(utilization, 100) / 100) * 100.5} 100.5`} />
+                        </svg>
+                        <div className="mini-gauge-text">
+                          <span className="mini-gauge-pct" style={{ color: getUtilColor() }}>{utilization}%</span>
+                          <span className="mini-gauge-hours">{parseFloat(allocatedHours.toFixed(1))}h</span>
                         </div>
-                        <div className="designer-col-bar">
-                          <div 
-                            className="designer-bar-fill"
-                            style={{ 
-                              width: `${Math.min(utilization, 100)}%`,
-                              backgroundColor: getUtilColor()
-                            }}
-                          />
-                        </div>
-                        <div className="designer-col-usage">
-                          <span className="usage-pct" style={{ color: getUtilColor() }}>{utilization}%</span>
-                          <span className="usage-hours">{parseFloat(allocatedHours.toFixed(1))}h</span>
-                        </div>
-                        </div>
+                      </div>
                     </div>
 
                     <div className="designer-card-body">
@@ -3742,24 +3679,20 @@ const [showFilters, setShowFilters] = useState(false)
                               </div>
                               <div className="load-heatmap-axis">
                                 {(() => {
-                                  const months: { label: string; position: number }[] = []
+                                  // Build month spans: each month gets flex weight = number of weeks it covers
+                                  const monthSpans: { label: string; weeks: number }[] = []
                                   let prevMonth = -1
                                   for (let i = 0; i < weeks.length; i++) {
                                     const m = weeks[i].start.getMonth()
                                     if (m !== prevMonth) {
-                                      months.push({ label: weeks[i].start.toLocaleDateString('en-US', { month: 'short' }), position: i })
+                                      monthSpans.push({ label: weeks[i].start.toLocaleDateString('en-US', { month: 'short' }), weeks: 1 })
                                       prevMonth = m
+                                    } else {
+                                      monthSpans[monthSpans.length - 1].weeks++
                                     }
                                   }
-                                  // Add the month after the last week if it's a new month
-                                  const lastEnd = weeks[weeks.length - 1].end
-                                  const nextMonth = new Date(lastEnd)
-                                  nextMonth.setDate(nextMonth.getDate() + 3)
-                                  if (nextMonth.getMonth() !== prevMonth) {
-                                    months.push({ label: nextMonth.toLocaleDateString('en-US', { month: 'short' }), position: weeks.length })
-                                  }
-                                  return months.map((m, i) => (
-                                    <span key={i} style={{ position: 'absolute', left: `${(m.position / weeks.length) * 100}%` }}>{m.label}</span>
+                                  return monthSpans.map((m, i) => (
+                                    <span key={i} className="load-heatmap-month" style={{ flex: m.weeks }}>{m.label}</span>
                                   ))
                                 })()}
                               </div>
@@ -3821,7 +3754,7 @@ const [showFilters, setShowFilters] = useState(false)
                             })()
                             return (
                               <div key={assignment.id} className={`assignment-chip${isDone ? ' chip-done' : ''}${isBlocked ? ' chip-blocked' : ''}${isReview ? ' chip-review' : ''}`}>
-                                <div className="chip-main">
+                                <div className="chip-header">
                                   <span
                                     className="chip-project-link"
                                     onClick={() => {
@@ -3833,46 +3766,54 @@ const [showFilters, setShowFilters] = useState(false)
                                     {isOverdue && <span className="overdue-label">Overdue</span>}{isOverdue && ' '}
                                     {assignment.project_name || 'Project'}
                                   </span>
-                                  <div className="chip-edit">
-                                    <span className="chip-hours-label">{isBlocked ? `(${allocHours}h)` : `${effectiveHours}h`}</span>
-                                    <input
-                                      type="range"
-                                      className="chip-slider"
-                                      min={0}
-                                      max={available}
-                                      step={0.5}
-                                      value={isBlocked ? allocHours : effectiveHours}
-                                      disabled={paused}
-                                      onChange={e => !paused && setAssignmentDraft({ ...assignmentDraft, [assignment.id]: Number(e.target.value) })}
-                                      onMouseUp={(e) => {
-                                        if (paused) return
-                                        const newHours = Number((e.target as HTMLInputElement).value)
-                                        const newPct = Math.round((newHours / available) * 100)
-                                        const oldPct = allocPct
-                                        if (newPct !== oldPct) saveAssignmentAllocation(assignment, newPct)
-                                      }}
-                                      onTouchEnd={(e) => {
-                                        if (paused) return
-                                        const newHours = Number((e.target as HTMLInputElement).value)
-                                        const newPct = Math.round((newHours / available) * 100)
-                                        const oldPct = allocPct
-                                        if (newPct !== oldPct) saveAssignmentAllocation(assignment, newPct)
-                                      }}
-                                      onClick={e => e.stopPropagation()}
-                                    />
-                                    <button
-                                      className="chip-delete"
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        openConfirmModal('Remove assignment?', `Remove ${assignment.project_name || 'project'} from ${member.name}?`, async () => {
-                                          await removeCapacityAssignment(assignment.id)
-                                          closeConfirmModal()
-                                        })
-                                      }}
-                                    >
-                                      <Trash2 size={14} />
-                                    </button>
-                                  </div>
+                                  <span className="chip-hours-badge">
+                                    {isBlocked ? `(${allocHours}h)` : `${effectiveHours}h`}
+                                  </span>
+                                  <button
+                                    className="chip-delete"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      openConfirmModal('Remove assignment?', `Remove ${assignment.project_name || 'project'} from ${member.name}?`, async () => {
+                                        await removeCapacityAssignment(assignment.id)
+                                        closeConfirmModal()
+                                      })
+                                    }}
+                                  >
+                                    <Trash2 size={11} />
+                                  </button>
+                                </div>
+                                <div className="chip-slider-row">
+                                  <input
+                                    type="range"
+                                    className="chip-slider"
+                                    min={0}
+                                    max={available}
+                                    step={0.5}
+                                    value={isBlocked ? allocHours : effectiveHours}
+                                    disabled={paused}
+                                    style={{
+                                      background: (() => {
+                                        const pctVal = available > 0 ? ((isBlocked ? allocHours : effectiveHours) / available) * 100 : 0
+                                        const fillColor = pctVal <= 40 ? '#22c55e' : pctVal <= 70 ? '#f59e0b' : '#ef4444'
+                                        return `linear-gradient(to right, ${fillColor} 0%, ${fillColor} ${pctVal}%, var(--color-border) ${pctVal}%, var(--color-border) 100%)`
+                                      })()
+                                    }}
+                                    onInput={e => !paused && setAssignmentDraft({ ...assignmentDraft, [assignment.id]: Number((e.target as HTMLInputElement).value) })}
+                                    onChange={() => {}}
+                                    onMouseUp={(e) => {
+                                      if (paused) return
+                                      const newHours = Number((e.target as HTMLInputElement).value)
+                                      const newPct = Math.round((newHours / available) * 100)
+                                      if (newPct !== allocPct) saveAssignmentAllocation(assignment, newPct)
+                                    }}
+                                    onTouchEnd={(e) => {
+                                      if (paused) return
+                                      const newHours = Number((e.target as HTMLInputElement).value)
+                                      const newPct = Math.round((newHours / available) * 100)
+                                      if (newPct !== allocPct) saveAssignmentAllocation(assignment, newPct)
+                                    }}
+                                    onClick={e => e.stopPropagation()}
+                                  />
                                 </div>
                                 {proj && (proj.estimatedHours || timelineTotal > 0) && (() => {
                                   const hrs = proj.estimatedHours || timelineTotal
@@ -3880,16 +3821,15 @@ const [showFilters, setShowFilters] = useState(false)
                                   const size = sizeMap[hrs] || ''
                                   const weeks = Math.round((hrs / 35) * 10) / 10
                                   const weeksStr = weeks % 1 === 0 ? weeks.toFixed(0) : weeks.toFixed(1)
-                                  return <span className="chip-est"><Clock size={10} /> {size ? `${size} · ` : ''}{hrs} hrs ({weeksStr} weeks)</span>
+                                  return <div className="chip-est"><Clock size={10} /> {size ? `${size} · ` : ''}{hrs}h est ({weeksStr}wk)</div>
                                 })()}
                                 {proj && capacityData && (() => {
                                   const projAssignments = capacityData.assignments.filter(a => a.project_id === proj.id && a.project_status !== 'done' && a.project_status !== 'blocked')
                                   if (projAssignments.length === 0) return null
                                   const totalWeeklyHrs = projAssignments.reduce((s, a) => {
-                                    const pct = a.allocation_percent || 0
                                     const designerMember = capacityData.team.find(m => m.id === a.designer_id)
                                     const dAvail = designerMember ? (designerMember.weekly_hours ?? 35) : 35
-                                    return s + Math.round((dAvail * pct) / 100 * 2) / 2
+                                    return s + Math.round((dAvail * (a.allocation_percent || 0)) / 100 * 2) / 2
                                   }, 0)
                                   const projCapacity = (proj.startDate && proj.endDate) ? calcRangeHours(proj.startDate, proj.endDate) : 0
                                   const projWeeks = projCapacity > 0 ? Math.round((projCapacity / 35) * 10) / 10 : 0
@@ -3897,14 +3837,13 @@ const [showFilters, setShowFilters] = useState(false)
                                   const estHrs = proj.estimatedHours || timelineTotal || 0
                                   const overAllocated = estHrs > 0 && totalEffort > estHrs * 1.2
                                   const underAllocated = estHrs > 0 && projWeeks > 0 && totalEffort < estHrs * 0.5
-                                  const designerCount = projAssignments.length
                                   const flag = overAllocated ? 'over' : underAllocated ? 'under' : ''
                                   return (
-                                    <span className={`chip-allocation-summary${flag ? ` chip-alloc-${flag}` : ''}`}>
-                                      {designerCount} designer{designerCount > 1 ? 's' : ''} · {parseFloat(totalWeeklyHrs.toFixed(1))}h/wk{projWeeks > 0 ? ` · ${projWeeks % 1 === 0 ? projWeeks.toFixed(0) : projWeeks.toFixed(1)} wk project` : ''}
+                                    <div className={`chip-allocation-summary${flag ? ` chip-alloc-${flag}` : ''}`}>
+                                      {projAssignments.length} designer{projAssignments.length > 1 ? 's' : ''} · {parseFloat(totalWeeklyHrs.toFixed(1))}h/wk{projWeeks > 0 ? ` · ${projWeeks % 1 === 0 ? projWeeks.toFixed(0) : projWeeks.toFixed(1)}wk` : ''}
                                       {flag === 'over' && ' ⚠ over-allocated'}
                                       {flag === 'under' && ' ⚠ under-allocated'}
-                                    </span>
+                                    </div>
                                   )
                                 })()}
                                 {hasTimeline && (
@@ -3914,13 +3853,6 @@ const [showFilters, setShowFilters] = useState(false)
                                     ))}
                                   </div>
                                 )}
-                                <div
-                                  className="chip-bar"
-                                  style={{
-                                    width: `${Math.min(effectivePct, 100)}%`,
-                                    backgroundColor: effectivePct > 50 ? 'var(--color-warning, #f59e0b)' : effectivePct > 0 ? 'var(--color-success, #22c55e)' : 'var(--color-bg-primary)'
-                                  }}
-                                />
                               </div>
                             )
                           }
