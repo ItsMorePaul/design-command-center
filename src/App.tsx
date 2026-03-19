@@ -16,7 +16,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Gauge, ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, Settings, GripVertical, Folder, StickyNote, RefreshCw, User, CheckSquare, Sun, Moon, Edit2, Bell, Loader, Clock, ClipboardCopy, BarChart3, FileBarChart, ListChecks, Palette, HelpCircle, AlertTriangle, Flag } from 'lucide-react'
+import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Gauge, ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, Settings, GripVertical, Folder, StickyNote, RefreshCw, User, CheckSquare, Sun, Moon, Edit2, Bell, Loader, Clock, ClipboardCopy, BarChart3, FileBarChart, ListChecks, Palette, HelpCircle, AlertTriangle, Flag, Info } from 'lucide-react'
 import { Tooltip } from './Tooltip'
 import './App.css'
 import initialData from './data.json'
@@ -33,6 +33,17 @@ const defaultHolidays = [
   { name: "Veterans Day", date: '2026-11-11' },
   { name: "Thanksgiving", date: '2026-11-26' },
   { name: "Christmas Day", date: '2026-12-25' },
+]
+
+// Recent updates shown on login screen
+const CHANGELOG = [
+  'Version guard prevents data loss from stale pages after deploys',
+  'Project risk warnings surface overdue, missing estimates, and ending-soon items',
+  'Clickable risk details with project links',
+  'Capacity mini arc gauges on designer cards',
+  'Responsive fiscal year timeline in capacity view',
+  'Unified project summary bar with status counts and risks',
+  'Normalized hover states across all filter components',
 ]
 
 // Get today's date string for comparison
@@ -369,18 +380,31 @@ interface ActivityItem {
   created_at: string
 }
 
-// Auth fetch helper - adds session ID to all requests
+// Track client version for stale-write protection
+let _clientVersion = ''
+
+// Auth fetch helper - adds session ID and version to all requests
 const authFetch = async (url: string, options: RequestInit = {}) => {
   const sessionId = localStorage.getItem('dcc-session-id')
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>),
     ...(sessionId ? { 'x-session-id': sessionId } : {}),
+    ...(_clientVersion ? { 'x-client-version': _clientVersion } : {}),
   }
   // Auto-add Content-Type for JSON bodies when not explicitly set
   if (options.body && typeof options.body === 'string' && !headers['Content-Type'] && !headers['content-type']) {
     headers['Content-Type'] = 'application/json'
   }
-  return fetch(url, { ...options, headers })
+  const res = await fetch(url, { ...options, headers })
+  if (res.status === 409) {
+    const data = await res.json().catch(() => ({}))
+    if (data.error === 'Version mismatch') {
+      alert('A new version of Wandi Hub has been deployed. The page will refresh now.')
+      window.location.reload()
+      return new Response(null, { status: 409 })
+    }
+  }
+  return res
 }
 
 // Use data from data.json for default brand options
@@ -1053,6 +1077,7 @@ const [showFilters, setShowFilters] = useState(false)
   const [maintenanceForm, setMaintenanceForm] = useState({ bannerMessage: 'Save your work. Wandi Hub maintenance about to begin in 5 minutes.', lockoutMessage: 'Wandi Hub will be back soon.', countdownMinutes: 5 })
   const [countdownDisplay, setCountdownDisplay] = useState('')
   const [updateAvailable, setUpdateAvailable] = useState(false)
+  const [showChangelog, setShowChangelog] = useState(false)
   const [copiedReport, setCopiedReport] = useState<number | null>(null)
   const [openCritsSyncing, setOpenCritsSyncing] = useState(false)
 
@@ -1068,6 +1093,8 @@ const [showFilters, setShowFilters] = useState(false)
     es.addEventListener('version', (e) => {
       try {
         const { site_version } = JSON.parse(e.data)
+        // Set client version on first connect (before state is populated)
+        if (!_clientVersion) _clientVersion = site_version
         setSiteVersion(prev => {
           // If we already have a version and the server sent a different one, show update banner
           if (prev.version && site_version && prev.version !== site_version) {
@@ -1119,6 +1146,7 @@ const [showFilters, setShowFilters] = useState(false)
       try {
         const res = await authFetch('/api/versions')
         const data = await res.json()
+        _clientVersion = data.site_version || ''
         setSiteVersion({ version: data.site_version || '', time: data.site_time || '' })
         setDbVersion({ version: data.db_version || '', time: data.db_time || '' })
       } catch (e) {
@@ -2213,7 +2241,19 @@ const [showFilters, setShowFilters] = useState(false)
           <div className="login-lockup">
             <LayoutGrid size={23} />
             <h1>Wandi Hub</h1>
+            <button className="changelog-toggle" onClick={() => setShowChangelog(v => !v)} aria-label="What's new">
+              <Info size={15} />
+            </button>
           </div>
+
+          {showChangelog && (
+            <div className="changelog-popover">
+              <div className="changelog-title">What's new</div>
+              <ul className="changelog-list">
+                {CHANGELOG.map((item, i) => <li key={i}>{item}</li>)}
+              </ul>
+            </div>
+          )}
 
           <form className="login-form" onSubmit={handleLogin} action="/api/auth/login" method="post" autoComplete="on">
             {loginError && <div className="login-error">{loginError}</div>}
