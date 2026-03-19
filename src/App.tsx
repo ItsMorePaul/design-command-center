@@ -1077,7 +1077,7 @@ const [showFilters, setShowFilters] = useState(false)
   const [maintenanceForm, setMaintenanceForm] = useState({ bannerMessage: 'Save your work. Wandi Hub maintenance about to begin in 5 minutes.', lockoutMessage: 'Wandi Hub will be back soon.', countdownMinutes: 5 })
   const [countdownDisplay, setCountdownDisplay] = useState('')
   const [updateAvailable, setUpdateAvailable] = useState(false)
-  const [showChangelog, setShowChangelog] = useState(false)
+  const [showChangelog, setShowChangelog] = useState(true)
   const [copiedReport, setCopiedReport] = useState<number | null>(null)
   const [openCritsSyncing, setOpenCritsSyncing] = useState(false)
 
