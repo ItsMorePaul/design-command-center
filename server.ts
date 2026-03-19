@@ -181,6 +181,84 @@ const get = (sql, params = []) => new Promise((resolve, reject) => {
 });
 
 // ============================================
+// CENTRALIZED UPSERT FUNCTIONS
+// Single source of truth for each table's columns.
+// Every INSERT path MUST use these — never inline column lists.
+// ============================================
+
+const upsertProject = async (p: any) => {
+  const timelineVal = typeof p.timeline === 'string' ? p.timeline : JSON.stringify(p.timeline || [])
+  const customLinksVal = typeof p.customLinks === 'string' ? p.customLinks : JSON.stringify(p.customLinks || [])
+  const designersVal = typeof p.designers === 'string' ? p.designers : JSON.stringify(p.designers || [])
+  const businessLineVal = typeof p.businessLine === 'string' && p.businessLine.startsWith('[')
+    ? p.businessLine
+    : typeof p.businessLines === 'string' ? p.businessLines
+    : JSON.stringify(p.businessLines || (p.businessLine ? [p.businessLine] : []))
+  await run(
+    `INSERT OR REPLACE INTO projects
+     (id, name, status, dueDate, assignee, url, description, businessLine,
+      deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink,
+      customLinks, designers, startDate, endDate, timeline, estimatedHours, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+    [p.id, p.name, p.status || 'active', p.dueDate || null, p.assignee || null,
+     p.url || '', p.description || '', businessLineVal,
+     p.deckName || '', p.deckLink || '', p.prdName || '', p.prdLink || '',
+     p.briefName || '', p.briefLink || '', p.figmaLink || '',
+     customLinksVal, designersVal, p.startDate || null, p.endDate || null,
+     timelineVal, p.estimatedHours || 0]
+  )
+}
+
+const upsertTeamMember = async (t: any) => {
+  const brandsVal = typeof t.brands === 'string' ? t.brands : JSON.stringify(t.brands || [])
+  const timeOffVal = typeof t.timeOff === 'string' ? t.timeOff : JSON.stringify(t.timeOff || [])
+  await run(
+    `INSERT OR REPLACE INTO team
+     (id, name, role, brands, status, slack, email, avatar, timeOff, weekly_hours, excluded, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+    [t.id, t.name, t.role || '', brandsVal, t.status || 'offline',
+     t.slack || '', t.email || '', t.avatar || '', timeOffVal,
+     t.weekly_hours ?? 35, t.excluded ? 1 : 0]
+  )
+}
+
+const upsertBusinessLine = async (bl: any) => {
+  const customLinksVal = typeof bl.customLinks === 'string' ? bl.customLinks : JSON.stringify(bl.customLinks || [])
+  await run(
+    `INSERT OR REPLACE INTO business_lines
+     (id, name, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinks, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+    [bl.id, bl.name, bl.deckName || '', bl.deckLink || '', bl.prdName || '', bl.prdLink || '',
+     bl.briefName || '', bl.briefLink || '', bl.figmaLink || '', customLinksVal]
+  )
+}
+
+const upsertAssignment = async (a: any) => {
+  const id = a.id || `${a.project_id}_${a.designer_id}`
+  await run(
+    `INSERT OR REPLACE INTO project_assignments (id, project_id, designer_id, allocation_percent, created_at)
+     VALUES (?, ?, ?, ?, ?)`,
+    [id, a.project_id, a.designer_id, a.allocation_percent ?? 0, a.created_at || new Date().toISOString()]
+  )
+}
+
+const upsertNote = async (n: any) => {
+  await run(
+    `INSERT OR REPLACE INTO notes
+     (id, source_id, source_filename, title, date, content_preview, people_raw, projects_raw,
+      drive_url, source_created_at, next_steps, details, attachments,
+      linkedTeamIds, linkedProjectIds, hidden, hidden_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [n.id, n.source_id || null, n.source_filename || '', n.title || '', n.date || '',
+     n.content_preview || '', n.people_raw || '', n.projects_raw || '',
+     n.drive_url || '', n.source_created_at || '', n.next_steps || '', n.details || '',
+     n.attachments || '[]', n.linkedTeamIds ? (typeof n.linkedTeamIds === 'string' ? n.linkedTeamIds : JSON.stringify(n.linkedTeamIds)) : '[]',
+     n.linkedProjectIds ? (typeof n.linkedProjectIds === 'string' ? n.linkedProjectIds : JSON.stringify(n.linkedProjectIds)) : '[]',
+     n.hidden ? 1 : 0, n.hidden_at || null]
+  )
+}
+
+// ============================================
 // AUTHENTICATION & USERS
 // ============================================
 
@@ -522,7 +600,12 @@ app.use((req, res, next) => {
 
 // ============ HEALTH ============
 app.get('/api/health', async (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString(), maintenance: maintenanceState.enabled })
+  res.json({
+    status: schemaDrift.length > 0 ? 'degraded' : 'ok',
+    timestamp: new Date().toISOString(),
+    maintenance: maintenanceState.enabled,
+    schemaDrift: schemaDrift.length > 0 ? schemaDrift : undefined,
+  })
 })
 
 // ============ SERVER-SENT EVENTS (SSE) ============
@@ -623,15 +706,11 @@ app.post('/api/projects', async (req, res) => {
       }
     }
 
-    const timelineJson = JSON.stringify(timeline || []);
-    const customLinksJson = JSON.stringify(customLinks || []);
-    const designersJson = JSON.stringify(designers || []);
-    const businessLinesJson = JSON.stringify(businessLines || []);
-    await run(
-      `INSERT OR REPLACE INTO projects (id, name, status, dueDate, assignee, url, description, businessLine, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinks, designers, startDate, endDate, timeline, estimatedHours, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-      [projectId, name, status || 'active', dueDate, assignee, url, description, businessLinesJson, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinksJson, designersJson, startDate, endDate, timelineJson, estimatedHours || 0]
-    );
+    await upsertProject({
+      id: projectId, name, status, dueDate, assignee, url, description,
+      businessLines, deckName, deckLink, prdName, prdLink, briefName, briefLink,
+      figmaLink, customLinks, designers, startDate, endDate, timeline, estimatedHours,
+    });
 
     await syncProjectDesignersToAssignments(projectId, designers || [])
 
@@ -700,8 +779,6 @@ app.post('/api/business-lines', async (req, res) => {
         return res.status(409).json({ error: 'This business line was modified by another user. Please refresh and try again.' })
       }
     }
-    const customLinksJson = JSON.stringify(customLinks || []);
-    
     // Check if this is a rename (name changed but same id)
     if (originalName && originalName !== name) {
       // Update all projects that have the old name in their businessLines array
@@ -731,11 +808,9 @@ app.post('/api/business-lines', async (req, res) => {
       }
     }
     
-    await run(
-      `INSERT OR REPLACE INTO business_lines (id, name, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinks, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-      [lineId, name, deckName || '', deckLink || '', prdName || '', prdLink || '', briefName || '', briefLink || '', figmaLink || '', customLinksJson]
-    );
+    await upsertBusinessLine({
+      id: lineId, name, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinks,
+    });
     await updateDbVersion()
     res.json({id: lineId, ...req.body});
   } catch (e) { res.status(500).json({error: e.message}); }
@@ -776,13 +851,9 @@ app.post('/api/team', async (req, res) => {
       }
     }
 
-    const brandsJson = JSON.stringify(brands || []);
-    const timeOffJson = JSON.stringify(timeOff || []);
-    await run(
-      `INSERT OR REPLACE INTO team (id, name, role, brands, status, slack, email, avatar, timeOff, weekly_hours, excluded, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-      [memberId, name, role, brandsJson, status || 'offline', slack, email, avatar, timeOffJson, weekly_hours ?? 35, excluded ? 1 : 0]
-    );
+    await upsertTeamMember({
+      id: memberId, name, role, brands, status, slack, email, avatar, timeOff, weekly_hours, excluded,
+    });
     await updateDbVersion()
     const saved = await get('SELECT * FROM team WHERE id = ?', [memberId])
     res.json(saved);
@@ -1266,13 +1337,11 @@ app.post('/api/notes', async (req, res) => {
       return res.status(409).json({ error: 'Note already exists', id })
     }
     
-    await run(
-      `INSERT INTO notes (id, source_id, source_filename, title, date, content_preview, people_raw, projects_raw, drive_url, source_created_at, next_steps, details, attachments)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, source_id || null, source_filename || '', title, date || '', content_preview || '', 
-       people_raw || '', projects_raw || '', drive_url || '', source_created_at || '', 
-       next_steps || '', details || '', attachments || '']
-    )
+    await upsertNote({
+      id, source_id, source_filename, title, date, content_preview,
+      people_raw, projects_raw, drive_url, source_created_at,
+      next_steps, details, attachments,
+    })
     
     const newNote = await get('SELECT * FROM notes WHERE id = ?', [id])
     res.status(201).json(newNote)
@@ -1449,14 +1518,14 @@ app.post('/api/notes/sync', async (req, res) => {
         const fp = noteFingerprint(gNote.filename || '', gNote.drive_url || '')
         const isBlocked = fp ? await get('SELECT fingerprint FROM hidden_note_fingerprints WHERE fingerprint = ?', [fp]) : null
 
-        await run(
-          `INSERT INTO notes (id, source_id, source_filename, title, date, content_preview, people_raw, projects_raw, drive_url, source_created_at, next_steps, details, attachments, hidden, hidden_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [noteId, gNote.id, gNote.filename || '', title, gNote.date || '',
-           cleanContentPreview(gNote.content_preview || ''), gNote.people || '', gNote.projects || '',
-           gNote.drive_url || '', gNote.created_at || '', gNote.next_steps || '', gNote.details || '', gNote.attachments || '',
-           isBlocked ? 1 : 0, isBlocked ? new Date().toISOString() : null]
-        )
+        await upsertNote({
+          id: noteId, source_id: gNote.id, source_filename: gNote.filename || '', title,
+          date: gNote.date || '', content_preview: cleanContentPreview(gNote.content_preview || ''),
+          people_raw: gNote.people || '', projects_raw: gNote.projects || '',
+          drive_url: gNote.drive_url || '', source_created_at: gNote.created_at || '',
+          next_steps: gNote.next_steps || '', details: gNote.details || '', attachments: gNote.attachments || '',
+          hidden: isBlocked ? 1 : 0, hidden_at: isBlocked ? new Date().toISOString() : null,
+        })
         inserted++
       }
 
@@ -1857,41 +1926,19 @@ app.post('/api/seed', async (req, res) => {
   try {
     const { projects, team, assignments, priorities, businessLines, brandOptions, notes, noteProjectLinks, notePeopleLinks } = req.body
     
-    // Clear and insert projects
+    // All inserts use centralized upsert functions — single source of truth for columns
     if (projects) {
       await run('DELETE FROM projects')
-      for (const p of projects) {
-        // Handle JSON fields - may be array (from API), string (from SQLite export), or undefined
-        const timelineValue = typeof p.timeline === 'string' ? p.timeline : JSON.stringify(p.timeline || [])
-        const customLinksValue = typeof p.customLinks === 'string' ? p.customLinks : JSON.stringify(p.customLinks || [])
-        const designersValue = typeof p.designers === 'string' ? p.designers : JSON.stringify(p.designers || [])
-        await run(`INSERT INTO projects (id, name, status, dueDate, assignee, url, description, businessLine, deckLink, prdLink, briefLink, startDate, endDate, timeline, deckName, prdName, briefName, figmaLink, customLinks, designers) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [p.id, p.name, p.status || 'active', p.dueDate || null, p.assignee || null, p.url || '', p.description || '', p.businessLine || null, p.deckLink || '', p.prdLink || '', p.briefLink || '', p.startDate || null, p.endDate || null, timelineValue, p.deckName || '', p.prdName || '', p.briefName || '', p.figmaLink || '', customLinksValue, designersValue])
-      }
+      for (const p of projects) await upsertProject(p)
     }
-    
-    // Clear and insert team
     if (team) {
       await run('DELETE FROM team')
-      for (const t of team) {
-        // Handle JSON fields - may already be string (from API) or array (from SQLite export)
-        const brandsValue = typeof t.brands === 'string' ? t.brands : JSON.stringify(t.brands || [])
-        const timeOffValue = typeof t.timeOff === 'string' ? t.timeOff : JSON.stringify(t.timeOff || [])
-        await run(`INSERT INTO team (id, name, role, brands, status, slack, email, avatar, timeOff, weekly_hours, excluded, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-          [t.id, t.name, t.role || '', brandsValue, t.status || 'offline', t.slack || '', t.email || '', t.avatar || '', timeOffValue, t.weekly_hours ?? 35, t.excluded ? 1 : 0])
-      }
+      for (const t of team) await upsertTeamMember(t)
     }
-    
-    // Clear and insert project assignments (for capacity sync)
     if (assignments && assignments.length > 0) {
       await run('DELETE FROM project_assignments')
-      for (const a of assignments) {
-        await run(`INSERT INTO project_assignments (id, project_id, designer_id, allocation_percent, created_at) VALUES (?, ?, ?, ?, ?)`,
-          [a.id || `${a.project_id}_${a.designer_id}`, a.project_id, a.designer_id, a.allocation_percent ?? 0, a.created_at || new Date().toISOString()])
-      }
+      for (const a of assignments) await upsertAssignment(a)
     }
-    
-    // Clear and insert project priorities (force rankings)
     if (priorities && priorities.length > 0) {
       await run('DELETE FROM project_priorities')
       for (const p of priorities) {
@@ -1899,18 +1946,10 @@ app.post('/api/seed', async (req, res) => {
           [p.business_line_id, p.project_id, p.rank])
       }
     }
-    
-    // Clear and insert business lines
     if (businessLines && businessLines.length > 0) {
       await run('DELETE FROM business_lines')
-      for (const bl of businessLines) {
-        const customLinksValue = typeof bl.customLinks === 'string' ? bl.customLinks : JSON.stringify(bl.customLinks || [])
-        await run(`INSERT INTO business_lines (id, name, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinks) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [bl.id, bl.name, bl.deckName || '', bl.deckLink || '', bl.prdName || '', bl.prdLink || '', bl.briefName || '', bl.briefLink || '', bl.figmaLink || '', customLinksValue])
-      }
+      for (const bl of businessLines) await upsertBusinessLine(bl)
     }
-    
-    // Clear and insert brand options
     if (brandOptions && brandOptions.length > 0) {
       await run('DELETE FROM brand_options')
       for (const bo of brandOptions) {
@@ -1921,25 +1960,16 @@ app.post('/api/seed', async (req, res) => {
         }
       }
     }
-    
-    // Clear and insert notes (Gemini Notes)
     if (notes && notes.length > 0) {
       await run('DELETE FROM notes')
-      for (const n of notes) {
-        await run(`INSERT INTO notes (id, source_id, source_filename, title, date, content_preview, people_raw, projects_raw, drive_url, source_created_at, next_steps, details, attachments, linkedTeamIds, linkedProjectIds) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [n.id, n.source_id || null, n.source_filename || '', n.title || '', n.date || null, n.content_preview || '', n.people_raw || '[]', n.projects_raw || '[]', n.drive_url || '', n.source_created_at || null, n.next_steps || '', n.details || '', n.attachments || '[]', JSON.stringify(n.linkedTeamIds || []), JSON.stringify(n.linkedProjectIds || [])])
-      }
+      for (const n of notes) await upsertNote(n)
     }
-    
-    // Clear and insert note_project_links
     if (noteProjectLinks && noteProjectLinks.length > 0) {
       await run('DELETE FROM note_project_links')
       for (const l of noteProjectLinks) {
         await run('INSERT INTO note_project_links (note_id, project_id) VALUES (?, ?)', [l.note_id, l.project_id])
       }
     }
-
-    // Clear and insert note_people_links
     if (notePeopleLinks && notePeopleLinks.length > 0) {
       await run('DELETE FROM note_people_links')
       for (const l of notePeopleLinks) {
@@ -1981,8 +2011,8 @@ if (isProduction) {
 // DB version: stored in DB, auto-updates on data changes
 // Format: YYYY.MM.DD.hhmm (e.g., 2026.02.26.2059) → displays as "2026.02.26 2059"
 
-const SITE_VERSION = '2026.03.19.1325'
-const SITE_TIME = '1325'
+const SITE_VERSION = '2026.03.19.1345'
+const SITE_TIME = '1345'
 
 const VERSION_KEY = 'dcc_versions'
 
@@ -2239,6 +2269,60 @@ const seedBusinessLines = async () => {
 }
 seedBusinessLines().catch(e => console.error('Seed error:', e.message))
 
+// ============================================
+// STARTUP SCHEMA VALIDATION
+// Compares upsert function columns against actual DB schema.
+// If a column exists in the DB but is missing from the upsert function,
+// data WILL be lost on INSERT OR REPLACE. This check catches that.
+// ============================================
+const UPSERT_COLUMNS: Record<string, string[]> = {
+  projects: ['id','name','status','dueDate','assignee','url','description','businessLine',
+    'deckName','deckLink','prdName','prdLink','briefName','briefLink','figmaLink',
+    'customLinks','designers','startDate','endDate','timeline','estimatedHours','updatedAt'],
+  team: ['id','name','role','brands','status','slack','email','avatar','timeOff','weekly_hours','excluded','updatedAt'],
+  business_lines: ['id','name','deckName','deckLink','prdName','prdLink','briefName','briefLink','figmaLink','customLinks','updatedAt'],
+  project_assignments: ['id','project_id','designer_id','allocation_percent','created_at'],
+  notes: ['id','source_id','source_filename','title','date','content_preview','people_raw','projects_raw',
+    'drive_url','source_created_at','next_steps','details','attachments',
+    'linkedTeamIds','linkedProjectIds','hidden','hidden_at'],
+}
+
+// Auto-generated columns that the DB manages (not in upsert VALUES but exist in schema)
+const AUTO_COLUMNS: Record<string, string[]> = {
+  projects: ['createdAt'],
+  team: ['createdAt'],
+  business_lines: ['createdAt'],
+  notes: ['created_at', 'updated_at'],
+}
+
+let schemaDrift: string[] = []
+
+const validateSchemaOnStartup = async () => {
+  const drift: string[] = []
+  for (const [table, upsertCols] of Object.entries(UPSERT_COLUMNS)) {
+    try {
+      const columns = await all(`PRAGMA table_info("${table}")`) as Array<{name: string}>
+      const dbCols = columns.map(c => c.name)
+      const autoCols = AUTO_COLUMNS[table] || []
+      const coveredCols = new Set([...upsertCols, ...autoCols])
+      const missing = dbCols.filter(col => !coveredCols.has(col))
+      if (missing.length > 0) {
+        const msg = `${table}: uncovered columns [${missing.join(', ')}]`
+        drift.push(msg)
+        console.error(`\n⚠️  SCHEMA DRIFT: table "${table}" has columns NOT covered by upsert function: [${missing.join(', ')}]`)
+        console.error(`   These columns will be LOST on INSERT OR REPLACE. Fix upsertFunction immediately!\n`)
+      }
+    } catch (e) {
+      console.error(`Schema validation error for ${table}:`, e)
+    }
+  }
+  schemaDrift = drift
+  if (drift.length === 0) {
+    console.log('✅ Schema validation passed — all upsert functions cover all DB columns')
+  }
+}
+validateSchemaOnStartup().catch(e => console.error('Schema validation error:', e))
+
 // Lightweight table counts for deploy verification (no auth required)
 app.get('/api/table-counts', async (_req, res) => {
   try {
@@ -2340,11 +2424,7 @@ app.post('/api/capacity/assignments', async (req, res) => {
   try {
     const { project_id, designer_id, allocation_percent } = req.body
     const id = `${project_id}_${designer_id}`
-    await run(
-      `INSERT OR REPLACE INTO project_assignments (id, project_id, designer_id, allocation_percent, created_at)
-       VALUES (?, ?, ?, ?, datetime('now'))`,
-      [id, project_id, designer_id, allocation_percent ?? 0]
-    )
+    await upsertAssignment({ id, project_id, designer_id, allocation_percent })
     await syncAssignmentToProjectDesigners(project_id, designer_id, true)
     await updateDbVersion()
     const projName = (await get('SELECT name FROM projects WHERE id = ?', [project_id]) as any)?.name || project_id
