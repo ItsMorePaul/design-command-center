@@ -549,6 +549,10 @@ function parseHash(): { tab: TabId; params: URLSearchParams } {
 }
 
 function App() {
+  // Strip unused query params from URL (everything before the hash)
+  if (window.location.search) {
+    window.history.replaceState(null, '', window.location.pathname + window.location.hash)
+  }
   const initialHash = parseHash()
   const [activeTab, setActiveTab] = useState<TabId>(initialHash.tab)
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -3430,22 +3434,25 @@ const [showFilters, setShowFilters] = useState(false)
                   {(() => {
                     const activeProjects = projects.filter(p => p.status === 'active' || p.status === 'review')
                     const totalEstimated = activeProjects.reduce((sum, p) => sum + (p.estimatedHours || 0), 0)
-                    const now = new Date()
-                    now.setHours(0, 0, 0, 0)
-                    const totalProjected = capacityData.assignments.reduce((sum: number, a: CapacityAssignment) => {
+                    const estimatedCount = activeProjects.filter(p => (p.estimatedHours || 0) > 0).length
+                    // Calculate total allocated hours over full project lifetime (start→end)
+                    const totalAllocated = capacityData.assignments.reduce((sum: number, a: CapacityAssignment) => {
                       const proj = projects.find(p => p.name === a.project_name)
                       if (!proj || proj.status === 'done' || proj.status === 'blocked') return sum
                       if (excludedDesigners.has(a.designer_id)) return sum
+                      if (!proj.startDate || !proj.endDate) return sum
                       const designer = activeTeam.find(m => m.id === a.designer_id)
                       const weeklyHours = designer?.weekly_hours || 35
                       const allocHours = (weeklyHours * (a.allocation_percent || 0)) / 100
-                      const endDate = proj.endDate ? parseLocalDate(proj.endDate) : null
-                      const weeksLeft = endDate ? Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (7 * 24 * 60 * 60 * 1000))) : 13
-                      return sum + (allocHours * weeksLeft)
+                      const start = parseLocalDate(proj.startDate)
+                      const end = parseLocalDate(proj.endDate)
+                      if (!start || !end) return sum
+                      const totalWeeks = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000)))
+                      return sum + (allocHours * totalWeeks)
                     }, 0)
-                    const delta = Math.round(totalProjected - totalEstimated)
-                    const estimatedCount = activeProjects.filter(p => (p.estimatedHours || 0) > 0).length
+                    const fundedPct = totalEstimated > 0 ? Math.round((totalAllocated / totalEstimated) * 100) : 0
                     if (totalEstimated === 0) return null
+                    const barColor = fundedPct >= 90 ? 'var(--color-success)' : fundedPct >= 60 ? 'var(--color-warning)' : 'var(--color-danger)'
                     return (
                       <div className="capacity-funding-stats">
                         <div className="funding-header">Project Funding</div>
@@ -3455,22 +3462,22 @@ const [showFilters, setShowFilters] = useState(false)
                             <span className="funding-stat-label">Estimated hrs ({estimatedCount} projects)</span>
                           </div>
                           <div className="funding-stat">
-                            <span className="funding-stat-value">{Math.round(totalProjected).toLocaleString()}</span>
-                            <span className="funding-stat-label">Projected hrs</span>
+                            <span className="funding-stat-value">{Math.round(totalAllocated).toLocaleString()}</span>
+                            <span className="funding-stat-label">Allocated hrs</span>
                           </div>
                           <div className="funding-stat">
-                            <span className="funding-stat-value" style={{ color: delta >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>
-                              {delta > 0 ? '+' : ''}{delta.toLocaleString()}
+                            <span className="funding-stat-value" style={{ color: barColor }}>
+                              {fundedPct}%
                             </span>
-                            <span className="funding-stat-label">{delta >= 0 ? 'Over-funded' : 'Under-funded'}</span>
+                            <span className="funding-stat-label">Funded</span>
                           </div>
                         </div>
                         <div className="funding-bar-track">
                           <div
                             className="funding-bar-fill"
                             style={{
-                              width: `${Math.min(totalEstimated > 0 ? (totalProjected / totalEstimated) * 100 : 0, 100)}%`,
-                              backgroundColor: delta >= 0 ? 'var(--color-success)' : delta > -totalEstimated * 0.3 ? 'var(--color-warning)' : 'var(--color-danger)'
+                              width: `${Math.min(fundedPct, 100)}%`,
+                              backgroundColor: barColor
                             }}
                           />
                         </div>
@@ -4178,23 +4185,25 @@ const [showFilters, setShowFilters] = useState(false)
             'PROJECT FUNDING',
             ...(() => {
               const totalEstimated = activeProjects.reduce((sum, p) => sum + (p.estimatedHours || 0), 0)
-              const now = new Date()
-              const totalProjected = capAssignments.reduce((sum, a) => {
+              const totalAllocated = capAssignments.reduce((sum, a) => {
                 const proj = projects.find(p => p.name === a.project_name)
                 if (!proj || proj.status === 'done' || proj.status === 'blocked') return sum
+                if (!proj.startDate || !proj.endDate) return sum
                 const designer = capTeam.find(m => m.id === a.designer_id)
                 if (!designer || excludedDesigners.has(designer.id)) return sum
                 const available = designer.weekly_hours || 35
                 const allocH = parseFloat(((available * (a.allocation_percent || 0)) / 100).toFixed(1))
-                const endDate = proj.endDate ? parseLocalDate(proj.endDate) : null
-                const weeksLeft = endDate ? Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (7 * 24 * 60 * 60 * 1000))) : 13
-                return sum + (allocH * weeksLeft)
+                const start = parseLocalDate(proj.startDate)
+                const end = parseLocalDate(proj.endDate)
+                if (!start || !end) return sum
+                const totalWeeks = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000)))
+                return sum + (allocH * totalWeeks)
               }, 0)
-              const delta = Math.round(totalProjected - totalEstimated)
+              const fundedPct = totalEstimated > 0 ? Math.round((totalAllocated / totalEstimated) * 100) : 0
               return [
-                `  Estimated: ${totalEstimated} hrs total across ${activeProjects.length} active projects`,
-                `  Projected: ${Math.round(totalProjected)} hrs (based on current allocations × weeks remaining)`,
-                `  Delta: ${delta >= 0 ? '+' : ''}${delta} hrs (${delta >= 0 ? 'overfunded' : 'UNDERFUNDED'})`,
+                `  Estimated: ${totalEstimated} hrs across ${activeProjects.length} active projects`,
+                `  Allocated: ${Math.round(totalAllocated)} hrs (allocations × full project duration)`,
+                `  Funded: ${fundedPct}%`,
               ]
             })(),
             '',
@@ -5659,13 +5668,13 @@ const [showFilters, setShowFilters] = useState(false)
               <p>Gauge color: green ≤ 85%, amber 85–100%, red &gt; 100%.</p>
 
               <h3>Project Funding</h3>
-              <p>Compares the team's projected output against project estimates to see if work is over- or under-funded.</p>
+              <p>Shows what percentage of estimated project work is covered by current designer allocations.</p>
               <ul>
                 <li><strong>Estimated hrs</strong> — Sum of T-shirt size estimates (XXS=35h through XXL=910h) across all active/in-review projects.</li>
-                <li><strong>Projected hrs</strong> — For each assignment: designer's allocated hours/week × weeks remaining until project end date. If no end date, defaults to 13 weeks.</li>
-                <li><strong>Delta</strong> — Projected minus estimated. Positive = over-funded (more capacity than needed). Negative = under-funded.</li>
+                <li><strong>Allocated hrs</strong> — For each assignment: designer's allocated hours/week × total project duration in weeks (start to end date). Projects without both dates are excluded.</li>
+                <li><strong>Funded %</strong> — Allocated ÷ estimated. 100% means allocations fully cover the estimates.</li>
               </ul>
-              <p>Bar color: green if over-funded, amber if under-funded by &lt; 30%, red if under-funded by &gt; 30%.</p>
+              <p>Bar color: green ≥ 90%, amber 60–89%, red &lt; 60%.</p>
 
               <h3>Weekly Load Heatmap</h3>
               <p>Shows each designer's allocated hours per week across the current DJ fiscal quarter.</p>
