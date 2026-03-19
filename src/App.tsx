@@ -16,7 +16,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Gauge, ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, Settings, GripVertical, Folder, StickyNote, RefreshCw, User, CheckSquare, Sun, Moon, Edit2, Bell, Loader, Clock, ClipboardCopy, BarChart3, FileBarChart, ListChecks, Palette, HelpCircle } from 'lucide-react'
+import { Pencil, Trash2, FileText, Presentation, FileEdit, Mail, MessageSquare, LayoutGrid, Users, Calendar, Figma, Link as LinkIcon, Search, Gauge, ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, Settings, GripVertical, Folder, StickyNote, RefreshCw, User, CheckSquare, Sun, Moon, Edit2, Bell, Loader, Clock, ClipboardCopy, BarChart3, FileBarChart, ListChecks, Palette, HelpCircle, AlertTriangle, Flag, CheckCircle } from 'lucide-react'
 import { Tooltip } from './Tooltip'
 import './App.css'
 import initialData from './data.json'
@@ -612,6 +612,7 @@ function App() {
   const [holidays, setHolidays] = useState<{ id: string; name: string; date: string }[]>([])
   const [holidayForm, setHolidayForm] = useState({ name: '', date: '' })
   const [showHolidayModal, setShowHolidayModal] = useState(false)
+  const [riskDetail, setRiskDetail] = useState<{ title: string; items: { name: string; detail: string; projectName?: string }[] } | null>(null)
 
   // Calendar day modal state
   const [selectedDay, setSelectedDay] = useState<{ date: string; events: CalendarEvent[]; dayName: string } | null>(null)
@@ -2452,17 +2453,119 @@ const [showFilters, setShowFilters] = useState(false)
         <div ref={contentRef} className={`content ${activeTab === 'calendar' ? 'content-calendar' : ''}`}>
           {activeTab === 'projects' && (
             <div className="projects-grid">
-              <div className="stats-row">
-                {([['active', 'Active', '#3b82f6'], ['review', 'In Review', '#f59e0b'], ['done', 'Done', '#22c55e'], ['blocked', 'Blocked', '#ef4444']] as const).map(([status, label, color]) => {
-                  const count = projects.filter(p => p.status === status).length
-                  return (
-                    <div key={status} className={`stat-card${count > 0 ? ' stat-card-active' : ''}`} style={count > 0 ? { borderColor: color, background: `color-mix(in srgb, ${color} 8%, var(--color-bg-secondary))` } : undefined}>
-                      <span className="stat-value" style={count > 0 ? { color } : undefined}>{count}</span>
-                      <span className="stat-label" style={count > 0 ? { color } : undefined}>{label}</span>
+              {(() => {
+                const now = new Date()
+                const in4Weeks = new Date(now.getTime() + 28 * 24 * 60 * 60 * 1000)
+                const activeProjects = projects.filter(p => p.status === 'active' || p.status === 'review')
+                const activeAssignments = capacityData?.assignments.filter((a: CapacityAssignment) => {
+                  const proj = projects.find(p => p.name === a.project_name)
+                  return proj && (proj.status === 'active' || proj.status === 'review')
+                }) || []
+                const warnings: { icon: React.ReactNode; text: string; severity: 'danger' | 'warn' | 'info'; detail?: { title: string; items: { name: string; detail: string; projectName?: string }[] } }[] = []
+
+                const overdue = activeProjects.filter(p => {
+                  if (!p.endDate) return false
+                  const end = parseLocalDate(p.endDate)
+                  return end && end < now
+                })
+                if (overdue.length > 0) warnings.push({
+                  icon: <AlertTriangle size={12} />, text: `${overdue.length} past end date`, severity: 'danger',
+                  detail: { title: 'Projects Past End Date', items: overdue.map(p => {
+                    const end = parseLocalDate(p.endDate!)!
+                    const days = Math.round((now.getTime() - end.getTime()) / (24 * 60 * 60 * 1000))
+                    return { name: p.name, detail: `${days}d overdue · ended ${formatShortDate(p.endDate!)}`, projectName: p.name }
+                  })}
+                })
+
+                const multiDesigner = activeProjects.filter(p => {
+                  const designers = activeAssignments.filter((a: CapacityAssignment) => a.project_name === p.name)
+                  return designers.length > 1
+                })
+                if (multiDesigner.length > 0) warnings.push({
+                  icon: <Users size={12} />, text: `${multiDesigner.length} multi-designer`, severity: 'info',
+                  detail: { title: 'Multi-Designer Projects', items: multiDesigner.map(p => {
+                    const designers = activeAssignments.filter((a: CapacityAssignment) => a.project_name === p.name)
+                    const names = designers.map((a: CapacityAssignment) => {
+                      const tm = team.find(t => t.id === a.designer_id)
+                      return tm?.name.split(' ')[0] || a.designer_name || '?'
+                    }).join(', ')
+                    return { name: p.name, detail: names, projectName: p.name }
+                  })}
+                })
+
+                const noEstimate = activeProjects.filter(p => !p.estimatedHours)
+                if (noEstimate.length > 0) warnings.push({
+                  icon: <FileBarChart size={12} />, text: `${noEstimate.length} missing estimates`, severity: 'warn',
+                  detail: { title: 'Projects Missing Estimates', items: noEstimate.map(p => {
+                    const designerCount = activeAssignments.filter((a: CapacityAssignment) => a.project_name === p.name).length
+                    return { name: p.name, detail: `${designerCount} designer${designerCount !== 1 ? 's' : ''}, no hours estimated`, projectName: p.name }
+                  })}
+                })
+
+                const endingSoon = activeProjects.filter(p => {
+                  if (!p.endDate) return false
+                  const end = parseLocalDate(p.endDate)
+                  return end && end > now && end <= in4Weeks
+                })
+                if (endingSoon.length > 0) warnings.push({
+                  icon: <Flag size={12} />, text: `${endingSoon.length} ending soon`, severity: 'info',
+                  detail: { title: 'Projects Ending Soon', items: endingSoon.map(p => {
+                    const end = parseLocalDate(p.endDate!)!
+                    const days = Math.round((end.getTime() - now.getTime()) / (24 * 60 * 60 * 1000))
+                    return { name: p.name, detail: `${days}d left · ends ${formatShortDate(p.endDate!)}`, projectName: p.name }
+                  })}
+                })
+
+                const ptoConflictDetails: { name: string; detail: string; projectName?: string }[] = []
+                activeProjects.forEach(p => {
+                  const projDesignerIds = activeAssignments.filter((a: CapacityAssignment) => a.project_name === p.name).map((a: CapacityAssignment) => a.designer_id)
+                  if (projDesignerIds.length < 2) return
+                  const ptoRanges = projDesignerIds.map(did => {
+                    const tm = team.find(t => t.id === did)
+                    if (!tm?.timeOff) return []
+                    return tm.timeOff.filter(to => { const end = parseLocalDate(to.endDate); return end && end >= now }).map(to => ({ did, name: tm.name, start: parseLocalDate(to.startDate)!, end: parseLocalDate(to.endDate)! }))
+                  }).flat()
+                  const conflicts: string[] = []
+                  for (let i = 0; i < ptoRanges.length; i++) {
+                    for (let j = i + 1; j < ptoRanges.length; j++) {
+                      if (ptoRanges[i].did !== ptoRanges[j].did && ptoRanges[i].start <= ptoRanges[j].end && ptoRanges[j].start <= ptoRanges[i].end) {
+                        conflicts.push(`${ptoRanges[i].name.split(' ')[0]} & ${ptoRanges[j].name.split(' ')[0]}`)
+                      }
+                    }
+                  }
+                  if (conflicts.length > 0) ptoConflictDetails.push({ name: p.name, detail: conflicts.join('; '), projectName: p.name })
+                })
+                if (ptoConflictDetails.length > 0) warnings.push({
+                  icon: <Calendar size={12} />, text: `${ptoConflictDetails.length} PTO overlap`, severity: 'warn',
+                  detail: { title: 'Overlapping PTO on Projects', items: ptoConflictDetails }
+                })
+
+                return (
+                  <div className="projects-summary">
+                    <div className="summary-stats">
+                      {([['active', 'Active', '#3b82f6'], ['review', 'In Review', '#f59e0b'], ['done', 'Done', '#22c55e'], ['blocked', 'Blocked', '#ef4444']] as const).map(([status, label, color]) => {
+                        const count = projects.filter(p => p.status === status).length
+                        return (
+                          <div key={status} className="summary-stat" style={count > 0 ? { color } : undefined}>
+                            <span className="summary-stat-value">{count}</span>
+                            <span className="summary-stat-label">{label}</span>
+                          </div>
+                        )
+                      })}
                     </div>
-                  )
-                })}
-              </div>
+                    {warnings.length > 0 && (
+                      <div className="summary-risks">
+                        {warnings.map((w, i) => (
+                          <div key={i} className={`risk-item risk-${w.severity}${w.detail ? ' risk-clickable' : ''}`} onClick={() => w.detail && setRiskDetail(w.detail)}>
+                            <span className="risk-icon">{w.icon}</span>
+                            <span className="risk-text">{w.text}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
 
               <div className="projects-sort-row">
                 <label className="arrange-priority-toggle">
@@ -3388,7 +3491,7 @@ const [showFilters, setShowFilters] = useState(false)
               
               return (
                 <div className="capacity-gauge-container">
-                  <div className="gauge-left">
+                  <div className="gauge-section gauge-utilization">
                     <div className="capacity-gauge">
                       <svg viewBox="0 0 200 120" className="gauge-svg">
                         <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="var(--color-border)" strokeWidth="12" strokeLinecap="round" />
@@ -3402,11 +3505,11 @@ const [showFilters, setShowFilters] = useState(false)
                     <div className="gauge-stats-row">
                       <div className="gauge-stat">
                         <span className="gauge-stat-value">{Math.round(allocatedQuarter).toLocaleString()}</span>
-                        <span className="gauge-stat-label">Allocated hrs</span>
+                        <span className="gauge-stat-label">Allocated</span>
                       </div>
                       <div className="gauge-stat">
                         <span className="gauge-stat-value">{Math.round(availableQuarter).toLocaleString()}</span>
-                        <span className="gauge-stat-label">Quarter hrs</span>
+                        <span className="gauge-stat-label">Available</span>
                       </div>
                       <div className="gauge-stat">
                         <span className="gauge-stat-value" style={{ color: remaining < 0 ? 'var(--color-danger)' : 'var(--color-success)' }}>{remaining.toLocaleString()}</span>
@@ -3414,21 +3517,9 @@ const [showFilters, setShowFilters] = useState(false)
                       </div>
                     </div>
                   </div>
-                  <div className="gauge-right">
-                    <div className="gauge-right-section">
-                      <div className="gauge-right-header">Quarter Allocation</div>
-                      <div className="gauge-alloc-bar">
-                        <div className="gauge-alloc-bar-track">
-                          <div className="gauge-alloc-bar-fill" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: getGaugeColor() }} />
-                        </div>
-                        <div className="gauge-alloc-bar-labels">
-                          <span>{Math.round(allocatedQuarter).toLocaleString()} hrs allocated</span>
-                          <span>{Math.round(availableQuarter).toLocaleString()} hrs available</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="gauge-right-section">
-                      <div className="gauge-right-header">Fiscal Year Progress</div>
+                  <div className="gauge-section gauge-fy">
+                    <div className="gauge-panel-header">Fiscal Year</div>
+                    <div className="fy-timeline">
                       {(() => {
                         const quarters = [
                           { label: 'Q3 FY26', start: new Date(2026, 0, 1), end: new Date(2026, 3, 1) },
@@ -3437,25 +3528,21 @@ const [showFilters, setShowFilters] = useState(false)
                           { label: 'Q2 FY27', start: new Date(2026, 9, 1), end: new Date(2027, 0, 1) },
                         ]
                         const now = new Date()
-                        return (
-                          <div className="fy-timeline">
-                            {quarters.map(q => {
-                              const qMs = q.end.getTime() - q.start.getTime()
-                              const elapsed = Math.max(0, Math.min(now.getTime() - q.start.getTime(), qMs))
-                              const fillPct = (elapsed / qMs) * 100
-                              const isCurrent = now >= q.start && now < q.end
-                              const isPast = now >= q.end
-                              return (
-                                <div key={q.label} className={`fy-quarter${isCurrent ? ' fy-quarter-current' : ''}`}>
-                                  <span className="fy-label">{q.label}</span>
-                                  <div className="fy-quarter-track">
-                                    <div className="fy-quarter-fill" style={{ width: `${isPast ? 100 : fillPct}%` }} />
-                                  </div>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        )
+                        return quarters.map(q => {
+                          const qMs = q.end.getTime() - q.start.getTime()
+                          const elapsed = Math.max(0, Math.min(now.getTime() - q.start.getTime(), qMs))
+                          const fillPct = (elapsed / qMs) * 100
+                          const isCurrent = now >= q.start && now < q.end
+                          const isPast = now >= q.end
+                          return (
+                            <div key={q.label} className={`fy-quarter${isCurrent ? ' fy-quarter-current' : ''}`}>
+                              <span className="fy-label">{q.label}</span>
+                              <div className="fy-quarter-track">
+                                <div className="fy-quarter-fill" style={{ width: `${isPast ? 100 : fillPct}%` }} />
+                              </div>
+                            </div>
+                          )
+                        })
                       })()}
                     </div>
                   </div>
@@ -5459,6 +5546,35 @@ const [showFilters, setShowFilters] = useState(false)
                 const res = await authFetch('/api/holidays', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(holidayForm) })
                 if (res.ok) { setHolidays(await res.json()); setCalendarData(null); setShowHolidayModal(false); setHolidayForm({ name: '', date: '' }) }
               }}>Add Special Day</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {riskDetail && (
+        <div className="modal-overlay" onMouseDown={e => { overlayMouseDownTarget.current = e.target }} onClick={e => { if (e.target === e.currentTarget && overlayMouseDownTarget.current === e.currentTarget) setRiskDetail(null) }}>
+          <div className="modal risk-detail-modal" style={{ maxWidth: 480 }}>
+            <div className="modal-header">
+              <h2>{riskDetail.title}</h2>
+              <button className="modal-close-btn" onClick={() => setRiskDetail(null)}><span>&times;</span></button>
+            </div>
+            <div className="modal-body">
+              <div className="risk-detail-list">
+                {riskDetail.items.map((item, i) => (
+                  <div key={i} className="risk-detail-row">
+                    {item.projectName ? (
+                      <a className="risk-detail-name risk-detail-link" onClick={() => {
+                        setRiskDetail(null)
+                        setActiveTab('projects')
+                        setProjectFilters({ businessLines: [], designers: [], statuses: [], project: item.projectName! })
+                      }}>{item.name}</a>
+                    ) : (
+                      <span className="risk-detail-name">{item.name}</span>
+                    )}
+                    <span className="risk-detail-info">{item.detail}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
