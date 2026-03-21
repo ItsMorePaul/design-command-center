@@ -3,7 +3,9 @@
 # Created: 2026-03-03 (post-incident)
 
 RAILWAY_URL="https://design-command-center-production.up.railway.app"
-BACKUP_DIR="$HOME/.openclaw/workspace/design-command-center/backups"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DCC_DIR="$(dirname "$SCRIPT_DIR")"
+BACKUP_DIR="$DCC_DIR/backups/railway"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
 mkdir -p "$BACKUP_DIR"
