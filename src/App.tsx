@@ -38,14 +38,7 @@ const defaultHolidays = [
 // Recent updates shown on login screen
 const CHANGELOG = [
   'Added background treatment to capacity page designer filters for visual consistency',
-  'Fixed missing estimates risk showing 0 designers when designers are assigned via project form',
-  'Centralized DB write functions with startup schema validation — prevents silent data loss',
-  'Version guard blocks stale pages from writing to the database after deploys',
-  'Project risk warnings surface overdue, missing estimates, ending-soon, and multi-designer items',
-  'Clickable risk details with project links and human-readable dates',
-  'Capacity mini arc gauges on designer cards',
   'Responsive fiscal year timeline in capacity view',
-  'Unified project summary bar with status counts and risks',
 ]
 
 // Get today's date string for comparison
