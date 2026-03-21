@@ -37,6 +37,7 @@ const defaultHolidays = [
 
 // Recent updates shown on login screen
 const CHANGELOG = [
+  'Added background treatment to capacity page designer filters for visual consistency',
   'Fixed missing estimates risk showing 0 designers when designers are assigned via project form',
   'Centralized DB write functions with startup schema validation — prevents silent data loss',
   'Version guard blocks stale pages from writing to the database after deploys',
