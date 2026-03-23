@@ -1,0 +1,207 @@
+import express from 'express';
+import { run, get, all, upsertProject, upsertBusinessLine } from '../db.js';
+import { updateDbVersion, logActivity } from '../version.js';
+import { getUserEmail } from '../auth.js';
+
+const router = express.Router();
+
+// ============ PROJECTS ============
+
+router.get('/projects', async (req, res) => {
+  try {
+    const projects = await all('SELECT * FROM projects ORDER BY createdAt DESC');
+    res.json((projects as any[]).map((p: any) => ({
+      ...p,
+      timeline: p.timeline ? JSON.parse(p.timeline) : [],
+      customLinks: p.customLinks ? JSON.parse(p.customLinks) : [],
+      designers: p.designers ? JSON.parse(p.designers) : [],
+      businessLines: p.businessLine ? (() => { try { return JSON.parse(p.businessLine); } catch { return [p.businessLine]; } })() : []
+    })));
+  } catch (e: any) { res.status(500).json({error: e.message}); }
+});
+
+router.post('/projects', async (req, res) => {
+  try {
+    const { id, name, status, dueDate, assignee, url, description, businessLines, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinks, designers, startDate, endDate, timeline, estimatedHours, updatedAt: clientUpdatedAt } = req.body;
+    const projectId = id || Date.now().toString();
+
+    if (id && clientUpdatedAt) {
+      const existing = await get('SELECT updatedAt FROM projects WHERE id = ?', [id]) as any
+      if (existing && existing.updatedAt && existing.updatedAt !== clientUpdatedAt) {
+        return res.status(409).json({ error: 'This project was modified by another user. Please refresh and try again.' })
+      }
+    }
+
+    await upsertProject({
+      id: projectId, name, status, dueDate, assignee, url, description,
+      businessLines, deckName, deckLink, prdName, prdLink, briefName, briefLink,
+      figmaLink, customLinks, designers, startDate, endDate, timeline, estimatedHours,
+    });
+
+    await syncProjectDesignersToAssignments(projectId, designers || [])
+
+    await updateDbVersion()
+    await logActivity('project', id ? 'update' : 'create', name || projectId, getUserEmail(req))
+    const saved = await get('SELECT * FROM projects WHERE id = ?', [projectId])
+    res.json(saved);
+  } catch (e: any) { res.status(500).json({error: e.message}); }
+});
+
+router.delete('/projects/:id', async (req, res) => {
+  try {
+    const existing = await get('SELECT name FROM projects WHERE id = ?', [req.params.id]) as any
+    await run('DELETE FROM projects WHERE id = ?', [req.params.id]);
+    await run('DELETE FROM project_assignments WHERE project_id = ?', [req.params.id]);
+    await updateDbVersion()
+    await logActivity('project', 'delete', existing?.name || req.params.id, getUserEmail(req))
+    res.json({success: true});
+  } catch (e: any) { res.status(500).json({error: e.message}); }
+});
+
+router.put('/projects/:id/done', async (req, res) => {
+  try {
+    const proj = await get('SELECT name FROM projects WHERE id = ?', [req.params.id]) as any
+    await run("UPDATE projects SET status = 'done', updatedAt = datetime('now') WHERE id = ?", [req.params.id])
+    await run('UPDATE project_assignments SET allocation_percent = 0 WHERE project_id = ?', [req.params.id])
+    await updateDbVersion()
+    await logActivity('project', 'update', proj?.name || req.params.id, getUserEmail(req), 'Marked as done')
+    res.json({ success: true })
+  } catch (e: any) { res.status(500).json({ error: e.message }) }
+})
+
+router.put('/projects/:id/undone', async (req, res) => {
+  try {
+    const proj = await get('SELECT name FROM projects WHERE id = ?', [req.params.id]) as any
+    await run("UPDATE projects SET status = 'active', updatedAt = datetime('now') WHERE id = ?", [req.params.id])
+    await updateDbVersion()
+    await logActivity('project', 'update', proj?.name || req.params.id, getUserEmail(req), 'Restored to active')
+    res.json({ success: true })
+  } catch (e: any) { res.status(500).json({ error: e.message }) }
+})
+
+// ============ BUSINESS LINES ============
+
+router.get('/business-lines', async (req, res) => {
+  try {
+    const lines = await all('SELECT * FROM business_lines ORDER BY name');
+    res.json((lines as any[]).map((l: any) => ({
+      ...l,
+      customLinks: l.customLinks ? JSON.parse(l.customLinks) : []
+    })));
+  } catch (e: any) { res.status(500).json({error: e.message}); }
+});
+
+router.post('/business-lines', async (req, res) => {
+  try {
+    const { id, name, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinks, originalName, updatedAt: clientUpdatedAt } = req.body;
+    const lineId = id || Date.now().toString();
+
+    if (id && clientUpdatedAt) {
+      const existing = await get('SELECT updatedAt FROM business_lines WHERE id = ?', [id]) as any
+      if (existing && existing.updatedAt && existing.updatedAt !== clientUpdatedAt) {
+        return res.status(409).json({ error: 'This business line was modified by another user. Please refresh and try again.' })
+      }
+    }
+    if (originalName && originalName !== name) {
+      const allProjects = await all("SELECT id, businessLine FROM projects") as any[];
+      for (const p of allProjects) {
+        if (p.businessLine) {
+          let bls: string[];
+          try { bls = JSON.parse(p.businessLine) as string[]; } catch { bls = [p.businessLine]; }
+          if (bls.includes(originalName)) {
+            const updated = bls.map((b: string) => b === originalName ? name : b);
+            await run("UPDATE projects SET businessLine = ? WHERE id = ?", [JSON.stringify(updated), p.id]);
+          }
+        }
+      }
+      const members = await all("SELECT id, brands FROM team") as any[];
+      for (const m of members) {
+        const brands = JSON.parse(m.brands || '[]');
+        if (brands.includes(originalName)) {
+          const updated = brands.map((b: string) => b === originalName ? name : b);
+          await run("UPDATE team SET brands = ? WHERE id = ?", [JSON.stringify(updated), m.id]);
+        }
+      }
+    }
+
+    await upsertBusinessLine({
+      id: lineId, name, deckName, deckLink, prdName, prdLink, briefName, briefLink, figmaLink, customLinks,
+    });
+    await updateDbVersion()
+    res.json({id: lineId, ...req.body});
+  } catch (e: any) { res.status(500).json({error: e.message}); }
+});
+
+router.delete('/business-lines/:id', async (req, res) => {
+  try {
+    await run('DELETE FROM business_lines WHERE id = ?', [req.params.id]);
+    await updateDbVersion()
+    res.json({success: true});
+  } catch (e: any) { res.status(500).json({error: e.message}); }
+});
+
+// ============ BRAND OPTIONS ============
+
+router.get('/brandOptions', async (req, res) => {
+  try {
+    const brands = await all('SELECT name FROM business_lines ORDER BY name') as any[];
+    res.json(brands.map((b: any) => b.name));
+  } catch (e: any) { res.status(500).json({error: e.message}); }
+});
+
+// ============ HELPERS ============
+
+interface TeamIdentity { id: string; name: string }
+
+export const syncProjectDesignersToAssignments = async (projectId: string, designerNames: string[]) => {
+  const teamRows = await all('SELECT id, name FROM team') as TeamIdentity[]
+  const normalizedNames = Array.from(new Set((designerNames || []).map(n => n.trim()).filter(Boolean)))
+  const matchingTeam = teamRows.filter(t => normalizedNames.includes(t.name))
+  const matchingIds = matchingTeam.map(t => t.id)
+
+  for (const team of matchingTeam) {
+    const assignmentId = `${projectId}_${team.id}`
+    await run(
+      `INSERT OR IGNORE INTO project_assignments (id, project_id, designer_id, allocation_percent, created_at)
+       VALUES (?, ?, ?, 0, datetime('now'))`,
+      [assignmentId, projectId, team.id]
+    )
+  }
+
+  if (matchingIds.length > 0) {
+    const placeholders = matchingIds.map(() => '?').join(',')
+    await run(
+      `DELETE FROM project_assignments WHERE project_id = ? AND designer_id NOT IN (${placeholders})`,
+      [projectId, ...matchingIds]
+    )
+  } else {
+    await run('DELETE FROM project_assignments WHERE project_id = ?', [projectId])
+  }
+}
+
+export const syncAssignmentToProjectDesigners = async (projectId: string, designerId: string, add: boolean) => {
+  const projectRow = await get('SELECT designers FROM projects WHERE id = ?', [projectId]) as { designers?: string } | undefined
+  const teamRow = await get('SELECT name FROM team WHERE id = ?', [designerId]) as { name?: string } | undefined
+  const designerName = teamRow?.name
+  if (!designerName) return
+
+  const currentDesigners = projectRow?.designers ? JSON.parse(projectRow.designers) as string[] : []
+  const set = new Set(currentDesigners)
+
+  if (add) { set.add(designerName) } else { set.delete(designerName) }
+
+  await run(
+    `UPDATE projects SET designers = ?, updatedAt = datetime('now') WHERE id = ?`,
+    [JSON.stringify(Array.from(set)), projectId]
+  )
+}
+
+export const reconcileProjectDesignerAssignments = async () => {
+  const projects = await all('SELECT id, designers FROM projects') as Array<{ id: string; designers?: string }>
+  for (const project of projects) {
+    const designers = project.designers ? JSON.parse(project.designers) as string[] : []
+    await syncProjectDesignersToAssignments(project.id, designers)
+  }
+}
+
+export default router;
