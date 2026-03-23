@@ -23,8 +23,9 @@ import { SortablePriorityItem, SortableDoneItem, SortableTimelineItem, InProgres
 
 // Recent updates shown on login screen
 const CHANGELOG = [
+  'Codebase refactored — server split into modules, frontend types and utilities extracted',
+  'Deleted 9 deprecated sync scripts that could cause data corruption',
   'Added background treatment to capacity page designer filters for visual consistency',
-  'Responsive fiscal year timeline in capacity view',
 ]
 
 
