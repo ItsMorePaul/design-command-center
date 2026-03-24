@@ -23,9 +23,9 @@ import { SortablePriorityItem, SortableDoneItem, SortableTimelineItem, InProgres
 
 // Recent updates shown on login screen
 const CHANGELOG = [
+  'Click any calendar date to quickly add your time off — no need to open the full team modal',
+  'Fiscal year chart now shows month labels below each quarter bar',
   'Codebase refactored — server split into modules, frontend types and utilities extracted',
-  'Deleted 9 deprecated sync scripts that could cause data corruption',
-  'Added background treatment to capacity page designer filters for visual consistency',
 ]
 
 
@@ -158,6 +158,9 @@ function App() {
 
   // Calendar day modal state
   const [selectedDay, setSelectedDay] = useState<{ date: string; events: CalendarEvent[]; dayName: string } | null>(null)
+  // Quick time-off modal (from calendar click)
+  const [quickTimeOff, setQuickTimeOff] = useState<{ date: string; member: TeamMember; editEntry: { name: string; startDate: string; endDate: string; id: string } | null; dayEvents: CalendarEvent[]; dayName: string } | null>(null)
+  const [quickTimeOffForm, setQuickTimeOffForm] = useState({ name: '', startDate: '', endDate: '' })
   const contentRef = useRef<HTMLDivElement>(null)
   const overlayMouseDownTarget = useRef<EventTarget | null>(null)
   const onDataChangeRef = useRef<() => void>(() => {})
@@ -1265,6 +1268,71 @@ const [showFilters, setShowFilters] = useState(false)
       setFormData(prev => ({ ...prev, timeOff: [...(prev.timeOff || []), newEntry] }))
     }
     setShowTimeOffModal(false)
+  }
+
+  // Quick time-off handlers (calendar click → add time off for signed-in user)
+  const findMyTeamMember = (): TeamMember | null => {
+    if (!currentUser?.email) return null
+    const email = currentUser.email.toLowerCase()
+    return team.find(m => {
+      if (!m.email) return false
+      const memberEmail = m.email.replace(/^mailto:/i, '').toLowerCase()
+      return memberEmail === email
+    }) || null
+  }
+
+  const handleCalendarDateClick = (date: string, dayEvents: CalendarEvent[], dayName: string) => {
+    const myMember = findMyTeamMember()
+    if (myMember) {
+      setQuickTimeOff({ date, member: myMember, editEntry: null, dayEvents, dayName })
+      setQuickTimeOffForm({ name: '', startDate: date, endDate: date })
+    } else if (dayEvents.length > 0) {
+      setSelectedDay({ date, events: dayEvents, dayName })
+    }
+  }
+
+  const handleQuickTimeOffEdit = (off: { name: string; startDate: string; endDate: string; id: string }) => {
+    setQuickTimeOff(prev => prev ? { ...prev, editEntry: off } : null)
+    setQuickTimeOffForm({ name: off.name, startDate: off.startDate, endDate: off.endDate })
+  }
+
+  const handleQuickTimeOffDelete = (id: string) => {
+    if (!quickTimeOff) return
+    const off = quickTimeOff.member.timeOff?.find(o => o.id === id)
+    openConfirmModal('Remove time off?', `This will remove "${off?.name || 'this time off'}".`, async () => {
+      const updatedTimeOff = (quickTimeOff.member.timeOff || []).filter(o => o.id !== id)
+      const timeOffStatus = getStatusFromTimeOff(updatedTimeOff)
+      const updated = { ...quickTimeOff.member, timeOff: updatedTimeOff, status: timeOffStatus || quickTimeOff.member.status }
+      await saveTeamMember(updated)
+      setTeam(prev => prev.map(m => m.id === updated.id ? updated : m))
+      setQuickTimeOff(prev => prev ? { ...prev, member: updated, editEntry: null } : null)
+      refreshCalendar()
+      closeConfirmModal()
+    })
+  }
+
+  const handleQuickTimeOffSave = async () => {
+    if (!quickTimeOff) return
+    if (!quickTimeOffForm.name.trim()) { alert('Please enter a label'); return }
+    if (!quickTimeOffForm.startDate || !quickTimeOffForm.endDate) { alert('Please select start and end dates'); return }
+    const toStart = parseLocalDate(quickTimeOffForm.startDate); const toEnd = parseLocalDate(quickTimeOffForm.endDate)
+    if (toStart && toEnd && toEnd < toStart) { alert('End date must be after start date'); return }
+
+    let updatedTimeOff: { name: string; startDate: string; endDate: string; id: string }[]
+    if (quickTimeOff.editEntry) {
+      updatedTimeOff = (quickTimeOff.member.timeOff || []).map(o =>
+        o.id === quickTimeOff.editEntry!.id ? { ...o, ...quickTimeOffForm } : o
+      )
+    } else {
+      updatedTimeOff = [...(quickTimeOff.member.timeOff || []), { ...quickTimeOffForm, id: Date.now().toString() }]
+    }
+    const timeOffStatus = getStatusFromTimeOff(updatedTimeOff)
+    const updated = { ...quickTimeOff.member, timeOff: updatedTimeOff, status: timeOffStatus || quickTimeOff.member.status }
+    await saveTeamMember(updated)
+    setTeam(prev => prev.map(m => m.id === updated.id ? updated : m))
+    setQuickTimeOff(prev => prev ? { ...prev, member: updated, editEntry: null } : null)
+    setQuickTimeOffForm({ name: '', startDate: quickTimeOff.date, endDate: quickTimeOff.date })
+    refreshCalendar()
   }
 
   const savePriorities = async (blId: string, orderedIds: string[]) => {
@@ -2959,7 +3027,7 @@ const [showFilters, setShowFilters] = useState(false)
                                     key={colIdx}
                                     className={`day-cell ${hasEvents ? 'has-events' : ''} ${isToday ? 'today' : ''}`}
                                     style={{ minHeight: cellMinH }}
-                                    onClick={() => hasEvents && setSelectedDay({ date: cell.day.date, events: cell.dayEvents, dayName: cell.day.dayName })}
+                                    onClick={() => handleCalendarDateClick(cell.day.date, cell.dayEvents, cell.day.dayName)}
                                   >
                                     <span className="day-number">{isToday ? '★ ' : ''}{cell.day.day}</span>
                                   </div>
@@ -3072,11 +3140,12 @@ const [showFilters, setShowFilters] = useState(false)
                     <div className="gauge-panel-header">Fiscal Year</div>
                     <div className="fy-timeline">
                       {(() => {
+                        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
                         const quarters = [
-                          { label: 'Q3 FY26', start: new Date(2026, 0, 1), end: new Date(2026, 3, 1) },
-                          { label: 'Q4 FY26', start: new Date(2026, 3, 1), end: new Date(2026, 6, 1) },
-                          { label: 'Q1 FY27', start: new Date(2026, 6, 1), end: new Date(2026, 9, 1) },
-                          { label: 'Q2 FY27', start: new Date(2026, 9, 1), end: new Date(2027, 0, 1) },
+                          { label: 'Q3 FY26', start: new Date(2026, 0, 1), end: new Date(2026, 3, 1), months: [0, 1, 2] },
+                          { label: 'Q4 FY26', start: new Date(2026, 3, 1), end: new Date(2026, 6, 1), months: [3, 4, 5] },
+                          { label: 'Q1 FY27', start: new Date(2026, 6, 1), end: new Date(2026, 9, 1), months: [6, 7, 8] },
+                          { label: 'Q2 FY27', start: new Date(2026, 9, 1), end: new Date(2027, 0, 1), months: [9, 10, 11] },
                         ]
                         const now = new Date()
                         return quarters.map(q => {
@@ -3090,6 +3159,9 @@ const [showFilters, setShowFilters] = useState(false)
                               <span className="fy-label">{q.label}</span>
                               <div className="fy-quarter-track">
                                 <div className="fy-quarter-fill" style={{ width: `${isPast ? 100 : fillPct}%` }} />
+                              </div>
+                              <div className="fy-months">
+                                {q.months.map(m => <span key={m} className="fy-month-label">{monthNames[m]}</span>)}
                               </div>
                             </div>
                           )
@@ -5170,6 +5242,100 @@ const [showFilters, setShowFilters] = useState(false)
             <div className="modal-footer">
               <button className="secondary-btn" onClick={() => setShowTimeOffModal(false)}>Cancel</button>
               <button className="primary-btn" onClick={handleSaveTimeOff}>{editingTimeOff ? 'Save Changes' : 'Add Time Off'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Time-Off Modal (calendar click) */}
+      {quickTimeOff && (
+        <div className="modal-overlay" onMouseDown={e => { overlayMouseDownTarget.current = e.target }} onClick={e => { if (e.target === e.currentTarget && overlayMouseDownTarget.current === e.currentTarget) setQuickTimeOff(null) }}>
+          <div className="modal" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>My Time Off</h2>
+              <button className="close-btn" onClick={() => setQuickTimeOff(null)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>{quickTimeOff.member.name}</span>
+                {quickTimeOff.dayEvents.length > 0 && (
+                  <button style={{ fontSize: '0.8rem', background: 'none', border: 'none', color: 'var(--color-accent)', cursor: 'pointer', padding: 0 }} onClick={() => {
+                    const { date, dayEvents, dayName } = quickTimeOff
+                    setQuickTimeOff(null)
+                    setSelectedDay({ date, events: dayEvents, dayName })
+                  }}>View day events</button>
+                )}
+              </div>
+
+              {/* Existing time off entries */}
+              {(quickTimeOff.member.timeOff?.length ?? 0) > 0 && (
+                <div className="timeline-list" style={{ marginBottom: '0.75rem' }}>
+                  {quickTimeOff.member.timeOff!.map(off => (
+                    <div key={off.id} className="timeline-item">
+                      <div className="timeline-info">
+                        <span className="timeline-name">{off.name}</span>
+                        <span className="timeline-dates">{formatShortDate(off.startDate)} → {formatShortDate(off.endDate)}</span>
+                      </div>
+                      <div className="timeline-actions">
+                        <button type="button" className="action-btn" onClick={() => handleQuickTimeOffEdit(off)}><Pencil size={14} /></button>
+                        <button type="button" className="action-btn delete" onClick={() => handleQuickTimeOffDelete(off.id)}><Trash2 size={14} /></button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add / Edit form */}
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.75rem' }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
+                  {quickTimeOff.editEntry ? 'Edit Entry' : 'Add Time Off'}
+                </div>
+                <div className={`float-field${quickTimeOffForm.name ? ' has-value' : ''}`} style={{ marginBottom: '0.5rem' }}>
+                  <input
+                    id="quick-timeoff-name"
+                    type="text"
+                    value={quickTimeOffForm.name}
+                    onChange={e => setQuickTimeOffForm({ ...quickTimeOffForm, name: e.target.value })}
+                    placeholder=" "
+                  />
+                  <label htmlFor="quick-timeoff-name">Label (e.g., Vacation)</label>
+                </div>
+                <div className="form-row">
+                  <div className={`float-field${quickTimeOffForm.startDate ? ' has-value' : ''}`}>
+                    <input
+                      id="quick-timeoff-start"
+                      type="date"
+                      value={quickTimeOffForm.startDate}
+                      onChange={e => setQuickTimeOffForm({ ...quickTimeOffForm, startDate: e.target.value })}
+                      onClick={e => (e.target as HTMLInputElement).showPicker?.()}
+                      placeholder=" "
+                    />
+                    <label htmlFor="quick-timeoff-start">Start Date</label>
+                  </div>
+                  <div className={`float-field${quickTimeOffForm.endDate ? ' has-value' : ''}`}>
+                    <input
+                      id="quick-timeoff-end"
+                      type="date"
+                      value={quickTimeOffForm.endDate}
+                      onChange={e => setQuickTimeOffForm({ ...quickTimeOffForm, endDate: e.target.value })}
+                      onClick={e => (e.target as HTMLInputElement).showPicker?.()}
+                      placeholder=" "
+                    />
+                    <label htmlFor="quick-timeoff-end">End Date</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              {quickTimeOff.editEntry && (
+                <button className="secondary-btn" onClick={() => {
+                  setQuickTimeOff(prev => prev ? { ...prev, editEntry: null } : null)
+                  setQuickTimeOffForm({ name: '', startDate: quickTimeOff.date, endDate: quickTimeOff.date })
+                }}>Cancel Edit</button>
+              )}
+              <button className="primary-btn" onClick={handleQuickTimeOffSave}>
+                {quickTimeOff.editEntry ? 'Save Changes' : 'Add Time Off'}
+              </button>
             </div>
           </div>
         </div>

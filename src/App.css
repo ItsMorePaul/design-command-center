@@ -3057,11 +3057,11 @@ input:checked + .slider:before {
   border: none;
 }
 
-.day-cell.has-events {
+.day-cell:not(.empty) {
   cursor: pointer;
 }
 
-.day-cell.has-events:hover {
+.day-cell:not(.empty):hover {
   background: rgba(59, 130, 246, 0.05);
   border-color: var(--color-accent);
 }
@@ -3393,8 +3393,8 @@ input:checked + .slider:before {
   display: block;
   font-size: 0.5rem;
   font-weight: 600;
-  color: var(--color-text-muted);
-  opacity: 0.4;
+  color: var(--text-secondary);
+  opacity: 0.7;
   text-align: center;
   margin-bottom: 0.15rem;
 }
@@ -3418,6 +3418,26 @@ input:checked + .slider:before {
   transition: width 0.5s ease;
 }
 
+.fy-months {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.15rem;
+}
+
+.fy-month-label {
+  font-size: 0.45rem;
+  color: var(--text-secondary);
+  opacity: 0.7;
+  flex: 1;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.fy-quarter-current .fy-month-label {
+  opacity: 1;
+  color: var(--color-accent);
+}
 
 .capacity-section {
   margin-bottom: 2rem;
