@@ -24,36 +24,37 @@ fi
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
 
-if [[ ! -f "server.ts" ]]; then
+VERSION_FILE="server/version.ts"
+if [[ ! -f "$VERSION_FILE" ]]; then
   exit 0
 fi
 
 extract_vals() {
   local content="$1"
   local version time
-  version=$(printf '%s' "$content" | sed -n "s/^const SITE_VERSION = '\([^']*\)'.*/\1/p" | head -n1)
-  time=$(printf '%s' "$content" | sed -n "s/^const SITE_TIME = '\([^']*\)'.*/\1/p" | head -n1)
+  version=$(printf '%s' "$content" | sed -n "s/^export const SITE_VERSION = '\([^']*\)'.*/\1/p" | head -n1)
+  time=$(printf '%s' "$content" | sed -n "s/^export const SITE_TIME = '\([^']*\)'.*/\1/p" | head -n1)
   printf '%s|%s' "$version" "$time"
 }
 
-local_vals=$(extract_vals "$(cat server.ts)")
+local_vals=$(extract_vals "$(cat "$VERSION_FILE")")
 
 # If remote branch doesn't exist yet, allow first push.
-if ! git show origin/main:server.ts >/dev/null 2>&1; then
+if ! git show "origin/main:$VERSION_FILE" >/dev/null 2>&1; then
   exit 0
 fi
 
-remote_vals=$(extract_vals "$(git show origin/main:server.ts)")
+remote_vals=$(extract_vals "$(git show "origin/main:$VERSION_FILE")")
 
 if [[ "$local_vals" == "$remote_vals" ]]; then
   echo ""
-  echo "❌ Push blocked: SITE_VERSION/SITE_TIME in server.ts match origin/main."
+  echo "❌ Push blocked: SITE_VERSION/SITE_TIME in $VERSION_FILE match origin/main."
   echo "Rule: Update site version metadata before Railway deploy/push."
   echo ""
   echo "Current: $local_vals"
   echo "Remote : $remote_vals"
   echo ""
-  echo "Update server.ts, then push again."
+  echo "Update $VERSION_FILE, then push again."
   exit 1
 fi
 
