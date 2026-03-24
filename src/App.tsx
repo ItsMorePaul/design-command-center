@@ -23,9 +23,10 @@ import { SortablePriorityItem, SortableDoneItem, SortableTimelineItem, InProgres
 
 // Recent updates shown on login screen
 const CHANGELOG = [
+  'Migrated GitHub to internal Dow Jones repo',
+  'Migrated to new home — wandihub.up.railway.app',
   'Click any calendar date to quickly add your time off — no need to open the full team modal',
   'Fiscal year chart now shows month labels below each quarter bar',
-  'Codebase refactored — server split into modules, frontend types and utilities extracted',
 ]
 
 

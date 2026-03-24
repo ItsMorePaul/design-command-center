@@ -45,7 +45,7 @@
   },
   "deployment": {
     "platform": "Railway",
-    "url": "https://design-command-center-production.up.railway.app",
+    "url": "https://wandihub.up.railway.app",
     "requiresPermission": true
   },
   "notes": [

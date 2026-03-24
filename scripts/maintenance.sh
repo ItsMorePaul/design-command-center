@@ -12,7 +12,7 @@ if [[ -z "${DCC_SEED_SECRET:-}" && -f "$HOME/.openclaw/.env" ]]; then
   export $(grep '^DCC_SEED_SECRET=' "$HOME/.openclaw/.env" | head -1)
 fi
 
-RAILWAY_URL="https://design-command-center-production.up.railway.app"
+RAILWAY_URL="https://wandihub.up.railway.app"
 
 if [[ -z "${DCC_SEED_SECRET:-}" ]]; then
   echo "ERROR: DCC_SEED_SECRET not set."

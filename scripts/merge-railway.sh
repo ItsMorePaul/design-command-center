@@ -21,7 +21,7 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DCC_DIR="$(dirname "$SCRIPT_DIR")"
 LOCAL_DB="$DCC_DIR/data/shared.db"
-RAILWAY_URL="https://design-command-center-production.up.railway.app"
+RAILWAY_URL="https://wandihub.up.railway.app"
 MERGE_TEMP="$DCC_DIR/data/.railway-merge-temp.db"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; CYAN='\033[0;36m'; NC='\033[0m'

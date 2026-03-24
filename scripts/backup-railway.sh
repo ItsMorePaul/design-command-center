@@ -2,7 +2,7 @@
 # Backup Railway production DB before risky operations
 # Created: 2026-03-03 (post-incident)
 
-RAILWAY_URL="https://design-command-center-production.up.railway.app"
+RAILWAY_URL="https://wandihub.up.railway.app"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DCC_DIR="$(dirname "$SCRIPT_DIR")"
 BACKUP_DIR="$DCC_DIR/backups/railway"
@@ -25,7 +25,7 @@ cat > "$BACKUP_DIR/restore_${TIMESTAMP}.sh" << 'EOF'
 # Restore Railway from backup
 # Usage: ./restore_YYYYMMDD_HHMMSS.sh
 
-RAILWAY_URL="https://design-command-center-production.up.railway.app"
+RAILWAY_URL="https://wandihub.up.railway.app"
 BACKUP_DIR="$(dirname "$0")"
 TIMESTAMP="$(basename "$0" | sed 's/restore_//' | sed 's/.sh//')"
 
